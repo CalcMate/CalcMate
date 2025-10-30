@@ -22,7 +22,7 @@ def PlotGraph(x, y, xlabel="x", ylabel="f(x)", title="Graph of f(x)"):
     sl.pyplot(fig)
 
 if page == "Home":
-    sl.image("/logo.png")
+    sl.image("src/logo.png")
     sl.title("CalcMate - Home")
     sl.text("Welcome to CalcMate, an app all about Calculus! Stuck on something in class? Need some more examples? You've come to the right place! CalcMate is a simple and accessible online Calculus textbook designed to explain complex Calculus topics in easy to understand ways.")
     sl.header("Who is CalcMate for?")
