@@ -191,6 +191,7 @@ elif page == "Derivatives":
         sl.latex(r"\cos^2(x) - sin^2(x)")
 
 elif page == "Reference":
+    sl.title("Calculus Rules Reference")
     with sl.expander("Derivative Rules"):
         sl.latex(r"\text{Constant Rule: } \frac{d}{dx}C = 0")
         sl.latex(r"\text{Constant Multiplication Rule: } \frac{d}{dx}[Cf(x)] = Cf^\prime(x)")
