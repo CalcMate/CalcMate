@@ -3,7 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
-st.set_page_config(
+sl.set_page_config(
    page_title="CalcMate",
    page_icon="🔢",
    layout="wide",
