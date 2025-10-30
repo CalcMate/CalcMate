@@ -3,6 +3,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
+st.set_page_config(
+   page_title="CalcMate",
+   page_icon="🔢",
+   layout="wide",
+   initial_sidebar_state="expanded",
+)
+
 page = sl.sidebar.radio("Pages:", ["Home", "Introduction to Limits", "One-Sided Limits", "Derivatives", "Reference"])
 
 def PlotGraph(x, y, xlabel="x", ylabel="f(x)", title="Graph of f(x)"):
