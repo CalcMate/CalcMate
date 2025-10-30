@@ -6,7 +6,7 @@ import numpy as np
 sl.set_page_config(
    page_title="CalcMate",
    page_icon="🔢",
-   layout="wide",
+   layout="centered",
    initial_sidebar_state="expanded",
 )
 
