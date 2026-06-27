@@ -17,8 +17,10 @@
 | 수집 | RSS(정책), 계산기 키워드 | ✅ |
 | 생성 | 정제→전략(M0/M2)→SEO(M1)→작성(M3)→검수(M4)→이미지→발행 (12단계) | ✅ (발행은 WP 구축 시) |
 | 계산기 | Formula/Form Engine, v1 UI 템플릿, 템플릿 라이브러리 5종, App Generator, AI Reviewer(자동검수·수정), Site Mode | ✅ |
-| 운영 | Streamlit 17탭(운영센터/작업보드/일정/사이트/계산기/App Factory/AI Workspace/Pipeline/비용/오류/헬스/로그/설정 등) | ✅ |
-| 스케줄 | 평일·주말 슬롯 + 랜덤 예약 + 실패모드 3종 | ✅ |
+| 운영 | Streamlit 대시보드 8그룹(Dashboard/Content/Calculator/Scheduler/Revenue/Logs/Settings/**AI Assistant**), 2단 네비 | ✅ |
+| 운영비서 | **AI Assistant**(GPT/Claude/Gemini 채팅 + 워크스페이스 파일도구 + 승인 게이트 + 메모리/태스크/분석) | ✅ |
+| 운영 자동화 | Cost Manager(80%경고/100%정지/익일재개) · Retry Queue(WP 재발행) · Image Fallback · Telegram 고도화 | ✅ |
+| 스케줄 | 평일·주말 슬롯 + 랜덤 예약 + 실패모드 3종 (예약발행 단일화, Legacy 제거) | ✅ |
 | 데이터 | Sheets/SQLite(DB), Drive/Local(Storage) 어댑터 | ✅ (Postgres/S3 stub) |
 | 성능 | 2단 캐시(메모리+SQLite 미러) + 로그 tail | ✅ |
 
@@ -77,13 +79,12 @@ SEO기획 STEP6 planner.plan_seo() + 2차 제목 중복검사     [Gemini 2.5-fl
 | 진입점 | 명령/파일 | 역할 |
 |--------|-----------|------|
 | 단발 실행 | `scripts/run_pipeline.bat` (`main.py --once`) | 12단계 1회(`DAILY_POST_COUNT`만큼) |
-| 예약 발행 | `scripts/run_scheduler.bat` (`main.py --scheduler`) | 슬롯 일정대로 시각별 1건(권장/기본) |
-| Legacy 반복 | `scripts/run_schedule.bat` (`main.py --schedule`) | `RUN_INTERVAL_HOURS` 간격 무한 |
+| 예약 발행 | `scripts/run_scheduler.bat` (`main.py --scheduler`) | 슬롯 일정대로 시각별 1건(**유일한 상시 운영 방식**) |
 | 검증 | `scripts/run_dryrun.bat` (`main.py --dry-run`) | 헬스체크+설정 검증 |
 | 전략회의실 | `scripts/run_strategy_room.bat` (`--strategy-room`) | 운영 분석 JSON |
 | 계산기 | `main.py --calculator` / `--seed-calculators` | 계산기 글 생성 / 초기 5종 시드 |
 | 캐시 워밍 | `scripts/sync_cache.bat` | 대시보드 SQLite 미러 갱신(첫 진입 가속) |
-| 대시보드 | `scripts/run_dashboard.bat` (`dashboard.py`, 다크 SaaS) / `run_dashboard_new.bat` (`dashboard_ui_refactor.py`) | 운영센터 |
+| 대시보드 | `scripts/run_dashboard.bat` (`dashboard.py`, 다크 SaaS, 8그룹) | 운영센터 + AI Assistant |
 
 > 운영 방식 기본값 `config.OPERATION_MODE`(scheduled). 플래그 없이 `main.py` 실행 시 이 값 따름.
 

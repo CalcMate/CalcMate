@@ -75,7 +75,8 @@
       "Bash(rm -f data/_p3.log)",
       "Bash(git commit -q -m 'refactor\\(slim\\): Legacy 반복 실행/RUN_INTERVAL_HOURS 제거, 예약발행 단일화 *)",
       "Bash(rm -f scripts/_shot.py nav8.png data/_p4.log data/_p4b.log)",
-      "Bash(git commit -q -m 'refactor\\(ui\\): 18탭 → 8그룹 2단 네비게이션 통합 \\(Calculator Builder 비노출, 계산기생성 App Factory 단일화\\) *)"
+      "Bash(git commit -q -m 'refactor\\(ui\\): 18탭 → 8그룹 2단 네비게이션 통합 \\(Calculator Builder 비노출, 계산기생성 App Factory 단일화\\) *)",
+      "Bash(git commit -q -m 'docs: README 갱신 + MIGRATION_NOTES + V12_LITE_TEST_REPORT \\(v12 Lite\\) *)"
     ]
   }
 }
