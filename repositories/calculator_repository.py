@@ -1,0 +1,58 @@
+"""
+repositories/calculator_repository.py — CalculatorRepository
+"""
+import uuid
+from datetime import datetime
+from adapters.db.base import AbstractDBAdapter
+
+
+class CalculatorRepository:
+    TABLE = "calculators"
+
+    def __init__(self, db: AbstractDBAdapter):
+        self._db = db
+
+    def get_all(self) -> list[dict]:
+        return self._db.get_all(self.TABLE)
+
+    def get_active(self) -> list[dict]:
+        return self._db.get_where(self.TABLE, {"status": "active"})
+
+    def get_by_site(self, site_id: str) -> list[dict]:
+        return self._db.get_where(self.TABLE, {"site_id": site_id})
+
+    def get_by_id(self, calc_id: str) -> dict | None:
+        rows = self._db.get_where(self.TABLE, {"id": calc_id})
+        return rows[0] if rows else None
+
+    def save(self, calc: dict) -> str:
+        if not calc.get("id"):
+            calc["id"] = "calc_" + datetime.now().strftime("%Y%m%d%H%M%S") + "_" + uuid.uuid4().hex[:4]
+        calc.setdefault("status", "draft")
+        calc.setdefault("version", "1.0.0")
+        calc.setdefault("created_at", datetime.now().isoformat())
+        calc.setdefault("updated_at", datetime.now().isoformat())
+        return self._db.insert(self.TABLE, calc)
+
+    # create(): save 의 명시적 별칭 (기본 status=active)
+    def create(self, calc: dict) -> str:
+        calc.setdefault("status", "active")
+        return self.save(calc)
+
+    def update(self, calc_id: str, data: dict):
+        data["updated_at"] = datetime.now().isoformat()
+        self._db.update(self.TABLE, calc_id, data)
+
+    def delete(self, calc_id: str):
+        self._db.delete(self.TABLE, calc_id)
+
+    def publish(self, calc_id: str, url: str):
+        self.update(calc_id, {"status": "active", "published_url": url})
+
+    def update_generated(self, calc_id: str, data: dict):
+        """AI 자동생성 결과 저장(seo_title/seo_description/article_content/
+        image_prompt_thumbnail/image_prompt_body 등) + generated_at 스탬프.
+        기존 컬럼은 변경하지 않고 신규 컬럼만 추가(어댑터가 자동 생성)."""
+        payload = dict(data or {})
+        payload["generated_at"] = datetime.now().isoformat()
+        self.update(calc_id, payload)

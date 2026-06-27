@@ -1,0 +1,80 @@
+"""
+repositories/article_repository.py — ArticleRepository
+마스터_DB CRUD. 기존 db_manager / sheet_sync 대체.
+"""
+import uuid
+from datetime import datetime
+from adapters.db.base import AbstractDBAdapter
+
+VALID_STATUSES = {
+    "대기", "진행중", "작성중", "이미지오류", "작성오류",
+    "발행완료", "발행실패", "복구대기", "보류", "만료", "재처리대기",
+}
+
+
+class ArticleRepository:
+    TABLE = "articles"
+
+    def __init__(self, db: AbstractDBAdapter):
+        self._db = db
+
+    def get_all(self) -> list[dict]:
+        return self._db.get_all(self.TABLE)
+
+    def get_pending(self) -> list[dict]:
+        rows = self._db.get_where(self.TABLE, {"상태값": "대기"})
+        rows.sort(key=lambda r: float(r.get("우선발행점수") or 0), reverse=True)
+        return rows
+
+    def get_top_pending(self) -> dict | None:
+        rows = self.get_pending()
+        return rows[0] if rows else None
+
+    def get_recent_published_titles(self, n: int = 30) -> list[str]:
+        rows = self._db.get_all(self.TABLE)
+        published = [r for r in rows if r.get("상태값") == "발행완료"]
+        published.sort(key=lambda r: r.get("발행일시") or "", reverse=True)
+        return [r.get("최종추천제목", "") for r in published[:n]]
+
+    def get_by_id(self, article_id: str) -> dict | None:
+        rows = self._db.get_where(self.TABLE, {"ID": article_id})
+        return rows[0] if rows else None
+
+    def save(self, article: dict) -> str:
+        if not article.get("ID"):
+            article["ID"] = datetime.now().strftime("%Y%m%d%H%M%S") + "_" + uuid.uuid4().hex[:4]
+        article.setdefault("상태값", "대기")
+        article.setdefault("최종수정일", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        return self._db.insert(self.TABLE, article)
+
+    def update_status(self, article_id: str, status: str, extra: dict = None):
+        if status not in VALID_STATUSES:
+            raise ValueError(f"유효하지 않은 상태값: {status}")
+        data = {"상태값": status, "최종수정일": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+        if extra:
+            data.update(extra)
+        self._db.update(self.TABLE, article_id, data)
+
+    def upsert_by_policy_name(self, policy_name: str, source_url: str, score: float,
+                               site_id: str = "") -> str:
+        rows = self._db.get_where(self.TABLE, {"정책명": policy_name})
+        if rows:
+            return str(rows[0].get("ID", ""))
+        return self.save({
+            "정책명": policy_name,
+            "원본출처": source_url,
+            "우선발행점수": score,
+            "site_id": site_id,
+        })
+
+    def increment_fail(self, article_id: str) -> int:
+        row = self.get_by_id(article_id)
+        if not row:
+            return 0
+        log = row.get("상태변경로그", "")
+        fail_count = log.count("FAIL:") + 1
+        self._db.update(self.TABLE, article_id, {
+            "상태변경로그": log + f" | FAIL:{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            "상태값": "재처리대기" if fail_count >= 3 else "발행실패",
+        })
+        return fail_count

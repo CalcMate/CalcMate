@@ -1,0 +1,1461 @@
+"""
+dashboard.py — 블로그자동화 v11.9 운영 대시보드 (오류 완치 최종본)
+최신 텍스트 AI 라인업 + 🎨 이미지 생성 AI 설정 (무료/유료 완벽 분기 및 인덱스 에러 방어 탑재)
+"""
+import streamlit as st
+import json, yaml, sys, time, os
+from pathlib import Path
+from datetime import datetime, date
+
+BASE = Path(__file__).parent
+sys.path.insert(0, str(BASE))
+
+# ── 마법사 우선 체크 (config.yaml 없거나 미설정이면 마법사 실행) ────────
+from modules.setup_wizard import config_exists, render_wizard
+
+def _needs_setup() -> bool:
+    if not config_exists():
+        return True
+    try:
+        cfg_path = BASE / "config" / "config.yaml"
+        with open(cfg_path, encoding="utf-8") as f:
+            c = yaml.safe_load(f) or {}
+    except Exception:
+        return True
+    has_ai_key   = any(c.get(k) for k in ("OPENAI_API_KEY", "CLAUDE_API_KEY", "GEMINI_API_KEY"))
+    has_sheet_id = bool(c.get("GOOGLE_SHEET_ID"))
+    return not (has_ai_key or has_sheet_id)
+
+if _needs_setup():
+    render_wizard()
+    st.stop()
+
+# ── 일반 대시보드 진입 ────────────────────────────────────────
+import health_check as hc_mod
+
+st.set_page_config(
+    page_title="블로그자동화 v12 운영센터",
+    page_icon="🛰️",
+    layout="wide",
+)
+
+# ── SaaS 다크/글래스 테마 적용 (UI 전용, 기존 로직 무관) ──────────
+def load_css(path: str = "assets/css/dashboard.css"):
+    f = BASE / path
+    if f.exists():
+        st.markdown(f"<style>{f.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
+
+load_css()
+
+# ── config 로드 ────────────────────────────────────────────────
+@st.cache_resource(ttl=30)
+def load_cfg():
+    cfg_path = BASE / "config" / "config.yaml"
+    with open(cfg_path, encoding="utf-8") as f:
+        c = yaml.safe_load(f) or {}
+    c["_root"] = str(BASE)   # scheduler/backup 경로 기준
+    return c
+
+cfg = load_cfg()
+
+# ── 빠른 읽기 헬퍼 (운영센터 5초 로딩 목표 — 모두 로컬 파일) ──────
+def _read_health_cache() -> dict:
+    p = BASE / "data" / "logs" / "health_last.json"
+    if p.exists():
+        try:
+            return json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+    return {}
+
+# ── 로그 tail 읽기 (전체 읽기 금지: 끝부분 바이트만) ──────────────
+def _tail_lines(rel: str, n: int = 150, blk: int = 65536) -> list:
+    p = BASE / rel
+    if not p.exists():
+        return []
+    try:
+        sz = p.stat().st_size
+        with open(p, "rb") as f:
+            f.seek(max(0, sz - blk))
+            data = f.read()
+        return data.decode("utf-8", "replace").splitlines()[-n:]
+    except Exception:
+        return []
+
+def _recent_error_lines(n: int = 5) -> list:
+    lines = _tail_lines("data/logs/pipeline.log", 400)
+    return [l for l in lines if "[ERROR]" in l][-n:][::-1]
+
+# ── 캐시 레이어 (Google Sheet 조회 60초 캐시 — 메뉴 이동 가속) ──────
+#   ※ 기능/출력 불변: 데이터는 최대 60초 캐시. 발행/생성 액션 후 _run_action에서 캐시 무효화.
+#   2단 캐시: st.cache_data(세션 60초) + SQLite 미러(세션간/만료 후 가속, 라이브 폴백)
+@st.cache_data(ttl=60, show_spinner=False)
+def cached_posts() -> list:
+    from modules.dashboard_cache import read
+    return read(cfg, "articles", ttl=120)
+
+@st.cache_data(ttl=60, show_spinner=False)
+def cached_table(table: str) -> list:
+    from modules.dashboard_cache import read
+    return read(cfg, table, ttl=120)
+
+def _run_action(label: str, fn):
+    """빠른 실행 패널 공통 래퍼 — 스피너 + 결과/오류 표시. 액션 후 캐시 무효화."""
+    with st.spinner(f"{label} 실행 중..."):
+        try:
+            res = fn()
+            st.session_state["_last_action"] = (True, f"✅ {label} 완료: {res if res is not None else ''}")
+        except Exception as e:
+            st.session_state["_last_action"] = (False, f"❌ {label} 실패: {e}")
+    try:
+        st.cache_data.clear()   # 발행/생성 등으로 데이터가 바뀌었을 수 있어 갱신
+        from modules.dashboard_cache import invalidate_all
+        invalidate_all(cfg)     # SQLite 미러도 만료 → 다음 읽기에서 원본 재조회
+    except Exception:
+        pass
+
+# ── 사이드바 ───────────────────────────────────────────────────
+st.sidebar.title("🛰️ 블로그자동화 v12")
+_op_mode = cfg.get("OPERATION_MODE", "scheduled")
+st.sidebar.markdown(f"**운영 방식:** `{'예약 발행' if _op_mode=='scheduled' else 'Legacy 반복'}`")
+st.sidebar.markdown(f"**애드센스:** `{cfg.get('ADSENSE_MODE','pre').upper()}`")
+st.sidebar.markdown(f"**일 예산:** `${cfg.get('DAILY_AI_BUDGET',5)}`")
+
+tab_names = [
+    "🏠 운영센터", "📋 작업 보드", "📅 오늘 발행 일정", "🌐 사이트 관리",
+    "🧮 Calculator Builder", "🧮 계산기 관리", "🏭 App Factory", "💬 AI Workspace", "📊 AI Pipeline",
+    "💰 비용 모니터", "⚠️ 오류 로그", "🏥 헬스체크", "📡 실시간 로그",
+    "📊 현황", "📋 발행 목록", "🧠 전략회의실", "🔧 설정"
+]
+tab = st.sidebar.radio("메뉴", tab_names)
+
+# ══════════════════════════════════════════════════════════════
+# 탭: 🏠 운영센터 (홈) — 5초 안에 전체 상태 파악 + 빠른 실행
+# ══════════════════════════════════════════════════════════════
+if tab == "🏠 운영센터":
+    st.title("🛰️ 운영센터")
+    from modules import scheduler as SCH
+    import main as PIPE
+
+    la = st.session_state.pop("_last_action", None)
+    if la:
+        (st.success if la[0] else st.error)(la[1])
+
+    # ── 🚀 마스터 발행 패널 (원클릭 대량 발행) ──
+    with st.container(border=True):
+        mc1, mc2 = st.columns([3, 1])
+        with mc2:
+            bulk_n = int(st.number_input("발행할 글 개수", min_value=1, max_value=50,
+                                         value=int(cfg.get("DAILY_POST_COUNT", 1) or 1),
+                                         key="bulk_count"))
+        with mc1:
+            st.markdown("##### 🚀 지금 즉시 블로그 자동 발행")
+            st.caption("스케줄과 별개로, 전체 12단계 파이프라인을 지정 개수만큼 즉시 실행합니다.")
+            if st.button(f"🚀 지금 즉시 발행 시작 ({bulk_n}건)", type="primary", use_container_width=True):
+                _run_action(f"즉시 대량 발행 {bulk_n}건",
+                            lambda: PIPE.run_once(cfg, max_count=bulk_n))
+                st.rerun()
+
+    # ── ⚡ 빠른 실행 패널 (상단 고정) ──
+    st.markdown("#### ⚡ 빠른 실행")
+    q = st.columns(7)
+    if q[0].button("▶ 즉시 발행", use_container_width=True):
+        st.session_state["_confirm_pub"] = True
+    if q[1].button("▶ 파이프라인 1회", use_container_width=True):
+        _run_action("파이프라인 1회 실행", lambda: PIPE.run_once(cfg)); st.rerun()
+    if q[2].button("▶ 발행 1건", use_container_width=True):
+        _run_action("발행 1건(생산)", lambda: PIPE.run_once(cfg, max_count=1)); st.rerun()
+    if q[3].button("▶ 이미지 재생성", use_container_width=True):
+        st.session_state["_show_img"] = not st.session_state.get("_show_img", False)
+    if q[4].button("▶ 전략회의실", use_container_width=True):
+        from modules.strategy_room import run_strategy_room
+        _run_action("전략회의실", lambda: (run_strategy_room({}, cfg) or {}).get("summary", "완료")); st.rerun()
+    if q[5].button("▶ 헬스체크", use_container_width=True):
+        _run_action("헬스체크", lambda: "OK" if hc_mod.critical_passed(hc_mod.run(cfg)) else "일부 실패"); st.rerun()
+    if q[6].button("▶ 백업 생성", use_container_width=True):
+        from modules.backup_manager import BackupManager
+        _run_action("백업 생성", lambda: str(BackupManager(cfg).run_daily_backup())); st.rerun()
+
+    # 즉시 발행 확인창
+    if st.session_state.get("_confirm_pub"):
+        with st.container(border=True):
+            st.warning("정말 발행하시겠습니까? (예약시간 무시, 즉시 1건 실행)")
+            mode_label = st.radio("실행 모드", ["예정 글 당겨쓰기(기본)", "추가 발행"], key="_pub_mode")
+            cc1, cc2 = st.columns(2)
+            if cc1.button("✅ 예, 발행", type="primary"):
+                mode = "pull" if "당겨" in mode_label else "add"
+                with st.spinner("즉시 발행 중..."):
+                    ok, msg = SCH.immediate_publish(cfg, PIPE.run_once, mode)
+                st.session_state["_last_action"] = (ok, msg)
+                st.session_state["_confirm_pub"] = False
+                st.rerun()
+            if cc2.button("취소"):
+                st.session_state["_confirm_pub"] = False; st.rerun()
+
+    # 이미지 재생성 폼
+    if st.session_state.get("_show_img"):
+        with st.container(border=True):
+            st.markdown("**🎨 이미지 재생성**")
+            tp = st.text_input("썸네일 프롬프트", "Clean minimal blog thumbnail, 3D render style", key="_img_tp")
+            bp = st.text_input("본문 프롬프트", "Bright office workspace photography", key="_img_bp")
+            if st.button("생성", key="_img_go"):
+                from modules import image_generator as IG
+                with st.spinner("이미지 생성 중..."):
+                    try:
+                        res = IG.generate("manual" + datetime.now().strftime("%Y%m%d%H%M%S"),
+                                          {"image_prompt_thumbnail": tp, "image_prompt_body": bp}, cfg)
+                        st.success(f"완료: {res}")
+                        for u in res.values():
+                            if u and u != "실패" and str(u).startswith("http"):
+                                st.image(u, width=240)
+                    except Exception as e:
+                        st.error(f"이미지 생성 실패: {e}")
+
+    st.divider()
+    # ── KPI 카드 ──
+    sched = SCH.load_schedule(cfg)
+    has_today = bool(sched and sched.get("date") == date.today().isoformat())
+    summ = SCH.summarize(sched) if has_today else {"total": 0, "completed": 0, "pending": 0, "failed": 0, "next": None}
+    goal = summ["total"] or len((cfg.get("PUBLISH_SCHEDULE", {}) or {}).get("weekday", [])) or cfg.get("DAILY_POST_COUNT", 0)
+    k = st.columns(5)
+    k[0].metric("🎯 오늘 목표", goal)
+    k[1].metric("🟢 발행 완료", summ["completed"])
+    k[2].metric("🟡 대기중", summ["pending"])
+    k[3].metric("🔴 실패", summ["failed"])
+    k[4].metric("⏭ 다음 예약", summ["next"] or "-")
+
+    try:
+        from modules.logger import BudgetTracker
+        bt = BudgetTracker(cfg); bs = bt.check_budget()
+        cc = st.columns(2)
+        cc[0].metric("💰 오늘 비용", f"${bs['daily_used']:.4f}", f"한도 ${bs['daily_limit']}")
+        cc[1].metric("💰 이번달 비용", f"${bs['monthly_used']:.4f}", f"한도 ${bs['monthly_limit']}")
+    except Exception as e:
+        st.caption(f"비용 로드 실패: {e}")
+
+    st.divider()
+    cL, cR = st.columns(2)
+    with cL:
+        st.markdown("**🩺 서비스 상태** (마지막 헬스체크 캐시)")
+        hc = _read_health_cache()
+        svc = [("OpenAI", "openai"), ("Claude", "claude"), ("Gemini", "gemini"),
+               ("Sheets", "google_sheet"), ("Drive", "google_drive"), ("WordPress", "wordpress")]
+        if hc:
+            for nm, key in svc:
+                v = hc.get(key, {})
+                ok = v.get("status") == "OK"
+                st.write(f"{'🟢' if ok else '🔴'} {nm} — {v.get('status', '미검사')}")
+            st.caption(f"기준: {hc.get('timestamp', '-')}")
+        else:
+            st.caption("헬스체크 기록 없음 — 위 '헬스체크' 버튼을 누르세요.")
+    with cR:
+        st.markdown("**⚠️ 최근 오류 5건** (pipeline.log)")
+        errs = _recent_error_lines(5)
+        if errs:
+            for e in errs:
+                st.code(e, language="text")
+        else:
+            st.caption("최근 오류 없음")
+
+    st.divider()
+    st.markdown("**📅 오늘 일정 요약**")
+    if has_today:
+        st.write(f"예약 {summ['total']} · 완료 {summ['completed']} · 대기 {summ['pending']} · 실패 {summ['failed']}")
+    else:
+        st.caption("오늘 일정 없음 — '📅 오늘 발행 일정'에서 생성하세요.")
+
+# ══════════════════════════════════════════════════════════════
+# 탭: 📋 작업 보드 (칸반)
+# ══════════════════════════════════════════════════════════════
+elif tab == "📋 작업 보드":
+    st.title("📋 작업 현황 보드")
+    st.caption("마스터_DB 상태값 기준 칸반. (수집중→작성중→검수중→발행대기→발행완료 / 오류)")
+    try:
+        posts = cached_posts()
+    except Exception as e:
+        posts = []
+        st.error(f"데이터 로드 실패(시트 권한 확인): {e}")
+    KANBAN = [
+        ("🟡 수집중", ["대기", "진행중"]),
+        ("🔵 작성중", ["작성중"]),
+        ("🟠 검수중", ["검수대기"]),
+        ("⏳ 발행대기", ["보류", "복구대기", "재처리대기"]),
+        ("🟢 발행완료", ["발행완료"]),
+        ("🔴 오류", ["작성오류", "이미지오류", "발행실패", "만료"]),
+    ]
+    cols = st.columns(len(KANBAN))
+    for col, (title, states) in zip(cols, KANBAN):
+        items = [p for p in posts if p.get("상태값") in states]
+        col.markdown(f"**{title}**")
+        col.metric("건수", len(items))
+        for p in items[:15]:
+            t = str(p.get("최종추천제목") or p.get("정책명") or "(제목없음)")
+            col.caption("• " + (t[:22] + ("…" if len(t) > 22 else "")))
+
+# ══════════════════════════════════════════════════════════════
+# 백그라운드 탭 로직 (현황, 목록, 오류, 비용)
+# ══════════════════════════════════════════════════════════════
+elif tab == "📊 현황":
+    st.title("📊 실시간 상태 현황")
+    try:
+        posts = cached_posts()
+        status_counts = {}
+        for p in posts:
+            s = p.get("상태값", "알 수 없음")
+            status_counts[s] = status_counts.get(s, 0) + 1
+
+        cols = st.columns(6)
+        state_map = [("대기", "🟡"), ("작성중", "🔵"), ("검수대기", "🟠"), ("발행완료", "🟢"), ("이미지오류", "🔴"), ("재처리대기", "⚫")]
+        for i, (state, icon) in enumerate(state_map):
+            cols[i].metric(f"{icon} {state}", status_counts.get(state, 0))
+
+        st.divider()
+        daily_goal = cfg.get("DAILY_POST_COUNT", 3)
+        today_str = date.today().isoformat()
+        today_published = sum(1 for p in posts if p.get("상태값") in ("발행완료", "검수대기") and str(p.get("발행일시", "")).startswith(today_str))
+        st.subheader(f"오늘 발행: {today_published}/{daily_goal}")
+        st.progress(min(today_published / max(daily_goal, 1), 1.0))
+    except Exception as e:
+        st.error(f"데이터 로드 오류: {e}")
+
+elif tab == "📋 발행 목록":
+    st.title("📋 최근 발행 목록")
+    try:
+        posts = cached_posts()
+        published = [p for p in posts if p.get("상태값") in ("발행완료", "검수대기")]
+        published.sort(key=lambda x: x.get("발행일시", ""), reverse=True)
+        for p in published[:20]:
+            with st.expander(f"✅ {p.get('최종추천제목','(제목없음)')} — {p.get('발행일시','')}"):
+                st.write(f"**URL:** {p.get('발행 URL', '')}")
+                st.write(f"**상태:** {p.get('상태값')}")
+    except Exception as e:
+        st.error(f"데이터 로드 오류: {e}")
+
+elif tab == "⚠️ 오류 로그":
+    st.title("⚠️ 최근 오류 로그")
+    st.caption("운영로그(logs) 테이블에서 실패 기록을 조회합니다.")
+    try:
+        rows = cached_table("logs")
+        # 가동결과에 '오류' 포함되거나 실패모듈이 있는 행
+        errors = [r for r in rows
+                  if "오류" in str(r.get("가동결과", "")) or str(r.get("실패모듈", "")).strip()]
+        errors = errors[-20:][::-1]  # 최근 20건, 최신 우선
+        if errors:
+            import pandas as pd
+            cols = ["실행일시", "마스터ID", "대상정책명", "실패모듈", "오류내용"]
+            df = pd.DataFrame(errors)
+            show = [c for c in cols if c in df.columns]
+            st.metric("최근 오류 건수", len(errors))
+            st.dataframe(df[show] if show else df, use_container_width=True)
+        else:
+            st.success("최근 오류 없음 ✅")
+    except Exception as e:
+        st.error(f"로그 로드 오류: {e}")
+        st.caption("Google Sheet 권한(서비스 계정 공유) 또는 네트워크를 확인하세요.")
+
+elif tab == "💰 비용 모니터":
+    st.title("💰 AI 사용 비용 모니터")
+    st.caption("data/logs/budget.json 기반 — 실제 호출 시 누적 기록됩니다.")
+    try:
+        from modules.logger import BudgetTracker
+        bt = BudgetTracker(cfg)
+        bs = bt.check_budget()
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("오늘 비용", f"${bs['daily_used']:.4f}", f"한도 ${bs['daily_limit']}")
+        c2.metric("이번달 비용", f"${bs['monthly_used']:.4f}", f"한도 ${bs['monthly_limit']}")
+        c3.metric("누적 비용(전체월)", f"${bt.get_total_cost():.4f}")
+        # 예산 진행률
+        st.progress(min(bs['daily_used'] / max(bs['daily_limit'], 0.0001), 1.0),
+                    text=f"일 예산 사용률 {bs['daily_used']/max(bs['daily_limit'],0.0001)*100:.1f}%")
+        if bs["daily_exceeded"]:
+            st.error("⛔ 일 예산 초과 — 파이프라인이 자동 중단됩니다.")
+        if bs["monthly_exceeded"]:
+            st.error("⛔ 월 예산 초과 — 파이프라인이 자동 중단됩니다.")
+
+        st.divider()
+        colA, colB = st.columns(2)
+        with colA:
+            st.subheader("Provider별 (이번달)")
+            prov = bt.get_provider_breakdown("monthly")
+            prov = {k: v for k, v in prov.items() if v}
+            if prov:
+                import pandas as pd
+                st.bar_chart(pd.Series(prov, name="USD"))
+                st.dataframe(pd.DataFrame(
+                    [{"Provider": k, "비용($)": v} for k, v in prov.items()]),
+                    use_container_width=True, hide_index=True)
+            else:
+                st.caption("이번달 집계 없음")
+        with colB:
+            st.subheader("모델별 (이번달)")
+            models = bt.get_model_breakdown("monthly")
+            if models:
+                import pandas as pd
+                st.dataframe(pd.DataFrame(
+                    [{"모델": k, "비용($)": v} for k, v in sorted(models.items(), key=lambda x: -x[1])]),
+                    use_container_width=True, hide_index=True)
+            else:
+                st.caption("이번달 집계 없음")
+
+        st.divider()
+        t1, t2 = st.columns(2)
+        t1.metric("오늘 토큰", f"{int(bt.get_today_tokens()):,}")
+        st.caption("※ 비용은 모델별 입력/출력 단가표 기반 추정치입니다(blended 적용 구간 존재).")
+    except Exception as e:
+        st.error(f"비용 데이터 로드 오류: {e}")
+
+# ══════════════════════════════════════════════════════════════
+# 탭: 📅 오늘 발행 일정 (슬롯 스케줄러)
+# ══════════════════════════════════════════════════════════════
+elif tab == "📅 오늘 발행 일정":
+    st.title("📅 오늘 발행 일정")
+    from modules import scheduler as SCH
+    from datetime import datetime as _dt
+
+    def _parse_t(s, fallback="09:00"):
+        try:
+            return _dt.strptime(s, "%H:%M").time()
+        except Exception:
+            return _dt.strptime(fallback, "%H:%M").time()
+
+    # ── 현재 일정 표시 ──
+    sched = SCH.load_schedule(cfg)
+    today = date.today().isoformat()
+    if sched and sched.get("date") == today:
+        st.caption(f"기준일: {sched['date']} ({sched.get('day_type')}) · 실패모드: {sched.get('failure_mode')}")
+        import pandas as pd
+        rows = []
+        for e in sched.get("schedule", []):
+            icon = {"pending": "🟡", "running": "🔵", "completed": "🟢",
+                    "failed": "🔴", "retry": "🟠"}.get(e.get("status"), "⬜")
+            rows.append({
+                "글번호": e.get("post_no"),
+                "슬롯": f"{e.get('slot_start')}~{e.get('slot_end')}",
+                "예약시간": e.get("scheduled_time"),
+                "실제실행": e.get("actual_time") or "-",
+                "지연(분)": e.get("delay_min", ""),
+                "상태": f"{icon} {e.get('status')}",
+                "결과": e.get("result") or "-",
+            })
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        done = sum(1 for e in sched["schedule"] if e.get("status") == "completed")
+        st.progress(done / max(len(sched["schedule"]), 1),
+                    text=f"완료 {done}/{len(sched['schedule'])}")
+
+        # 실패 건 즉시 재시도
+        failed = [e for e in sched["schedule"] if e.get("status") == "failed"]
+        if failed:
+            st.warning(f"실패 {len(failed)}건 — 즉시 재시도 가능")
+            rc1, rc2 = st.columns([2, 1])
+            pick = rc1.selectbox("재시도할 글", [f"글{e['post_no']} ({e.get('result','')})" for e in failed],
+                                 key="retry_pick")
+            if rc2.button("🔁 즉시 재시도", type="primary"):
+                import main as PIPE
+                entry = failed[[f"글{e['post_no']} ({e.get('result','')})" for e in failed].index(pick)]
+                entry["status"] = "pending"  # 재실행 대상으로 전환
+                with st.spinner("재시도 실행 중..."):
+                    SCH.execute_due_post(cfg, sched, entry, PIPE.run_once)
+                st.rerun()
+    else:
+        st.info("오늘 생성된 일정이 없습니다. 아래에서 '스케줄 생성'을 누르세요.")
+
+    b1, b2, b3, b4 = st.columns(4)
+    if b1.button("🆕 스케줄 생성", type="primary"):
+        SCH.generate_today_schedule(cfg); st.rerun()
+    if b2.button("♻️ 스케줄 재생성"):
+        SCH.reset_today(cfg); SCH.generate_today_schedule(cfg); st.rerun()
+    if b3.button("🗑️ 오늘 일정 초기화"):
+        SCH.reset_today(cfg); st.rerun()
+    if b4.button("⚡ 즉시 발행"):
+        st.session_state["_sched_confirm"] = True
+
+    if st.session_state.get("_sched_confirm"):
+        with st.container(border=True):
+            st.warning("즉시 1건 발행할까요? (예약시간 무시)")
+            m = st.radio("모드", ["예정 글 당겨쓰기(기본)", "추가 발행"], key="_sched_mode")
+            x1, x2 = st.columns(2)
+            if x1.button("✅ 예, 발행", type="primary", key="_sched_yes"):
+                import main as PIPE
+                with st.spinner("즉시 발행 중..."):
+                    ok, msg = SCH.immediate_publish(cfg, PIPE.run_once, "pull" if "당겨" in m else "add")
+                (st.success if ok else st.error)(msg)
+                st.session_state["_sched_confirm"] = False; st.rerun()
+            if x2.button("취소", key="_sched_no"):
+                st.session_state["_sched_confirm"] = False; st.rerun()
+
+    st.divider()
+    # ── 슬롯 설정 ──
+    st.subheader("⚙️ 슬롯 설정 (평일/주말 분리)")
+    ps = dict(cfg.get("PUBLISH_SCHEDULE", {}) or {})
+    default_count = len(ps.get("weekday") or []) or int(cfg.get("DAILY_POST_COUNT", 1) or 1)
+    count = int(st.number_input("하루 발행 개수 (= 슬롯 수, DAILY_POST_COUNT 자동 결정)",
+                                1, 20, default_count, key="sch_count"))
+    st.caption("슬롯 수가 곧 하루 발행 개수입니다. 시작 < 종료, 슬롯 겹침 금지.")
+
+    enabled = st.toggle("스케줄러 사용(enabled)", value=ps.get("enabled", True), key="sch_enabled")
+    fmode = st.selectbox(
+        "실패 처리 모드", SCH.FAILURE_MODES,
+        index=SCH.FAILURE_MODES.index(ps.get("failure_mode", "retry_in_slot"))
+        if ps.get("failure_mode", "retry_in_slot") in SCH.FAILURE_MODES else 1,
+        format_func=lambda m: {"none": "모드1: 재시도 안함",
+                               "retry_in_slot": "모드2: 슬롯 내 재시도",
+                               "next_slot": "모드3: 다음 빈 슬롯으로 이동"}.get(m, m),
+        key="sch_fmode")
+
+    def _slot_editor(day_type: str, label: str):
+        st.markdown(f"**{label}**")
+        existing = ps.get(day_type) or SCH.default_slots(count)
+        new_slots = []
+        for i in range(count):
+            cur = existing[i] if i < len(existing) else {"start": "09:00", "end": "10:00"}
+            c1, c2 = st.columns(2)
+            s = c1.time_input(f"[{label}] 글{i+1} 시작", value=_parse_t(cur.get("start", "09:00")),
+                              key=f"{day_type}_s_{i}", step=300)
+            e = c2.time_input(f"[{label}] 글{i+1} 종료", value=_parse_t(cur.get("end", "10:00")),
+                              key=f"{day_type}_e_{i}", step=300)
+            new_slots.append({"start": s.strftime("%H:%M"), "end": e.strftime("%H:%M")})
+        return new_slots
+
+    cwd, cwe = st.columns(2)
+    with cwd:
+        weekday_slots = _slot_editor("weekday", "평일(월~금)")
+    with cwe:
+        weekend_slots = _slot_editor("weekend", "주말(토~일)")
+
+    # 검증
+    errs = SCH.validate_slots(weekday_slots, count) + SCH.validate_slots(weekend_slots, count)
+    if errs:
+        for e in errs:
+            st.warning(e)
+
+    if st.button("💾 슬롯 설정 저장", type="primary"):
+        if errs:
+            st.error("검증 오류를 먼저 해결하세요.")
+        else:
+            cfg_path = BASE / "config" / "config.yaml"
+            with open(cfg_path, encoding="utf-8") as f:
+                raw = yaml.safe_load(f) or {}
+            raw["PUBLISH_SCHEDULE"] = {
+                "enabled": bool(enabled),
+                "failure_mode": fmode,
+                "weekday": weekday_slots,
+                "weekend": weekend_slots,
+            }
+            raw["DAILY_POST_COUNT"] = int(count)  # 슬롯 수 = 하루 발행 개수 동기화
+            with open(cfg_path, "w", encoding="utf-8") as f:
+                yaml.dump(raw, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+            st.success(f"✅ 슬롯 설정 저장 완료 (하루 {count}건). '스케줄 재생성'으로 오늘 일정에 반영하세요.")
+            st.cache_resource.clear()
+
+# ══════════════════════════════════════════════════════════════
+# 탭: 🌐 사이트 관리 (사이트/계산기 생성 마법사 + 관리)
+# ══════════════════════════════════════════════════════════════
+elif tab == "🌐 사이트 관리":
+    st.title("🌐 사이트 관리")
+    from modules import site_wizard as SW
+    AI_PROFILES = ["gemini_flash", "gemini_pro", "gpt4o", "gpt4o_mini",
+                   "claude_sonnet", "claude_haiku", "claude_opus"]
+
+    # ── ➕ 사이트 추가 ──
+    with st.expander("➕ 사이트 추가", expanded=True):
+        type_label = st.selectbox("유형 선택", SW.SITE_TYPES, key="sw_type")
+        spec = SW.TYPE_DEFS[type_label]
+        st.caption(f"site_type=`{spec['site_type']}` · 수익화=`{spec['monetization']}` · "
+                   f"content_mode=`{spec['content_mode']}`"
+                   + (" · ⚠️ 수집기 미구현(stub)" if spec['site_type'] in SW.STUB_TYPES else ""))
+
+        if type_label == "계산기":
+            c1, c2 = st.columns(2)
+            calc_name = c1.text_input("계산기명 *", placeholder="주휴수당 계산기", key="sw_calc_name")
+            calc_cat  = c2.text_input("카테고리", placeholder="노무/급여", key="sw_calc_cat")
+            calc_desc = st.text_area("설명", placeholder="예: 주휴수당 자동 계산", key="sw_calc_desc")
+            st.caption("예시: 주휴수당 계산기 · 퇴직금 계산기 · 대출이자 계산기")
+            if st.button("💾 계산기 등록", type="primary", key="sw_calc_save"):
+                ok, msg = SW.create_calculator(cfg, {
+                    "name": calc_name, "description": calc_desc, "category": calc_cat})
+                (st.success if ok else st.error)(msg)
+                if ok:
+                    st.cache_resource.clear(); st.rerun()
+        else:
+            c1, c2 = st.columns(2)
+            site_name = c1.text_input("사이트명 *", key="sw_name")
+            domain    = c2.text_input("도메인 *", placeholder="example.com", key="sw_domain")
+            category  = st.text_input("카테고리", placeholder="복지/정책", key="sw_cat")
+
+            wp_url = wp_user = wp_pw = ""
+            if spec["needs_wp"]:
+                st.markdown("**WordPress 연동**")
+                w1, w2 = st.columns(2)
+                wp_url  = w1.text_input("WordPress URL *", placeholder="https://yourblog.com", key="sw_wpurl")
+                wp_user = w2.text_input("WordPress ID *", placeholder="admin", key="sw_wpuser")
+                wp_pw   = st.text_input("App Password *", type="password",
+                                        placeholder="xxxx xxxx xxxx xxxx", key="sw_wppw")
+            rss = ""
+            if spec["uses_rss"]:
+                rss = st.text_input("RSS 수집원(콤마 구분, 선택)",
+                                    placeholder="https://www.korea.kr/rss/policy.xml", key="sw_rss")
+
+            with st.expander("AI 프로필(선택) — 미선택 시 기본값"):
+                a1, a2, a3 = st.columns(3)
+                research = a1.selectbox("Research AI", AI_PROFILES,
+                                        index=AI_PROFILES.index(SW.DEFAULT_AI["research_ai"]), key="sw_research")
+                writing  = a2.selectbox("Writing AI", AI_PROFILES,
+                                        index=AI_PROFILES.index(SW.DEFAULT_AI["writing_ai"]), key="sw_writing")
+                review   = a3.selectbox("Review AI", AI_PROFILES,
+                                        index=AI_PROFILES.index(SW.DEFAULT_AI["review_ai"]), key="sw_review")
+
+            if st.button("💾 사이트 등록", type="primary", key="sw_site_save"):
+                ok, msg = SW.create_site(cfg, type_label, {
+                    "site_name": site_name, "domain": domain, "category": category,
+                    "wp_url": wp_url, "wp_user": wp_user, "wp_app_password": wp_pw,
+                    "rss_sources": rss,
+                    "research_ai": research, "writing_ai": writing, "review_ai": review,
+                })
+                (st.success if ok else st.error)(msg)
+                if ok:
+                    st.cache_resource.clear(); st.rerun()
+
+    st.divider()
+    # ── 사이트 목록 / 관리 ──
+    st.subheader("📋 등록된 사이트")
+    try:
+        sites = SW.list_sites(cfg)
+    except Exception as e:
+        sites = []
+        st.error(f"사이트 목록 조회 실패(시트 권한 확인): {e}")
+    if not sites:
+        st.caption("등록된 사이트 없음")
+    for s in sites:
+        sid = s.get("site_id", "")
+        active = str(s.get("status", "")).lower() == "active"
+        icon = "🟢" if active else "⚪"
+        with st.expander(f"{icon} {s.get('site_name','(이름없음)')} — {s.get('domain','')} "
+                         f"[{s.get('site_type','')}] ({s.get('status','')})"):
+            e1, e2 = st.columns(2)
+            new_name = e1.text_input("사이트명", value=s.get("site_name", ""), key=f"ed_name_{sid}")
+            new_dom  = e2.text_input("도메인", value=s.get("domain", ""), key=f"ed_dom_{sid}")
+            new_cat  = st.text_input("카테고리", value=s.get("site_tags", ""), key=f"ed_cat_{sid}")
+            b1, b2, b3 = st.columns(3)
+            if b1.button("💾 수정 저장", key=f"ed_save_{sid}"):
+                ok, msg = SW.update_site(cfg, sid, {
+                    "site_name": new_name, "domain": new_dom, "site_tags": new_cat})
+                (st.success if ok else st.error)(msg)
+                if ok: st.rerun()
+            toggle_label = "⏸ 비활성화" if active else "▶ 활성화"
+            if b2.button(toggle_label, key=f"ed_tog_{sid}"):
+                ok, msg = SW.set_site_status(cfg, sid, "inactive" if active else "active")
+                (st.success if ok else st.error)(msg)
+                if ok: st.rerun()
+            if b3.button("🗑️ 삭제", key=f"ed_del_{sid}"):
+                ok, msg = SW.delete_site(cfg, sid)
+                (st.success if ok else st.error)(msg)
+                if ok: st.rerun()
+
+    st.divider()
+    # ── 계산기 목록 / 관리 ──
+    st.subheader("🧮 등록된 계산기")
+    try:
+        calcs = SW.list_calculators(cfg)
+    except Exception as e:
+        calcs = []
+        st.error(f"계산기 목록 조회 실패: {e}")
+    if not calcs:
+        st.caption("등록된 계산기 없음")
+    for c in calcs:
+        cid = c.get("id", "")
+        with st.expander(f"🧮 {c.get('name','(이름없음)')} — {c.get('category','')} ({c.get('status','')})"):
+            st.write(c.get("seo_desc", ""))
+            if st.button("🗑️ 삭제", key=f"cdel_{cid}"):
+                ok, msg = SW.delete_calculator(cfg, cid)
+                (st.success if ok else st.error)(msg)
+                if ok: st.rerun()
+
+# ══════════════════════════════════════════════════════════════
+# 탭: 🧮 Calculator Builder (계산기 CRUD — CalculatorRepository 경유)
+# ══════════════════════════════════════════════════════════════
+elif tab == "🧮 Calculator Builder":
+    st.title("🧮 Calculator Builder")
+    st.caption("계산기를 코드 수정 없이 생성/수정/상태변경 (CalculatorRepository 경유)")
+    from adapters.db.factory import get_db_adapter
+    from repositories.calculator_repository import CalculatorRepository
+    repo = CalculatorRepository(get_db_adapter(cfg))
+
+    ab1, ab2 = st.columns(2)
+    if ab1.button("🌱 SalaryMate 초기 5종 시드"):
+        try:
+            from modules.calculator_seed import seed_all
+            r = seed_all(cfg)
+            st.success(f"시드 완료 — 템플릿 {r['templates']}, 계산기 {r['calculators']}"); st.rerun()
+        except Exception as e:
+            st.error(f"시드 실패(시트 권한 확인): {e}")
+    if ab2.button("▶ 계산기 글 1건 생성(SEO+CTA)"):
+        try:
+            from modules.calculator_pipeline import run_calculator_once
+            with st.spinner("키워드→SEO→본문→계산기 위젯 생성 중..."):
+                s = run_calculator_once(cfg, max_count=1)
+            st.success(f"생산 {s.get('produced',0)}건 (발행대기 포함). 상세는 작업보드/오류로그 참고.")
+        except Exception as e:
+            st.error(f"생성 실패: {e}")
+    st.divider()
+    try:
+        calcs = repo.get_all()
+    except Exception as e:
+        calcs = []
+        st.error(f"계산기 목록 조회 실패(시트 권한 확인): {e}")
+
+    options = ["+ 신규 생성"] + [f"{c.get('name','?')} ({c.get('id','')})" for c in calcs]
+    sel = st.selectbox("대상 선택", options, key="cb_sel")
+    editing = calcs[options.index(sel) - 1] if sel != "+ 신규 생성" else None
+
+    def _v(k, d=""):
+        return (editing or {}).get(k, d)
+
+    c1, c2 = st.columns(2)
+    name = c1.text_input("계산기명 *", value=_v("name"), key="cb_name")
+    slug = c2.text_input("slug", value=_v("slug"), key="cb_slug")
+    c3, c4 = st.columns(2)
+    category = c3.text_input("category", value=_v("category"), key="cb_cat")
+    ctype = c4.text_input("calculator_type", value=_v("calculator_type", "general"), key="cb_type")
+    seo_title = st.text_input("seo_title", value=_v("seo_title"), key="cb_st")
+    seo_desc = st.text_area("seo_desc", value=_v("seo_desc"), key="cb_sd")
+    formula = st.text_area("formula", value=_v("formula"), key="cb_f")
+    faq = st.text_area("faq", value=_v("faq"), key="cb_faq")
+    insch = st.text_area("input_schema (JSON)",
+                         value=_v("input_schema", '{"hourly_wage":"number","weekly_hours":"number"}'), key="cb_in")
+    outsch = st.text_area("output_schema (JSON)",
+                          value=_v("output_schema", '{"weekly_allowance":"number"}'), key="cb_out")
+    stt = _v("status", "draft")
+    status = st.selectbox("status", ["draft", "active", "inactive"],
+                          index=["draft", "active", "inactive"].index(stt) if stt in ["draft", "active", "inactive"] else 0,
+                          key="cb_status")
+    if st.button("💾 저장", type="primary", key="cb_save"):
+        if not name.strip():
+            st.error("계산기명은 필수입니다.")
+        else:
+            row = {"name": name, "slug": slug, "category": category, "calculator_type": ctype,
+                   "seo_title": seo_title, "seo_desc": seo_desc, "formula": formula, "faq": faq,
+                   "input_schema": insch, "output_schema": outsch, "status": status}
+            try:
+                if editing:
+                    repo.update(editing.get("id"), row); st.success("✅ 수정 완료")
+                else:
+                    repo.save(row); st.success("✅ 생성 완료")
+                st.rerun()
+            except Exception as e:
+                st.error(f"저장 실패(시트 권한 확인): {e}")
+    if editing:
+        st.divider(); st.caption(f"상태 변경 (현재: {editing.get('status')})")
+        sc = st.columns(3)
+        for i, s in enumerate(["draft", "active", "inactive"]):
+            if sc[i].button(f"→ {s}", key=f"cb_s_{s}"):
+                try:
+                    repo.update(editing.get("id"), {"status": s}); st.success(f"상태 → {s}"); st.rerun()
+                except Exception as e:
+                    st.error(f"실패: {e}")
+
+# ══════════════════════════════════════════════════════════════
+# 탭: 🧮 계산기 관리 (앱 생성 + GitHub Pages 배포)
+# ══════════════════════════════════════════════════════════════
+elif tab == "🧮 계산기 관리":
+    st.title("🧮 계산기 관리")
+    st.caption("계산기 메타데이터로 정적 앱(HTML/CSS/JS) 생성 → GitHub Pages 배포 → URL/상태 관리. (모든 접근 Repository 경유)")
+    from adapters.db.factory import get_db_adapter
+    from repositories.calculator_repository import CalculatorRepository
+    from modules import app_generator as AG, github_deployer as GH, formula_engine as FE
+    repo = CalculatorRepository(get_db_adapter(cfg))
+
+    if st.button("🌱 기본 계산기 5종 시드"):
+        from modules.calculator_seeder import seed_default_calculators
+        r = seed_default_calculators(cfg)
+        if "error" in r:
+            st.error(f"시드 실패(시트 권한 확인): {r['error']}")
+        else:
+            st.success(f"생성 {r.get('created',0)} / 스킵 {r.get('skipped',0)}"); st.rerun()
+
+    st.caption("배포 설정: " + ("✅ GITHUB_TOKEN 있음" if GH.is_configured(cfg)
+               else "⚠️ GITHUB_TOKEN 미설정 — 배포 비활성(로컬 미리보기만 가능)"))
+    try:
+        calcs = repo.get_all()
+    except Exception as e:
+        calcs = []
+        st.error(f"계산기 조회 실패(시트 권한 확인): {e}")
+    if not calcs:
+        st.info("등록된 계산기 없음 — 위 시드 버튼 또는 🧮 Calculator Builder / 🏭 App Factory로 등록")
+
+    def _inline(files):
+        h = files["index.html"].replace('<link rel="stylesheet" href="style.css">',
+                                        f'<style>{files["style.css"]}</style>')
+        return h.replace('<script src="script.js"></script>', f'<script>{files["script.js"]}</script>')
+
+    for c in calcs:
+        cid = c.get("id", "")
+        url = c.get("published_url", "")
+        status_icon = "🟢" if str(c.get("status")).lower() == "active" else "⚪"
+        with st.expander(f"{status_icon} {c.get('name','(이름없음)')} — {c.get('status','')}"
+                         + (f" · 배포됨" if url else "")):
+            if url:
+                st.markdown(f"**배포 URL:** [{url}]({url})")
+            # 수식 편집(검증 후 저장)
+            cur_formula = c.get("formula", "")
+            new_formula = st.text_input("수식(formula)", value=str(cur_formula), key=f"cm_f_{cid}")
+            ins = FE._pj(c.get("input_schema"), {}) if hasattr(FE, "_pj") else {}
+            if st.button("💾 수식 저장(검증)", key=f"cm_fs_{cid}"):
+                ok, msg = FE.validate_formula(new_formula, ins)
+                if ok:
+                    FE.save_formula(cfg, cid, new_formula); st.success("수식 저장 완료"); st.rerun()
+                else:
+                    st.error(f"수식 검증 실패: {msg}")
+
+            # ── AI 자동 생성 ──
+            st.markdown("**🤖 AI 자동 생성**")
+            g = st.columns(5)
+            if g[0].button("SEO 생성", key=f"ag_seo_{cid}"):
+                from modules import calculator_seo_generator as SEO
+                with st.spinner("SEO 생성 중..."):
+                    repo.update_generated(cid, {"seo_title": SEO.generate_seo_title(cfg, c),
+                                                "seo_description": SEO.generate_meta_description(cfg, c)})
+                st.success("SEO 생성·저장"); st.rerun()
+            if g[1].button("FAQ 생성", key=f"ag_faq_{cid}"):
+                from modules.calculator_faq_generator import generate_faq
+                import json as _j
+                with st.spinner("FAQ 생성 중..."):
+                    repo.update_generated(cid, {"faq": _j.dumps(generate_faq(cfg, c), ensure_ascii=False)})
+                st.success("FAQ 생성·저장"); st.rerun()
+            if g[2].button("본문 생성", key=f"ag_art_{cid}"):
+                from modules.calculator_content_generator import generate_article
+                with st.spinner("본문 생성 중..."):
+                    repo.update_generated(cid, {"article_content": generate_article(cfg, c)})
+                st.success("본문 생성·저장"); st.rerun()
+            if g[3].button("이미지 프롬프트", key=f"ag_img_{cid}"):
+                from modules import calculator_image_prompt_generator as IMG
+                with st.spinner("이미지 프롬프트 생성 중..."):
+                    repo.update_generated(cid, {"image_prompt_thumbnail": IMG.generate_thumbnail_prompt(cfg, c),
+                                                "image_prompt_body": IMG.generate_body_prompt(cfg, c)})
+                st.success("이미지 프롬프트 생성·저장"); st.rerun()
+            if g[4].button("⚡ 전체 자동생성", key=f"ag_all_{cid}", type="primary"):
+                from modules.calculator_content_generator import auto_generate_all
+                with st.spinner("SEO→FAQ→본문→이미지→저장 진행 중... (수십 초)"):
+                    r = auto_generate_all(cfg, c, save=True)
+                (st.success if r.get("_saved") else st.warning)(
+                    f"전체 자동생성 완료 (저장 {'성공' if r.get('_saved') else '실패: '+r.get('_save_error','')})")
+                st.rerun()
+
+            # 생성 결과 미리보기
+            if c.get("seo_title") or c.get("article_content"):
+                with st.expander("👁 생성 결과 미리보기"):
+                    st.write(f"**SEO 제목:** {c.get('seo_title','-')}")
+                    st.write(f"**메타설명:** {c.get('seo_description', c.get('seo_desc','-'))}")
+                    if c.get("faq"):
+                        import json as _j
+                        try:
+                            fq = _j.loads(c["faq"]) if isinstance(c["faq"], str) else c["faq"]
+                            st.write(f"**FAQ {len(fq)}개:**")
+                            for f in fq[:10]:
+                                st.markdown(f"- **{f.get('question', f.get('q',''))}** — {f.get('answer', f.get('a',''))}")
+                        except Exception:
+                            pass
+                    if c.get("image_prompt_thumbnail"):
+                        st.caption(f"썸네일 프롬프트: {c.get('image_prompt_thumbnail')}")
+                        st.caption(f"본문 프롬프트: {c.get('image_prompt_body','')}")
+                    if c.get("article_content"):
+                        st.markdown("**본문 미리보기:**")
+                        st.markdown(c["article_content"][:1500] + (" …" if len(c["article_content"]) > 1500 else ""),
+                                    unsafe_allow_html=True)
+                    if c.get("generated_at"):
+                        st.caption(f"생성 시각: {c.get('generated_at')}")
+
+            files = AG.generate_calculator(c)
+            if not files["_formula_valid"]:
+                st.warning(f"수식 경고: {files['_formula_msg']}")
+            with st.expander("🔎 앱 미리보기"):
+                import streamlit.components.v1 as components
+                components.html(_inline(files), height=440, scrolling=True)
+
+            b = st.columns(4)
+            deploy_label = "🚀 재배포" if url else "🚀 배포"
+            if b[0].button(deploy_label, key=f"cm_dep_{cid}", disabled=not GH.is_configured(cfg)):
+                ok, res = GH.deploy_app(cfg, files,
+                                        repo=cfg.get("GITHUB_REPO", "salarymate-calculators"),
+                                        subdir=c.get("slug", cid))
+                if ok:
+                    repo.publish(cid, res); st.success(f"배포 완료: {res}"); st.rerun()
+                else:
+                    st.error(res)
+            if b[1].button("⏸ 상태토글", key=f"cm_tg_{cid}"):
+                repo.update(cid, {"status": "inactive" if str(c.get("status")).lower() == "active" else "active"})
+                st.rerun()
+            if b[2].button("📥 파일 저장", key=f"cm_dl_{cid}"):
+                from modules.ai_workspace import write_workspace_file
+                slug = c.get("slug", cid)
+                for fn in ("index.html", "style.css", "script.js"):
+                    write_workspace_file(f"calc_{slug}_{fn}", files[fn])
+                st.success(f"data/workspace/ 에 calc_{slug}_*.* 저장")
+            if b[3].button("🗑 삭제", key=f"cm_del_{cid}"):
+                repo.delete(cid); st.rerun()
+
+# ══════════════════════════════════════════════════════════════
+# 탭: 🏭 App Factory (계산기 자동 생성)
+# ══════════════════════════════════════════════════════════════
+elif tab == "🏭 App Factory":
+    st.title("🏭 App Factory")
+    st.caption("자동 생성 흐름: GPT 스펙 → Claude 코드(HTML) → GPT SEO/FAQ/초안 → Gemini 이미지 프롬프트 → 저장")
+    from modules import app_factory as AF
+    c1, c2 = st.columns(2)
+    af_name = c1.text_input("계산기명 *", placeholder="퇴직금 계산기", key="af_name")
+    af_cat = c2.text_input("카테고리", placeholder="노무/급여", key="af_cat")
+    af_desc = st.text_area("설명", placeholder="예: 근속연수와 평균임금으로 퇴직금 계산", key="af_desc")
+    if st.button("🏭 자동 생성", type="primary", key="af_gen"):
+        if not af_name.strip():
+            st.error("계산기명은 필수입니다.")
+        else:
+            with st.spinner("AI가 계산기를 생성 중입니다... (수십 초)"):
+                try:
+                    st.session_state["af_result"] = AF.generate_app(cfg, af_name, af_cat, af_desc)
+                except Exception as e:
+                    st.session_state["af_result"] = None
+                    st.error(f"생성 실패: {e}")
+    app = st.session_state.get("af_result")
+    if app:
+        st.success(f"생성 완료 — 토큰 {app['_tokens']}")
+        st.write("**단계:** " + " → ".join(f"{s[0]}({s[1]})" for s in app["_steps"]))
+        m = st.columns(3)
+        m[0].metric("HTML 길이", len(app["html"]))
+        m[1].metric("FAQ 수", len(app["faq"]) if isinstance(app["faq"], list) else 0)
+        m[2].metric("계산기 유형", app["calculator_type"])
+        st.text_input("SEO 제목", app["seo_title"], disabled=True, key="af_seo")
+        with st.expander("입력/출력 스키마"):
+            st.json({"input": app["input_schema"], "output": app["output_schema"]})
+        with st.expander("HTML 코드"):
+            st.code(app["html"][:4000], language="html")
+        with st.expander("FAQ / 블로그 초안"):
+            st.write(app["faq"]); st.write(app.get("blog_draft", ""))
+        if app["html"]:
+            with st.expander("🔎 실제 렌더 미리보기"):
+                import streamlit.components.v1 as components
+                components.html(app["html"], height=420, scrolling=True)
+        if st.button("💾 calculators + app_templates 저장", type="primary", key="af_save"):
+            ok, msg = AF.save_app(cfg, app)
+            (st.success if ok else st.error)(msg)
+            if ok:
+                st.session_state["af_result"] = None
+
+# ══════════════════════════════════════════════════════════════
+# 탭: 💬 AI Workspace (대시보드 내 AI 대화 + 파일/데이터 도구)
+# ══════════════════════════════════════════════════════════════
+elif tab == "💬 AI Workspace":
+    st.title("💬 AI Workspace")
+    from modules import ai_workspace as WS
+    role_map = {"총괄 (GPT)": "orchestrator", "코드 (Claude)": "code", "리서치 (Gemini)": "research"}
+    role_label = st.selectbox("역할 / 모델", list(role_map.keys()), key="ws_role")
+    role = role_map[role_label]
+
+    with st.expander("📎 컨텍스트 첨부 (선택)"):
+        try:
+            files = WS.list_project_files()
+        except Exception:
+            files = []
+        attach_file = st.selectbox("프로젝트 파일(읽기)", ["(없음)"] + files, key="ws_file")
+        attach_repo = st.selectbox("Repository/시트 데이터", ["(없음)", "sites", "calculators", "articles", "templates"], key="ws_repo")
+        attach_struct = st.checkbox("프로젝트 구조 요약", key="ws_struct")
+
+    if "ws_msgs" not in st.session_state:
+        st.session_state["ws_msgs"] = []
+    for msg in st.session_state["ws_msgs"]:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    prompt = st.chat_input("메시지 입력 (예: 퇴직금 계산기 HTML 만들어줘 / main.py 구조 분석해줘)")
+    if prompt:
+        ctx = ""
+        try:
+            if attach_file != "(없음)":
+                ctx += f"# 파일: {attach_file}\n{WS.read_project_file(attach_file)}\n\n"
+            if attach_repo != "(없음)":
+                ctx += f"# {attach_repo} 데이터(최대 20행)\n{str(WS.query_repo(cfg, attach_repo)[:20])}\n\n"
+            if attach_struct:
+                ctx += f"# 프로젝트 구조\n{WS.analyze_structure()['by_dir']}\n\n"
+        except Exception as e:
+            ctx += f"(컨텍스트 첨부 실패: {e})"
+        st.session_state["ws_msgs"].append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+        with st.chat_message("assistant"):
+            with st.spinner("생각 중..."):
+                try:
+                    reply, model, tok = WS.chat(cfg, role, st.session_state["ws_msgs"], ctx)
+                except Exception as e:
+                    reply, model, tok = f"오류: {e}", "", 0
+            st.markdown(reply)
+            st.caption(f"{model} · {tok} tokens")
+        st.session_state["ws_msgs"].append({"role": "assistant", "content": reply})
+
+    st.divider()
+    with st.expander("💾 코드/파일 저장 도구"):
+        st.caption("기본은 샌드박스(data/workspace/)에 저장. 프로젝트 파일 덮어쓰기는 원본 백업 후 확인 시에만.")
+        fname = st.text_input("파일명", "generated.html", key="ws_save_name")
+        fcontent = st.text_area("내용", height=200, key="ws_save_content")
+        if st.button("샌드박스 저장", key="ws_sb_save"):
+            if fcontent.strip():
+                st.success(f"저장: {WS.write_workspace_file(fname, fcontent)}")
+            else:
+                st.error("내용이 비어 있습니다.")
+        st.markdown("---")
+        st.caption("⚠️ 고급: 프로젝트 파일 덮어쓰기 (원본 자동 백업)")
+        tgt = st.text_input("대상 경로 (예: data/workspace/x.py)", key="ws_tgt")
+        confirm = st.checkbox("이 경로 덮어쓰기를 확인합니다", key="ws_confirm")
+        if st.button("프로젝트 파일 저장", key="ws_proj_save"):
+            if confirm and tgt.strip() and fcontent.strip():
+                try:
+                    st.success(f"저장(백업됨): {WS.write_project_file(tgt, fcontent)}")
+                except Exception as e:
+                    st.error(f"실패: {e}")
+            else:
+                st.error("대상 경로/내용/확인 체크가 필요합니다.")
+    if st.button("🗑 대화 초기화", key="ws_clear"):
+        st.session_state["ws_msgs"] = []; st.rerun()
+
+# ══════════════════════════════════════════════════════════════
+# 탭: 📊 AI Pipeline Monitor
+# ══════════════════════════════════════════════════════════════
+elif tab == "📊 AI Pipeline":
+    st.title("📊 AI Pipeline Monitor")
+    st.caption("pipeline.log 기반 단계 상태(비침습적). 파이프라인 실행 중 자동 반영.")
+    from modules.pipeline_status import get_pipeline_state
+    ps = get_pipeline_state(cfg)
+    COLOR = {"pending": "🟡", "running": "🔵", "completed": "🟢", "error": "🔴"}
+    cols = st.columns(len(ps["stages"]))
+    for col, s in zip(cols, ps["stages"]):
+        with col.container(border=True):
+            st.markdown(f"### {COLOR.get(s['status'], '⬜')}")
+            st.markdown(f"**{s['name']}**")
+            st.caption(f"모델: {s['model']}")
+            st.caption(f"상태: {s['status']}")
+    st.divider()
+    m = st.columns(3)
+    m[0].metric("오늘 비용", f"${ps['cost_today']:.4f}")
+    m[1].metric("오늘 토큰", f"{ps['tokens_today']:,}")
+    m[2].metric("실행 상태", "🔴 오류" if ps["has_error"] else ("✅ 완료/대기" if ps["finished"] else "🔵 진행중"))
+    if ps["model_costs"]:
+        st.subheader("오늘 모델별 비용")
+        import pandas as pd
+        st.dataframe(pd.DataFrame([{"모델": k, "비용($)": v} for k, v in ps["model_costs"].items()]),
+                     hide_index=True, use_container_width=True)
+    st.subheader("최근 로그")
+    st.code("\n".join(ps["last_lines"]) or "(로그 없음)", language="text")
+
+# ══════════════════════════════════════════════════════════════
+# 탭: 🧠 전략회의실 (AI 운영 분석)
+# ══════════════════════════════════════════════════════════════
+elif tab == "🧠 전략회의실":
+    st.title("🧠 전략회의실")
+    st.caption(
+        f"분석 모델: `{cfg.get('ORCHESTRATOR_PROVIDER','openai')} / "
+        f"{cfg.get('MODEL_ORCHESTRATOR','gpt-4o')}` · "
+        f"AI가 최근 운영 데이터를 분석해 카테고리·RSS·발행시간·수익화 전략을 추천합니다 (실행만, 직접 적용 안 함)."
+    )
+
+    enabled = cfg.get("ENABLE_STRATEGY_ROOM", True)
+    if not enabled:
+        st.warning("⚠️ `ENABLE_STRATEGY_ROOM` 설정이 꺼져 있습니다. '🔧 설정 → 운영 설정'에서 켜주세요.")
+
+    if st.button("▶ 전략회의실 실행", type="primary", disabled=not enabled):
+        with st.spinner("AI가 최근 운영 데이터를 분석 중입니다..."):
+            # ── 운영 데이터 수집 (가능한 범위, 실패해도 빈 값으로 진행) ──
+            analytics = {}
+            try:
+                posts = cached_posts()
+                published = [p for p in posts if p.get("상태값") in ("발행완료", "검수대기")]
+                published.sort(key=lambda x: x.get("발행일시", ""), reverse=True)
+                analytics["total_published"] = len(published)
+                analytics["recent_posts"] = [
+                    {"title": p.get("최종추천제목", ""), "url": p.get("발행 URL", ""),
+                     "date": p.get("발행일시", "")}
+                    for p in published[:7]
+                ]
+            except Exception as e:
+                st.info(f"운영 데이터 일부 수집 실패 — 빈 값으로 진행합니다: {e}")
+
+            try:
+                from modules.strategy_room import run_strategy_room
+                st.session_state["strategy_result"] = run_strategy_room(analytics, cfg)
+            except Exception as e:
+                st.session_state["strategy_result"] = {}
+                st.error(f"전략회의실 실행 중 오류: {e}")
+
+    result = st.session_state.get("strategy_result")
+    if result is not None:
+        if not result:
+            st.error(
+                "전략회의실이 빈 결과를 반환했습니다. "
+                "LLM이 올바른 JSON을 반환하지 못했거나 설정이 꺼져 있을 수 있습니다. "
+                "잠시 후 다시 실행해 보세요. ('📡 실시간 로그'에서 상세 확인 가능)"
+            )
+        else:
+            st.divider()
+            st.subheader("📝 요약")
+            st.write(result.get("summary", "(요약 없음)"))
+
+            ate = result.get("auto_topic_expansion_eligible", {}) or {}
+            if ate:
+                st.subheader("🚦 AUTO_TOPIC_EXPANSION 전환 조건")
+                cols = st.columns(5)
+                labels = [
+                    ("애드센스 발행", "condition_1_adsense_post"),
+                    ("게시물 수",     "condition_2_post_count"),
+                    ("CTR",          "condition_3_ctr"),
+                    ("긍정 추천",     "condition_4_positive_recommendation"),
+                    ("전체 충족",     "all_met"),
+                ]
+                for col, (lab, key) in zip(cols, labels):
+                    col.metric(lab, "✅" if ate.get(key) else "❌")
+
+            def _show_list(title, items):
+                st.subheader(title)
+                if items:
+                    st.write(items)
+                else:
+                    st.caption("추천 없음")
+
+            _show_list("🆕 신규 카테고리 후보",   result.get("new_category_candidates", []))
+            _show_list("📡 RSS 수집원 추천",      result.get("rss_recommendations", []))
+            _show_list("♻️ 리라이팅 후보",        result.get("rewrite_candidates", []))
+            _show_list("⏰ 최적 발행 시간대",      result.get("best_publish_time", []))
+
+            st.subheader("💰 수익화 제안")
+            mon = result.get("monetization_suggestions")
+            st.write(mon if mon else "추천 없음 (ADSENSE_MODE=pre이면 비활성)")
+
+            st.caption(f"사용 토큰: {result.get('_tokens', '-')}")
+            with st.expander("🔧 원본 JSON 보기"):
+                st.json(result)
+
+# ══════════════════════════════════════════════════════════════
+# 탭 5: 설정 ★ [팅김 버그 완치 검수 완료]
+# ══════════════════════════════════════════════════════════════
+elif tab == "🔧 설정":
+    st.title("🔧 설정 관리")
+    st.info("모든 모델 세팅을 마우스 클릭으로 제어하세요.")
+
+    cfg_path = BASE / "config" / "config.yaml"
+
+    with st.expander("🔑 AI API Keys", expanded=False):
+        openai_key = st.text_input("OpenAI API Key", value=cfg.get("OPENAI_API_KEY",""), type="password", key="s_openai")
+        claude_key = st.text_input("Claude API Key", value=cfg.get("CLAUDE_API_KEY",""), type="password", key="s_claude")
+        gemini_key = st.text_input("Gemini API Key", value=cfg.get("GEMINI_API_KEY",""), type="password", key="s_gemini")
+
+    # ── 1. 텍스트 AI 모델 설정 ──────────────────────────────
+    with st.expander("🤖 최신 텍스트 AI 역할 및 모델 매칭", expanded=True):
+        providers_list = ["openai", "claude", "gemini"]
+        model_presets = {
+            "openai": ["gpt-4o", "gpt-4o-mini", "o1-preview", "o1-mini"],
+            "claude": ["claude-3-5-sonnet-latest", "claude-3-opus-latest"],
+            "gemini": ["gemini-2.5-flash", "gemini-2.5-pro"]
+        }
+
+        def render_model_selector(label, provider_val, current_model, key_prefix):
+            st.markdown(f"**{label}**")
+            col_p, col_m = st.columns(2)
+            with col_p:
+                p_idx = providers_list.index(provider_val) if provider_val in providers_list else 0
+                chosen_provider = st.selectbox(f"{label} 제공사", providers_list, index=p_idx, key=f"{key_prefix}_prov", label_visibility="collapsed")
+            with col_m:
+                presets = model_presets.get(chosen_provider, ["gpt-4o"])
+                
+                clean_curr = current_model if "-latest" in current_model else f"{current_model}-latest" if chosen_provider in ("claude", "gemini") else current_model
+                if clean_curr not in presets:
+                    m_idx = 0
+                else:
+                    m_idx = presets.index(clean_curr)
+                    
+                chosen_model = st.selectbox(f"{label} 모델명", presets, index=m_idx, key=f"{key_prefix}_model", label_visibility="collapsed")
+            return chosen_provider, chosen_model
+
+        orch_prov, orch_mod = render_model_selector("1. 전체 총괄 (Orchestrator)", cfg.get("ORCHESTRATOR_PROVIDER", "openai"), cfg.get("MODEL_ORCHESTRATOR", "gpt-4o"), "s_orch")
+        plan_prov, plan_mod = render_model_selector("2. 키워드 기획 (Planner)", cfg.get("PLANNER_PROVIDER", "openai"), cfg.get("MODEL_PLANNER", "gpt-4o"), "s_plan")
+        writ_prov, writ_mod = render_model_selector("3. 본문 초고 작성 (Writer)", cfg.get("WRITER_PROVIDER", "openai"), cfg.get("MODEL_WRITER", "gpt-4o"), "s_write")
+        edit_prov, edit_mod = render_model_selector("4. SEO 교정 및 검수 (Editor)", cfg.get("EDITOR_PROVIDER", "claude"), cfg.get("MODEL_EDITOR", "claude-3-5-sonnet-latest"), "s_edit")
+
+        st.markdown("---")
+        col_s1, col_s2 = st.columns(2)
+        with col_s1:
+            clean_mod = st.selectbox("뉴스 정리기 (Cleaner) 모델", model_presets["openai"], index=0, key="s_clean_mod")
+        with col_s2:
+            fb_mod = st.selectbox("교정 실패시 백업 (Fallback) 모델", model_presets["openai"], index=0, key="s_fb_mod")
+
+    # ── 2. 🎨 이미지 생성 AI 설정 섹션 [팅김 방지 완벽 방어형 인덱싱 코드] ──────────────────────────────
+    with st.expander("🎨 블로그 이미지 생성 AI 설정", expanded=True):
+        st.markdown("### 썸네일 및 본문 삽입용 이미지 옵션")
+        
+        img_providers = ["free_pollinations", "gemini", "openai"]
+        img_presets = {
+            "free_pollinations": ["무료 이미지 엔진 (API키/결제 없음)"],
+            "gemini": ["imagen-3.0-generate-002"],
+            "openai": ["dall-e-3"]
+        }
+        
+        col_img1, col_img2 = st.columns(2)
+        with col_img1:
+            curr_img_prov = str(cfg.get("IMAGE_PROVIDER", "free_pollinations")).lower()
+            # 팅김 원천 방지: 리스트에 존재하지 않는 값이 들어올 경우 무조건 0번(무료엔진)으로 매핑
+            img_prov_idx = img_providers.index(curr_img_prov) if curr_img_prov in img_providers else 0
+            image_provider = st.selectbox("이미지 AI 제공사 (구글 무료 계정은 'free_pollinations' 필수)", img_providers, index=img_prov_idx, key="s_img_prov")
+        with col_img2:
+            curr_img_mod = cfg.get("MODEL_IMAGE", "")
+            img_models = img_presets.get(image_provider, ["무료 이미지 엔진 (API키/결제 없음)"])
+            img_mod_idx = img_models.index(curr_img_mod) if curr_img_mod in img_models else 0
+            image_model = st.selectbox("이미지 생성 모델명", img_models, index=img_mod_idx, key="s_img_mod")
+            
+        st.markdown("---")
+        col_size, col_quality = st.columns(2)
+        with col_size:
+            size_options = ["auto (🤖 AI 자동 판단)", "1024x1024", "1792x1024 (가로형)"]
+            curr_size = cfg.get("IMAGE_SIZE", "auto")
+            if curr_size == "auto": size_idx = 0
+            elif curr_size == "1024x1024": size_idx = 1
+            else: size_idx = 2
+            image_size_raw = st.selectbox("이미지 비율/사이즈", size_options, index=size_idx, key="s_img_size")
+            image_size = "auto" if "auto" in image_size_raw else "1024x1024" if "1024x1024" in image_size_raw else "1792x1024"
+        with col_quality:
+            image_quality = st.selectbox("품질 등급 (DALL-E 전용)", ["standard", "hd"], index=0 if cfg.get("IMAGE_QUALITY", "standard") == "standard" else 1)
+
+    # ── Google 및 운영 세팅 연동 ──────────────────────────────────
+    with st.expander("📊 Google 연동", expanded=False):
+        g_sheet = st.text_input("GOOGLE_SHEET_ID", value=cfg.get("GOOGLE_SHEET_ID",""), key="s_sheet")
+        g_drive = st.text_input("GOOGLE_DRIVE_ROOT_ID", value=cfg.get("GOOGLE_DRIVE_ROOT_ID",""), key="s_drive")
+        g_placeholder = st.text_input("GOOGLE_DRIVE_PLACEHOLDER_FOLDER_ID", value=cfg.get("GOOGLE_DRIVE_PLACEHOLDER_FOLDER_ID",""), key="s_ph")
+
+    with st.expander("⚙️ 운영 설정", expanded=False):
+        st.markdown("**발행 방식**")
+        op_choice = st.radio(
+            "운영 방식 선택", ["예약 발행 모드", "Legacy 반복 실행 모드"],
+            index=0 if cfg.get("OPERATION_MODE", "scheduled") == "scheduled" else 1,
+            key="s_opmode",
+            help="예약 발행=📅 슬롯 일정대로 발행(권장/기본). Legacy=RUN_INTERVAL_HOURS 간격 반복.")
+        operation_mode = "scheduled" if op_choice.startswith("예약") else "legacy"
+        st.caption("실행: 예약 발행 → `scripts/run_scheduler.bat` · Legacy → `scripts/run_schedule.bat` · 단발 → `run_pipeline.bat`")
+        st.divider()
+        col1, col2 = st.columns(2)
+        with col1:
+            adsense_mode = st.selectbox("ADSENSE_MODE", ["pre","post"], index=["pre","post"].index(cfg.get("ADSENSE_MODE","pre")), key="s_adsense")
+            st.metric("하루 발행 개수 (DAILY_POST_COUNT)", cfg.get("DAILY_POST_COUNT", 3))
+            st.caption("※ '📅 오늘 발행 일정' 탭의 슬롯 수로 자동 결정")
+            daily_count = cfg.get("DAILY_POST_COUNT", 3)
+            run_interval = st.number_input("RUN_INTERVAL_HOURS (Legacy 전용)", 1, 168, cfg.get("RUN_INTERVAL_HOURS",24), key="s_ri")
+        with col2:
+            daily_budget = st.number_input("DAILY_AI_BUDGET (USD)", 1, 100, cfg.get("DAILY_AI_BUDGET",5), key="s_db")
+            monthly_budget = st.number_input("MONTHLY_AI_BUDGET (USD)", 10, 1000, cfg.get("MONTHLY_AI_BUDGET",100), key="s_mb")
+            dlq_threshold = st.number_input("DLQ_THRESHOLD", 1, 10, cfg.get("DLQ_THRESHOLD",3), key="s_dlq")
+        auto_topic = st.toggle("AUTO_TOPIC_EXPANSION", value=cfg.get("AUTO_TOPIC_EXPANSION",False), key="s_ate")
+        enable_strategy = st.toggle("ENABLE_STRATEGY_ROOM", value=cfg.get("ENABLE_STRATEGY_ROOM",True), key="s_esr")
+
+    # ── AI 역할 체계 (확장 기능 전용 — 기존 파이프라인 모델과 별개) ──
+    with st.expander("🧠 AI 역할 체계 (AI Workspace / App Factory 용)", expanded=False):
+        st.caption("총괄/리서치/코드/작성/검수/이미지 역할별 모델. 기존 ORCHESTRATOR/PLANNER/WRITER/EDITOR 설정과 별개로 동작합니다.")
+        from modules.ai_roles import ROLE_DEFS, get_role
+        providers_list2 = ["openai", "claude", "gemini"]
+        role_inputs = {}
+        for rk, base in ROLE_DEFS.items():
+            cur_p, cur_m = get_role(cfg, rk)
+            st.markdown(f"**{base['label']}** — {base['desc']}")
+            rc1, rc2 = st.columns(2)
+            pv = rc1.selectbox(f"{rk} provider", providers_list2,
+                               index=providers_list2.index(cur_p) if cur_p in providers_list2 else 0,
+                               key=f"role_p_{rk}", label_visibility="collapsed")
+            mv = rc2.text_input(f"{rk} model", value=cur_m, key=f"role_m_{rk}", label_visibility="collapsed")
+            role_inputs[rk] = {"provider": pv, "model": mv}
+        if st.button("💾 AI 역할 저장", key="save_roles"):
+            with open(cfg_path, encoding="utf-8") as f:
+                raw = yaml.safe_load(f) or {}
+            raw["AI_ROLES"] = role_inputs
+            with open(cfg_path, "w", encoding="utf-8") as f:
+                yaml.dump(raw, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+            st.success("✅ AI 역할 저장 완료")
+            st.cache_resource.clear()
+
+    # ── AI 점수 가중치 슬라이더 편집기 (score_weights.yaml) ──
+    with st.expander("⚖️ AI 점수 가중치 (score_weights.yaml)", expanded=False):
+        st.caption("M2 Strategist가 글 우선순위를 매기는 기준. 슬라이더 조정 후 저장하면 yaml에 반영(합계 1.0 자동 정규화).")
+        sw_path = BASE / "config" / "score_weights.yaml"
+        try:
+            with open(sw_path, encoding="utf-8") as f:
+                sw_raw = yaml.safe_load(f) or {}
+        except Exception:
+            sw_raw = {}
+        sw = sw_raw.get("score_weights", {}) or {}
+        SW_LABELS = {
+            "traffic": "검색량(트래픽)", "cpc": "클릭단가(CPC)",
+            "competition": "경쟁도(낮을수록 유리)", "cluster": "클러스터 연관성",
+            "calculator": "계산기 연동", "revenue": "수익모델 적합도",
+        }
+        defaults = {"traffic": 0.30, "cpc": 0.20, "competition": 0.20,
+                    "cluster": 0.10, "calculator": 0.10, "revenue": 0.10}
+        sw_vals = {}
+        for k, label in SW_LABELS.items():
+            sw_vals[k] = st.slider(label, 0.0, 1.0,
+                                   float(sw.get(k, defaults[k])), 0.05, key=f"sw_{k}")
+        total = sum(sw_vals.values())
+        st.caption(f"현재 합계: {total:.2f} (저장 시 1.0으로 자동 정규화)")
+        if st.button("💾 가중치 저장", key="save_weights"):
+            if total <= 0:
+                st.error("가중치 합계가 0보다 커야 합니다.")
+            else:
+                norm = {k: round(v / total, 4) for k, v in sw_vals.items()}
+                sw_raw["score_weights"] = norm
+                with open(sw_path, "w", encoding="utf-8") as f:
+                    yaml.dump(sw_raw, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+                st.success(f"✅ 가중치 저장(정규화) 완료: {norm}")
+
+    # ── 저장 로직 ──────────────────────────────────────────
+    st.divider()
+    if st.button("💾 설정 저장", type="primary"):
+        new_cfg = dict(cfg)
+        
+        safe_orch = orch_mod.replace("-latest", "") if orch_prov == "gemini" else orch_mod
+        safe_plan = plan_mod.replace("-latest", "") if plan_prov == "gemini" else plan_mod
+        safe_writ = writ_mod.replace("-latest", "") if writ_prov == "gemini" else writ_mod
+        safe_edit = edit_mod.replace("-latest", "") if edit_prov == "gemini" else edit_mod
+
+        updates = {
+            "OPENAI_API_KEY": st.session_state.get("s_openai", cfg.get("OPENAI_API_KEY","")),
+            "CLAUDE_API_KEY": st.session_state.get("s_claude", cfg.get("CLAUDE_API_KEY","")),
+            "GEMINI_API_KEY": st.session_state.get("s_gemini", cfg.get("GEMINI_API_KEY","")),
+            
+            "ORCHESTRATOR_PROVIDER": orch_prov,
+            "PLANNER_PROVIDER":      plan_prov,
+            "WRITER_PROVIDER":       writ_prov,
+            "EDITOR_PROVIDER":       edit_prov,
+            
+            "MODEL_ORCHESTRATOR":    safe_orch,
+            "MODEL_PLANNER":         safe_plan,
+            "MODEL_WRITER":          safe_writ,
+            "MODEL_EDITOR":          safe_edit,
+            "MODEL_CLEANER":         clean_mod,
+            "MODEL_EDITOR_FALLBACK": fb_mod,
+            
+            "IMAGE_PROVIDER":        image_provider,
+            "MODEL_IMAGE":           image_model,
+            "IMAGE_SIZE":            image_size,
+            "IMAGE_QUALITY":         image_quality,
+            
+            "GOOGLE_SHEET_ID":   st.session_state.get("s_sheet", cfg.get("GOOGLE_SHEET_ID","")),
+            "GOOGLE_DRIVE_ROOT_ID": st.session_state.get("s_drive", cfg.get("GOOGLE_DRIVE_ROOT_ID","")),
+            "GOOGLE_DRIVE_PLACEHOLDER_FOLDER_ID": st.session_state.get("s_ph", cfg.get("GOOGLE_DRIVE_PLACEHOLDER_FOLDER_ID","")),
+            "RUN_MODE":           "wordpress",
+            "ADSENSE_MODE":       adsense_mode,
+            "DAILY_POST_COUNT":   int(daily_count),
+            "RUN_INTERVAL_HOURS": int(run_interval),
+            "DAILY_AI_BUDGET":    int(daily_budget),
+            "MONTHLY_AI_BUDGET":  int(monthly_budget),
+            "DLQ_THRESHOLD":      int(dlq_threshold),
+            "AUTO_TOPIC_EXPANSION": auto_topic,
+            "ENABLE_STRATEGY_ROOM": enable_strategy,
+            "OPERATION_MODE": operation_mode,
+        }
+        new_cfg.update(updates)
+
+        with open(cfg_path, "w", encoding="utf-8") as f:
+            yaml.dump(new_cfg, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+        st.success("✅ 제미나이 안전 규격 및 무료 이미지 옵션이 반영되어 저장되었습니다!")
+        st.cache_resource.clear()
+
+        st.subheader("🏥 저장 후 자동 헬스체크")
+        with st.spinner("연결 상태 확인 중..."):
+            try:
+                hc_results = hc_mod.run(new_cfg)
+                for k, v in hc_results.items():
+                    if k == "timestamp": continue
+                    if isinstance(v, dict):
+                        if v.get("status") == "OK": st.success(f"✅ {k}: 연결 정상")
+                        else: st.error(f"❌ {k}: 실패 — {v.get('error','')}")
+            except Exception as e:
+                st.error(f"헬스체크 모듈 가동 실패: {e}")
+
+elif tab == "🏥 헬스체크":
+    st.title("🏥 헬스체크 센터")
+    run_live = st.button("▶ 헬스체크 실행(실시간)", type="primary")
+    results = None
+    if run_live:
+        with st.spinner("검사 중... (API 연결 확인, 최대 30초)"):
+            results = hc_mod.run(cfg)
+    else:
+        results = _read_health_cache()
+        if results:
+            st.caption(f"마지막 검사: {results.get('timestamp','-')} (실시간 재검사하려면 위 버튼)")
+        else:
+            st.info("검사 기록이 없습니다. 위 버튼으로 실행하세요.")
+
+    if results:
+        labels = {"openai": "OpenAI", "claude": "Claude", "gemini": "Gemini",
+                  "google_sheet": "Sheets", "google_drive": "Drive",
+                  "wordpress": "WordPress", "service_account": "Service Account"}
+        items = [(labels.get(k, k), v) for k, v in results.items()
+                 if isinstance(v, dict) and "status" in v]
+        cols = st.columns(3)
+        for i, (name, v) in enumerate(items):
+            ok = v.get("status") == "OK"
+            with cols[i % 3].container(border=True):
+                st.markdown(f"### {'🟢' if ok else '🔴'} {name}")
+                st.write(f"상태: **{v.get('status')}** ({v.get('level','')})")
+                if not ok and v.get("error"):
+                    st.error(str(v.get("error"))[:200])
+
+elif tab == "📡 실시간 로그":
+    st.title("📡 실시간 로그 센터")
+    log_path = BASE / "data" / "logs" / "pipeline.log"
+    fc1, fc2 = st.columns([1, 2])
+    auto = fc1.toggle("🔄 자동 갱신(5초)", value=True, key="log_auto")
+    level_filter = fc2.radio("필터", ["전체", "ERROR만", "WARN+ERROR", "INFO만"],
+                             horizontal=True, key="log_filter")
+
+    def _classify(line: str) -> str:
+        if "[ERROR]" in line:
+            return "error"
+        if "[WARN" in line:   # [WARNING]/[WARN]
+            return "warn"
+        if "[INFO]" in line:
+            return "info"
+        return "other"
+
+    def _render_log():
+        st.caption(f"마지막 갱신: {datetime.now().strftime('%H:%M:%S')}")
+        if not log_path.exists():
+            st.info("아직 로그 파일이 없습니다 (data/logs/pipeline.log).")
+            return
+        lines = _tail_lines("data/logs/pipeline.log", 300)
+        want = {"전체": {"error", "warn", "info", "other"},
+                "ERROR만": {"error"},
+                "WARN+ERROR": {"error", "warn"},
+                "INFO만": {"info"}}[level_filter]
+        rows = [(l, _classify(l)) for l in lines if _classify(l) in want]
+        cnt = {"error": 0, "warn": 0, "info": 0}
+        for _, lv in [(l, _classify(l)) for l in lines]:
+            if lv in cnt:
+                cnt[lv] += 1
+        m = st.columns(3)
+        m[0].metric("🔴 ERROR", cnt["error"]); m[1].metric("🟡 WARN", cnt["warn"]); m[2].metric("🟢 INFO", cnt["info"])
+        if not rows:
+            st.caption("표시할 로그가 없습니다.")
+            return
+        color = {"error": "#ef4444", "warn": "#f59e0b", "info": "#16a34a", "other": "#9ca3af"}
+        html = ['<div style="font-family:monospace;font-size:12px;line-height:1.5;'
+                'max-height:460px;overflow:auto;background:#0f172a;padding:10px;border-radius:8px">']
+        import html as _h
+        for line, lv in rows[-200:]:
+            html.append(f'<div style="color:{color[lv]};white-space:pre-wrap">{_h.escape(line)}</div>')
+        html.append("</div>")
+        st.markdown("".join(html), unsafe_allow_html=True)
+
+    if auto:
+        try:
+            log_fragment = st.fragment(run_every=5)(_render_log)
+            log_fragment()
+        except Exception:
+            # 구버전 Streamlit 폴백
+            if st.button("🔄 새로고침"):
+                st.rerun()
+            _render_log()
+    else:
+        if st.button("🔄 새로고침"):
+            st.rerun()
+        _render_log()

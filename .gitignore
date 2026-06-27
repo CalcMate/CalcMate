@@ -1,0 +1,12 @@
+# 보안 파일
+config/secrets.yaml
+credentials.json
+
+# 가상환경 / 캐시 / 생성물 (대용량)
+.venv/
+__pycache__/
+*.pyc
+data/cache/
+data/outputs/
+*.db
+data/logs/*.log

@@ -1,0 +1,397 @@
+"""
+main.py — 블로그자동화 v11.6 메인 오케스트레이터
+12단계 무인 파이프라인 + 체크포인트 복구 + 비용 보호 + DLQ
+"""
+import sys, os, json, argparse, time, uuid
+from datetime import datetime
+from pathlib import Path
+
+# 경로 설정
+BASE = Path(__file__).parent
+sys.path.insert(0, str(BASE))
+
+from modules.config_loader import load_config, ConfigError
+from modules.logger import get_logger, BudgetTracker
+from modules.telegram_notifier import send as tg_send
+import modules.rss_collector as rss_collector       # 하위 호환 유지
+from modules.collector.factory import get_collector
+from modules.site_manager import SiteManager
+import modules.cleaner as cleaner
+import modules.duplicate_checker as dup_checker
+import modules.history_loader as history_loader
+import modules.strategist as strategist
+import modules.planner as planner
+import modules.writer as writer
+import modules.editor as editor
+import modules.image_generator as image_generator
+import modules.publisher as publisher
+import modules.sheet_sync as sheet_sync
+import modules.backup_manager as backup_manager
+import health_check
+
+LOG = get_logger("pipeline")
+DLQ_DIR = BASE / "data" / "dlq"
+DLQ_DIR.mkdir(parents=True, exist_ok=True)
+
+# ─────────────────────────────────────────────────────────────
+def parse_args():
+    p = argparse.ArgumentParser(description="블로그자동화 v11.6")
+    p.add_argument("--dry-run", action="store_true", help="설정 검증만 수행, 실제 API 호출 없음")
+    p.add_argument("--once", action="store_true", help="파이프라인 1회만 실행(단발)")
+    p.add_argument("--schedule", action="store_true", help="[Legacy] RUN_INTERVAL_HOURS 주기 반복 실행")
+    p.add_argument("--scheduler", action="store_true", help="슬롯 기반 발행 스케줄러 (오늘 일정대로 시각별 1건 발행)")
+    p.add_argument("--instance", default=None, help="멀티 인스턴스 ID (config/instances/{id}/config.yaml 로드)")
+    p.add_argument("--strategy-room", action="store_true", help="전략회의실 즉시 실행")
+    p.add_argument("--calculator", action="store_true", help="계산기 콘텐츠 파이프라인 1회 실행")
+    p.add_argument("--seed-calculators", action="store_true", help="SalaryMate 초기 계산기/템플릿 시드 등록")
+    return p.parse_args()
+
+# ─────────────────────────────────────────────────────────────
+def run_once(cfg: dict, dry_run: bool = False, max_count: int = None) -> dict:
+    """수집 후 DAILY_POST_COUNT(또는 max_count)만큼 글을 '생산'한다.
+
+    - 각 항목은 _process_one()에서 독립 처리(한 건 실패가 전체를 멈추지 않음)
+    - 중복/실패 건은 건너뛰고 다음 항목 시도
+    - 목표 개수 도달 시 종료
+    - 매 항목 전 예산 재확인 → 초과 시 즉시 중단
+    - 처리 통계를 로그에 기록하고 dict로 반환
+
+    max_count: 스케줄러가 1건씩 실행할 때 사용(미지정 시 DAILY_POST_COUNT).
+    """
+    start_time = time.time()
+    budget = BudgetTracker(cfg)
+    target = int(max_count if max_count is not None else cfg.get("DAILY_POST_COUNT", 1) or 1)
+
+    # ── 예산 선차단 ────────────────────────────────────────────
+    bs = budget.check_budget()
+    if bs["daily_exceeded"]:
+        LOG.warning("일 예산 초과 — 오늘 파이프라인 중단")
+        tg_send(cfg, f"⛔ BUDGET_LIMIT_DAILY: 일 예산 ${bs['daily_limit']} 초과")
+        return {"produced": 0, "reason": "budget_daily"}
+    if bs["monthly_exceeded"]:
+        LOG.warning("월 예산 초과 — 이번 달 파이프라인 중단")
+        tg_send(cfg, f"⛔ BUDGET_LIMIT_MONTHLY: 월 예산 ${bs['monthly_limit']} 초과")
+        return {"produced": 0, "reason": "budget_monthly"}
+
+    # ── STEP 1: 수집 ──────────────────────────────────────────
+    LOG.info("STEP 1: 수집 시작")
+    if dry_run:
+        LOG.info("[dry-run] STEP 1 완료")
+        return {"produced": 0, "reason": "dry_run"}
+
+    site_mgr = SiteManager(cfg)
+    active_sites = site_mgr.get_active_sites()
+    items = []
+    if active_sites:
+        for site in active_sites:
+            collector = get_collector(site.get("site_type", "policy"))
+            collected = collector.collect(cfg, site=site)
+            items.extend(collected)
+            LOG.info(f"사이트 '{site.get('site_name')}' ({site.get('site_type')}): {len(collected)}건")
+    else:
+        LOG.info("등록된 사이트 없음 — 기본 RSS 수집 fallback")
+        items = rss_collector.collect(cfg)
+
+    if not items:
+        LOG.info("수집된 항목 없음 — 종료")
+        return {"produced": 0, "reason": "no_items"}
+    LOG.info(f"STEP 1 완료: 총 {len(items)}건 수집 / 목표 {target}건 생산")
+
+    # 공통 컨텍스트 (한 번만 로드)
+    existing_titles = sheet_sync.get_recent_titles(cfg, 30)
+    recent_titles   = history_loader.load_recent_titles(cfg, 30)
+
+    stats = {"produced": 0, "processed": 0, "dup": 0, "failed": 0, "no_wp": 0, "reason": "ok"}
+    for idx, item in enumerate(items, 1):
+        if stats["produced"] >= target:
+            break
+        # 매 항목 전 예산 재확인 (즉시 중단)
+        bs = budget.check_budget()
+        if bs["daily_exceeded"] or bs["monthly_exceeded"]:
+            LOG.warning("처리 중 예산 초과 감지 — 남은 항목 중단 (생산 %d/%d)",
+                        stats["produced"], target)
+            tg_send(cfg, "⛔ BUDGET_LIMIT: 처리 중 예산 초과 — 중단")
+            stats["reason"] = "budget_midrun"
+            break
+        stats["processed"] += 1
+        LOG.info("──[%d/%d] 항목 처리 (생산 %d/%d)──", idx, len(items),
+                 stats["produced"], target)
+        status = _process_one(item, cfg, budget, site_mgr, existing_titles, recent_titles)
+        if status in ("published", "skipped_no_wp"):
+            stats["produced"] += 1
+            if status == "skipped_no_wp":
+                stats["no_wp"] += 1
+        elif status == "dup":
+            stats["dup"] += 1
+        else:
+            stats["failed"] += 1
+
+    elapsed = round(time.time() - start_time, 1)
+    LOG.info("✅ 실행 종료: 목표 %d / 생산 %d (발행 %d, WP대기 %d) / 처리 %d / 중복 %d / 실패 %d / %s초",
+             target, stats["produced"], stats["produced"] - stats["no_wp"], stats["no_wp"],
+             stats["processed"], stats["dup"], stats["failed"], elapsed)
+    return stats
+
+
+def _process_one(item: dict, cfg: dict, budget, site_mgr,
+                 existing_titles: list, recent_titles: list) -> str:
+    """단일 항목 STEP 2~12. 반환: 'published'|'skipped_no_wp'|'dup'|'failed'.
+
+    비용은 단계별 실제 모델로 기록(_accrue→flush)하며, 실패해도 그때까지의
+    토큰 비용을 기록한다(task: 비용 정확도).
+    """
+    costs: dict = {}   # model -> tokens (단계별 정확 기록용)
+    def _accrue(model, tokens):
+        if tokens:
+            costs[model] = costs.get(model, 0) + int(tokens)
+
+    post_id = ""
+    log_entry = {
+        "로그ID": str(uuid.uuid4())[:8],
+        "실행일시": datetime.now().isoformat(),
+        "마스터ID": "", "대상 정책명": "", "가동 결과": "오류",
+        "실패 모듈명": "", "오류 원인 내용": "", "발행 URL (성공 시)": "",
+        "총 소요시간(초)": "", "사용 토큰 합계": "",
+    }
+    t0 = time.time()
+    try:
+        # ── STEP 2: 표준화 ──
+        clean = cleaner.clean_rss_item(item, cfg)
+        _accrue(cfg.get("MODEL_CLEANER"), clean.pop("_tokens", 0))
+        clean["source_type"] = item.get("source_type", "policy")
+        clean["site_id"] = item.get("site_id", "")
+        LOG.info("STEP 2 완료: %s", clean.get("clean_policy_name"))
+
+        # ── STEP 3: 1차 유사도 ──
+        doc_for_check = f"{clean.get('clean_policy_name')} {clean.get('clean_summary','')}"
+        is_dup, sim = dup_checker.check_duplicate(doc_for_check, existing_titles, cfg)
+        if is_dup:
+            LOG.info("STEP 3 차단: 유사도=%.3f → 보류", sim)
+            sheet_sync.append_row(cfg, {
+                "상태값": "보류", "정책명": clean.get("clean_policy_name"),
+                "유사문서 위험도": sim, "발행일시": datetime.now().isoformat(),
+            })
+            _flush_costs(budget, costs)
+            return "dup"
+        LOG.info("STEP 3 통과: 유사도=%.3f", sim)
+
+        # ── 사이트 AI 프로필 ──
+        site_id  = clean.get("site_id", "")
+        site_cfg = site_mgr.get_by_id(site_id) if site_id else None
+        if site_cfg:
+            LOG.info("사이트 AI 프로필 — research=%s writing=%s review=%s",
+                     site_cfg.get("research_ai"), site_cfg.get("writing_ai"),
+                     site_cfg.get("review_ai"))
+
+        # ── STEP 5: M0 전략 ──
+        strategy = strategist.design_strategy(clean, 70.0, recent_titles, cfg, site_cfg=site_cfg)
+        _accrue(cfg.get("MODEL_ORCHESTRATOR"), strategy.pop("_tokens", 0))
+        LOG.info("STEP 5 완료: final_score=%s", strategy.get("final_score"))
+
+        # ── STEP 6: M1 SEO ──
+        seo = planner.plan_seo(clean, strategy, recent_titles, cfg, site_cfg=site_cfg)
+        _accrue(cfg.get("MODEL_PLANNER"), seo.pop("_tokens", 0))
+        is_dup2, sim2 = dup_checker.check_duplicate(seo.get("seo_title", ""), existing_titles, cfg)
+        if is_dup2:
+            LOG.info("STEP 6 SEO 제목 유사도 차단: %.3f → 보류", sim2)
+            _flush_costs(budget, costs)
+            return "dup"
+        LOG.info("STEP 6 완료: %s", seo.get("seo_title"))
+
+        # ── STEP 7: M3 Writer ──
+        draft_html, tok7 = writer.write_draft(clean, seo, strategy, [None, None, None],
+                                              cfg, site_cfg=site_cfg)
+        _accrue(cfg.get("MODEL_WRITER"), tok7)
+        LOG.info("STEP 7 완료")
+
+        # ── STEP 8: M4 Review ──
+        edited_raw, tok8 = editor.edit(draft_html, cfg, LOG, site_cfg=site_cfg)
+        _accrue(cfg.get("MODEL_EDITOR"), tok8)
+        LOG.info("STEP 8 완료")
+
+        # ── STEP 9: 파싱 ──
+        final_html = cleaner.parse_html_body(edited_raw)
+
+        # ── STEP 10: 이미지 ──
+        post_id = datetime.now().strftime("%Y%m%d%H%M%S")
+        image_urls = image_generator.generate(post_id, seo, cfg)
+
+        # ── STEP 11: 발행 (사이트별 WP override) ──
+        pub_cfg = dict(cfg)
+        if site_id:
+            wp_override = site_mgr.get_wp_config(site_id)
+            if wp_override.get("WORDPRESS_URL"):
+                pub_cfg.update(wp_override)
+                LOG.info("사이트 '%s' WP 설정 적용", site_id)
+        pub_result = publisher.publish(post_id, seo, final_html, image_urls, pub_cfg)
+        pub_status = pub_result.get("status", "published")
+        pub_url = pub_result.get("wordpress", "")
+        LOG.info("STEP 11 완료: %s", pub_status)
+
+        # ── STEP 12: DB/로그 ──
+        article_status = "발행완료" if pub_status == "published" else "검수대기"
+        sheet_sync.append_row(cfg, {
+            "상태값": article_status,
+            "정책명": clean.get("clean_policy_name"),
+            "최종추천제목": seo.get("seo_title"),
+            "메인 키워드": seo.get("main_keyword"),
+            "메타설명": seo.get("meta_description"),
+            "태그": ", ".join(seo.get("tags_list", [])),
+            "발행 URL": pub_url,
+            "발행일시": datetime.now().isoformat(),
+            "원본출처": clean.get("source_url"),
+        })
+        _flush_costs(budget, costs)
+
+        # 같은 실행 내 중복 방지 (메모리 갱신)
+        if seo.get("seo_title"):
+            existing_titles.append(seo.get("seo_title"))
+
+        total_tokens = sum(costs.values())
+        log_entry.update({
+            "마스터ID": post_id,
+            "대상 정책명": clean.get("clean_policy_name"),
+            "가동 결과": "성공" if pub_status == "published" else "성공(WP대기)",
+            "발행 URL (성공 시)": pub_url,
+            "총 소요시간(초)": round(time.time() - t0, 1),
+            "사용 토큰 합계": total_tokens,
+        })
+        sheet_sync.append_log(cfg, log_entry)
+        LOG.info("항목 완료: %s (%s, %d토큰)",
+                 clean.get("clean_policy_name"), pub_status, total_tokens)
+        return "published" if pub_status == "published" else "skipped_no_wp"
+
+    except Exception as e:
+        # 실패해도 그때까지 쓴 토큰 비용은 기록
+        _flush_costs(budget, costs)
+        log_entry.update({
+            "실패 모듈명": type(e).__name__,
+            "오류 원인 내용": str(e)[:500],
+            "마스터ID": post_id,
+            "사용 토큰 합계": sum(costs.values()),
+            "총 소요시간(초)": round(time.time() - t0, 1),
+        })
+        try:
+            sheet_sync.append_log(cfg, log_entry)
+        except Exception as log_err:
+            LOG.warning("운영로그 기록 실패(원 오류 처리 중): %s", log_err)
+        tg_send(cfg, f"❌ 항목 처리 오류: {e}")
+        LOG.error("항목 처리 오류: %s", e, exc_info=True)
+        _check_dlq(post_id, cfg)
+        return "failed"
+
+
+def _flush_costs(budget, costs: dict):
+    """단계별로 모은 (모델→토큰)을 실제 모델 단가로 기록."""
+    for model, tokens in costs.items():
+        if model and tokens:
+            try:
+                budget.record(model, tokens)
+            except Exception as e:
+                LOG.warning("비용 기록 실패(model=%s): %s", model, e)
+    costs.clear()
+
+def _check_dlq(post_id: str, cfg: dict):
+    if not post_id:
+        return
+    dlq_file = DLQ_DIR / f"{post_id}.json"
+    failures = []
+    if dlq_file.exists():
+        with open(dlq_file, encoding="utf-8") as f:
+            failures = json.load(f)
+    failures.append(datetime.now().isoformat())
+    with open(dlq_file, "w", encoding="utf-8") as f:
+        json.dump(failures, f)
+    threshold = cfg.get("DLQ_THRESHOLD", 3)
+    if len(failures) >= threshold:
+        tg_send(cfg, f"⚠️ DLQ_MOVED: ID={post_id} 발행실패 {len(failures)}회 → 재처리대기")
+        LOG.warning(f"DLQ: {post_id} 재처리대기 이동")
+
+# ─────────────────────────────────────────────────────────────
+def main():
+    args = parse_args()
+    # 설정 로드
+    if args.instance:
+        cfg_path = BASE / "config" / "instances" / args.instance / "config.yaml"
+    else:
+        cfg_path = BASE / "config" / "config.yaml"
+    try:
+        cfg = load_config(str(cfg_path))
+    except ConfigError as e:
+        print(f"[ConfigError] {e}")
+        sys.exit(1)
+    except FileNotFoundError:
+        print(f"[오류] config.yaml 파일을 찾을 수 없습니다: {cfg_path}")
+        sys.exit(1)
+
+    # 프로젝트 루트 주입 (backup/score_weights/secrets 경로 기준)
+    cfg["_root"] = str(BASE)
+    cfg["_instance_id"] = args.instance or "default"
+
+    LOG.info(f"블로그자동화 v12 시작 | instance={args.instance or 'default'} | dry-run={args.dry_run}")
+
+    # 헬스체크
+    LOG.info("헬스체크 실행...")
+    hc = health_check.run(cfg)
+    if not health_check.critical_passed(hc):
+        failed = [k for k, v in hc.items() if isinstance(v, dict) and v.get("status") == "FAIL" and v.get("level") == "CRITICAL"]
+        LOG.error(f"헬스체크 CRITICAL 실패: {failed} → 중단")
+        tg_send(cfg, f"⛔ HEALTH_CHECK_FAILED: {failed}")
+        sys.exit(1)
+    LOG.info("헬스체크 통과")
+
+    if args.dry_run:
+        LOG.info("[dry-run] 설정 검증 완료. 실제 실행 없이 종료.")
+        return
+
+    if args.strategy_room:
+        from modules.strategy_room import run_strategy_room
+        LOG.info("전략회의실 즉시 실행")
+        result = run_strategy_room({}, cfg)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+
+    if args.seed_calculators:
+        from modules.calculator_seed import seed_all
+        LOG.info("SalaryMate 초기 계산기/템플릿 시드 등록")
+        print(json.dumps(seed_all(cfg), ensure_ascii=False))
+        return
+
+    if args.calculator:
+        from modules.calculator_pipeline import run_calculator_once
+        LOG.info("계산기 콘텐츠 파이프라인 실행")
+        print(json.dumps(run_calculator_once(cfg), ensure_ascii=False))
+        return
+
+    # 단발 실행 (run_pipeline.bat 등 하위호환)
+    if args.once:
+        run_once(cfg)
+        return
+
+    # 운영 방식 결정: 기본 = 예약 발행(스케줄러). RUN_INTERVAL_HOURS는 Legacy.
+    op_mode = cfg.get("OPERATION_MODE", "scheduled")
+    use_scheduler = args.scheduler or (op_mode == "scheduled" and not args.schedule)
+
+    if use_scheduler:
+        # 슬롯 기반 발행 스케줄러 (data/schedule/today_schedule.json)
+        from modules.scheduler import run_scheduler_loop
+        LOG.info("운영 방식: 예약 발행(스케줄러)")
+        run_scheduler_loop(cfg, run_once)
+        return
+
+    # Legacy 반복 실행 모드 (RUN_INTERVAL_HOURS 간격)
+    from modules.backup_manager import BackupManager
+    bm = BackupManager(cfg)
+    interval = cfg.get("RUN_INTERVAL_HOURS", 24) * 3600
+    LOG.info(f"운영 방식: Legacy 반복 실행 — {cfg.get('RUN_INTERVAL_HOURS',24)}시간 간격")
+    while True:
+        run_once(cfg)
+        try:
+            bm.run_daily_backup()
+        except Exception as e:
+            LOG.warning("일일 백업 실패: %s", e)
+        LOG.info(f"다음 실행까지 {interval//3600}시간 대기...")
+        time.sleep(interval)
+
+if __name__ == "__main__":
+    main()

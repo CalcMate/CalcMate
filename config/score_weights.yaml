@@ -1,0 +1,9 @@
+# config/score_weights.yaml — M2 Strategist 점수 가중치
+# 합계 = 1.0  /  대시보드 Settings에서 조정 가능
+score_weights:
+  traffic:     0.30   # 검색량
+  cpc:         0.20   # 클릭단가
+  competition: 0.20   # 경쟁도 (낮을수록 유리)
+  cluster:     0.10   # 클러스터 연관성
+  calculator:  0.10   # 계산기 연동 여부
+  revenue:     0.10   # 수익모델 적합도

@@ -1,0 +1,14 @@
+# 블로그자동화 v12 의존성 (v11.7 보존 + Gemini SDK 최신화)
+openai>=1.30.0
+anthropic>=0.28.0
+google-genai>=0.3.0          # 신규 Gemini SDK (구 google-generativeai 대체, deprecated)
+google-auth>=2.29.0
+google-api-python-client>=2.130.0
+gspread>=6.1.0
+feedparser>=6.0.11
+pyyaml>=6.0.1
+numpy>=1.26.0
+requests>=2.32.0
+streamlit>=1.35.0
+pandas>=2.0.0
+Pillow>=10.0.0               # image_generator(webp 저장)에서 사용 — 기존 미선언분 추가

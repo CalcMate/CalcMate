@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<meta name="description" content="{{DESCRIPTION}}">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="sm-wrap">
+
+  <!-- Hero -->
+  <header class="sm-hero">
+    <h1>{{TITLE}}</h1>
+    <p class="sm-sub">{{DESCRIPTION}}</p>
+  </header>
+
+  <!-- 입력폼 -->
+  <section class="sm-card sm-form">
+    <h2>입력</h2>
+    {{FORM_HTML}}
+    <button type="button" class="sm-btn" onclick="calculate()">계산하기</button>
+  </section>
+
+  <!-- 결과 카드 -->
+  <section class="sm-card sm-result">
+    <h2>결과</h2>
+    {{RESULT_HTML}}
+  </section>
+
+  <!-- 결과 해설 -->
+  <section class="sm-card sm-explain">
+    <h2>결과 해설</h2>
+    {{EXPLANATION_HTML}}
+  </section>
+
+  <!-- FAQ -->
+  <section class="sm-card sm-faq">
+    <h2>자주 묻는 질문</h2>
+    {{FAQ_HTML}}
+  </section>
+
+  <!-- 관련 계산기 (site mode에 따라 표시) -->
+  {{RELATED_HTML}}
+
+  <!-- 업데이트 내역 -->
+  <section class="sm-card sm-update">
+    <h2>업데이트 내역</h2>
+    {{UPDATE_HTML}}
+  </section>
+
+  <div class="sm-foot">Powered by SalaryMate</div>
+</div>
+
+<!-- 모바일 고정 CTA -->
+<div class="sm-mobile-cta">
+  <button type="button" onclick="document.querySelector('.sm-form button').click();window.scrollTo({top:document.querySelector('.sm-result').offsetTop-20,behavior:'smooth'})">
+    지금 계산하기
+  </button>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

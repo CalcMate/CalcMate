@@ -1,0 +1,20 @@
+mode: pre_adsense
+modes:
+  pre_adsense:
+    ads: false
+    cpa: false
+    share: false
+    report: false
+    related: false
+  post_adsense:
+    ads: true
+    cpa: false
+    share: false
+    report: false
+    related: true
+  growth:
+    ads: true
+    cpa: true
+    share: true
+    report: true
+    related: true
