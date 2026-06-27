@@ -120,13 +120,23 @@ st.sidebar.markdown("**운영 방식:** `예약 발행`")
 st.sidebar.markdown(f"**애드센스:** `{cfg.get('ADSENSE_MODE','pre').upper()}`")
 st.sidebar.markdown(f"**일 예산:** `${cfg.get('DAILY_AI_BUDGET',5)}`")
 
-tab_names = [
-    "🏠 운영센터", "🤖 AI Assistant", "📋 작업 보드", "📅 오늘 발행 일정", "🌐 사이트 관리",
-    "🧮 Calculator Builder", "🧮 계산기 관리", "🏭 App Factory", "💬 AI Workspace", "📊 AI Pipeline",
-    "💰 비용 모니터", "⚠️ 오류 로그", "🏥 헬스체크", "📡 실시간 로그",
-    "📊 현황", "📋 발행 목록", "🧠 전략회의실", "🔧 설정"
-]
-tab = st.sidebar.radio("메뉴", tab_names)
+# v12 Lite: 8개 그룹으로 통합(기존 페이지 유지, 그룹→하위 2단 네비). 계산기 생성은 App Factory 단일화.
+NAV_GROUPS = {
+    "🏠 Dashboard":    ["🏠 운영센터", "📊 현황"],
+    "📝 Content":      ["📋 발행 목록", "📋 작업 보드", "💬 AI Workspace", "🧠 전략회의실"],
+    "🧮 Calculator":   ["🏭 App Factory", "🧮 계산기 관리"],
+    "📅 Scheduler":    ["📅 오늘 발행 일정", "📊 AI Pipeline", "🌐 사이트 관리"],
+    "💰 Revenue":      ["💰 비용 모니터"],
+    "📡 Logs":         ["⚠️ 오류 로그", "📡 실시간 로그", "🏥 헬스체크"],
+    "🔧 Settings":     ["🔧 설정"],
+    "🤖 AI Assistant": ["🤖 AI Assistant"],
+}
+_group = st.sidebar.radio("메뉴", list(NAV_GROUPS.keys()))
+_subs = NAV_GROUPS[_group]
+if len(_subs) > 1:
+    tab = st.sidebar.radio(_group, _subs, key=f"sub_{_group}")
+else:
+    tab = _subs[0]
 
 # ══════════════════════════════════════════════════════════════
 # 탭: 🏠 운영센터 (홈) — 5초 안에 전체 상태 파악 + 빠른 실행
