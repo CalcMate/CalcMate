@@ -1344,6 +1344,37 @@ elif tab == "🔧 설정":
         g_drive = st.text_input("GOOGLE_DRIVE_ROOT_ID", value=cfg.get("GOOGLE_DRIVE_ROOT_ID",""), key="s_drive")
         g_placeholder = st.text_input("GOOGLE_DRIVE_PLACEHOLDER_FOLDER_ID", value=cfg.get("GOOGLE_DRIVE_PLACEHOLDER_FOLDER_ID",""), key="s_ph")
 
+    with st.expander("🌐 WordPress 연동", expanded=False):
+        from modules import config_loader as _CL
+        _ready = _CL.is_wordpress_ready(cfg)
+        st.caption(("🟢 WordPress 연동됨" if _ready else "⚪ 미설정 — 발행은 '검수대기'로 대기(크래시 없음)"))
+        wp_url = st.text_input("WORDPRESS_URL", value=cfg.get("WORDPRESS_URL",""),
+                               placeholder="https://your-site.com", key="s_wpurl")
+        wcol1, wcol2 = st.columns(2)
+        wp_user = wcol1.text_input("WORDPRESS_USERNAME", value=cfg.get("WORDPRESS_USERNAME",""),
+                                   placeholder="admin", key="s_wpuser")
+        wp_pw = wcol2.text_input("WORDPRESS_APP_PASSWORD", type="password",
+                                 value=cfg.get("WORDPRESS_APP_PASSWORD", cfg.get("WORDPRESS_PASSWORD","")),
+                                 placeholder="xxxx xxxx xxxx xxxx", key="s_wppw")
+        st.caption("앱 비밀번호=WordPress 관리자 → 사용자 → 프로필 → '애플리케이션 비밀번호' 생성. 일반 로그인 비번 아님.")
+        if st.button("🔌 WordPress 연결 테스트", key="s_wptest"):
+            _u = (wp_url or "").strip().rstrip("/")
+            if not _u or not wp_user.strip() or not wp_pw.strip():
+                st.warning("URL/사용자/앱 비밀번호를 모두 입력하세요.")
+            else:
+                try:
+                    import requests
+                    r = requests.get(f"{_u}/wp-json/wp/v2/users/me",
+                                     auth=(wp_user.strip(), wp_pw.strip().replace(" ", "")), timeout=10)
+                    if r.status_code == 200:
+                        st.success(f"연결 성공 — 사용자: {r.json().get('name','?')}")
+                    elif r.status_code in (401, 403):
+                        st.error("인증 실패(401/403) — 사용자/앱 비밀번호 확인")
+                    else:
+                        st.error(f"응답 코드 {r.status_code} — URL/REST API 활성화 확인")
+                except Exception as _e:
+                    st.error(f"연결 실패: {_e}")
+
     with st.expander("⚙️ 운영 설정", expanded=False):
         st.markdown("**발행 방식** — 예약 발행(슬롯 스케줄러) 단일화 (v12 Lite)")
         operation_mode = "scheduled"
@@ -1474,6 +1505,9 @@ elif tab == "🔧 설정":
             "GOOGLE_SHEET_ID":   st.session_state.get("s_sheet", cfg.get("GOOGLE_SHEET_ID","")),
             "GOOGLE_DRIVE_ROOT_ID": st.session_state.get("s_drive", cfg.get("GOOGLE_DRIVE_ROOT_ID","")),
             "GOOGLE_DRIVE_PLACEHOLDER_FOLDER_ID": st.session_state.get("s_ph", cfg.get("GOOGLE_DRIVE_PLACEHOLDER_FOLDER_ID","")),
+            "WORDPRESS_URL":          wp_url.strip(),
+            "WORDPRESS_USERNAME":     wp_user.strip(),
+            "WORDPRESS_APP_PASSWORD": wp_pw.strip(),
             "RUN_MODE":           "wordpress",
             "ADSENSE_MODE":       adsense_mode,
             "DAILY_POST_COUNT":   int(daily_count),
