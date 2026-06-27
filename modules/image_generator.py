@@ -14,7 +14,29 @@ LOG = get_logger()
 def generate(post_id: str, seo_data: dict, cfg: dict) -> dict:
     thumb_url = _generate_free_image(post_id, "thumb", seo_data.get("image_prompt_thumbnail", ""), cfg)
     body_url  = _generate_free_image(post_id, "body",  seo_data.get("image_prompt_body", ""),  cfg)
+    # 폴백: Pollinations 실패 시 브랜드 템플릿 이미지 생성(항상 결과 보장)
+    title = seo_data.get("seo_title", "") or seo_data.get("main_keyword", "")
+    if not thumb_url:
+        thumb_url = _fallback(post_id, "thumb", title, cfg)
+    if not body_url:
+        body_url = _fallback(post_id, "body", title, cfg)
     return {"thumbnail_url": thumb_url or "실패", "body_image_url": body_url or "실패"}
+
+
+def _fallback(post_id: str, kind: str, title: str, cfg: dict) -> str | None:
+    try:
+        from . import image_fallback
+        fpath = image_fallback.generate_brand_image(post_id, kind, title)
+        if not fpath:
+            return None
+        try:
+            return _upload(Path(fpath), cfg)
+        except Exception as e:
+            LOG.warning("폴백 이미지 업로드 실패→로컬 경로: %s", e)
+            return fpath
+    except Exception as e:
+        LOG.warning("이미지 폴백 실패: %s", e)
+        return None
 
 def _generate_free_image(post_id: str, kind: str, prompt: str, cfg: dict) -> str | None:
     try:

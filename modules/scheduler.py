@@ -376,6 +376,16 @@ def run_scheduler_loop(cfg: dict, run_once_fn, poll_seconds: int = 30):
     LOG.info("슬롯 발행 스케줄러 시작 (poll=%ds)", poll_seconds)
     while True:
         try:
+            # 비용 관리: 80% 경고 / 100% 자동 일시정지(익일 자동 재개)
+            try:
+                from . import cost_manager
+                cost_manager.check_budget_alerts(cfg)
+                if cost_manager.is_paused(cfg):
+                    LOG.warning("[cost] 일 예산 한도 — 발행 일시정지(익일 재개). 이번 주기 건너뜀")
+                    time.sleep(poll_seconds)
+                    continue
+            except Exception as _e:
+                LOG.warning("cost_manager 점검 실패(무시): %s", _e)
             sched = ensure_today_schedule(cfg)
             for entry in get_due_posts(sched):
                 if _acquire_lock(cfg):

@@ -368,6 +368,46 @@ elif tab == "💰 비용 모니터":
     except Exception as e:
         st.error(f"비용 데이터 로드 오류: {e}")
 
+    st.divider()
+    # ── Cost Manager (80% 경고 / 100% 자동 일시정지 / 익일 재개) ──
+    st.subheader("🛡️ Cost Manager")
+    try:
+        from modules import cost_manager as CM
+        cs = CM.status(cfg)
+        paused = CM.is_paused(cfg)
+        cc = st.columns(3)
+        cc[0].metric("일 예산 사용률", f"{cs['pct']:.0f}%")
+        cc[1].metric("상태", "⛔ 일시정지" if paused else "🟢 정상")
+        cc[2].metric("정책", "80%경고 / 100%정지")
+        if paused:
+            st.error("일 예산 한도 도달로 자동 일시정지됨(익일 자동 재개).")
+            if st.button("▶ 지금 수동 재개", key="cm_resume"):
+                CM.resume(cfg); st.success("재개됨"); st.rerun()
+    except Exception as e:
+        st.caption(f"Cost Manager 로드 실패: {e}")
+
+    st.divider()
+    # ── Retry Queue (WordPress 발행 실패분 재발행) ──
+    st.subheader("🔁 발행 재시도 큐")
+    try:
+        from modules import retry_queue as RQ
+        pend = RQ.list_pending()
+        if not pend:
+            st.caption("재발행 대기 없음")
+        for it in pend[:20]:
+            with st.container(border=True):
+                st.markdown(f"**{it['seo'].get('seo_title','(제목없음)')}** · "
+                            f"<span class='sm-dim'>{it.get('created_at','')[:16]} · {it.get('error','')[:60]}</span>",
+                            unsafe_allow_html=True)
+                rc = st.columns(2)
+                if rc[0].button("🔁 재발행", key=f"rq_{it['id']}"):
+                    ok, msg = RQ.retry(cfg, it["id"])
+                    (st.success if ok else st.error)(msg); st.rerun()
+                if rc[1].button("🗑 제거", key=f"rqd_{it['id']}"):
+                    RQ.remove(it["id"]); st.rerun()
+    except Exception as e:
+        st.caption(f"Retry Queue 로드 실패: {e}")
+
 # ══════════════════════════════════════════════════════════════
 # 탭: 📅 오늘 발행 일정 (슬롯 스케줄러)
 # ══════════════════════════════════════════════════════════════

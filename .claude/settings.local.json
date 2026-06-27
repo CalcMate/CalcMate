@@ -67,7 +67,9 @@
       "Bash(git init *)",
       "Bash(git config *)",
       "Bash(git add *)",
-      "Bash(git commit -q -m 'backup: before v12 lite refactoring *)"
+      "Bash(git commit -q -m 'backup: before v12 lite refactoring *)",
+      "Bash(.venv/Scripts/python.exe -m py_compile dashboard.py modules/ai_assistant.py)",
+      "Bash(git commit -q -m 'feat: AI Assistant 탭 추가 \\(채팅/파일도구/메모리/태스크/분석, 승인 게이트\\) *)"
     ]
   }
 }
