@@ -116,8 +116,7 @@ def _run_action(label: str, fn):
 
 # ── 사이드바 ───────────────────────────────────────────────────
 st.sidebar.title("🛰️ 블로그자동화 v12")
-_op_mode = cfg.get("OPERATION_MODE", "scheduled")
-st.sidebar.markdown(f"**운영 방식:** `{'예약 발행' if _op_mode=='scheduled' else 'Legacy 반복'}`")
+st.sidebar.markdown("**운영 방식:** `예약 발행`")
 st.sidebar.markdown(f"**애드센스:** `{cfg.get('ADSENSE_MODE','pre').upper()}`")
 st.sidebar.markdown(f"**일 예산:** `${cfg.get('DAILY_AI_BUDGET',5)}`")
 
@@ -1336,14 +1335,9 @@ elif tab == "🔧 설정":
         g_placeholder = st.text_input("GOOGLE_DRIVE_PLACEHOLDER_FOLDER_ID", value=cfg.get("GOOGLE_DRIVE_PLACEHOLDER_FOLDER_ID",""), key="s_ph")
 
     with st.expander("⚙️ 운영 설정", expanded=False):
-        st.markdown("**발행 방식**")
-        op_choice = st.radio(
-            "운영 방식 선택", ["예약 발행 모드", "Legacy 반복 실행 모드"],
-            index=0 if cfg.get("OPERATION_MODE", "scheduled") == "scheduled" else 1,
-            key="s_opmode",
-            help="예약 발행=📅 슬롯 일정대로 발행(권장/기본). Legacy=RUN_INTERVAL_HOURS 간격 반복.")
-        operation_mode = "scheduled" if op_choice.startswith("예약") else "legacy"
-        st.caption("실행: 예약 발행 → `scripts/run_scheduler.bat` · Legacy → `scripts/run_schedule.bat` · 단발 → `run_pipeline.bat`")
+        st.markdown("**발행 방식** — 예약 발행(슬롯 스케줄러) 단일화 (v12 Lite)")
+        operation_mode = "scheduled"
+        st.caption("실행: 예약 발행 → `scripts/run_scheduler.bat` · 단발 → `scripts/run_pipeline.bat`")
         st.divider()
         col1, col2 = st.columns(2)
         with col1:
@@ -1351,7 +1345,6 @@ elif tab == "🔧 설정":
             st.metric("하루 발행 개수 (DAILY_POST_COUNT)", cfg.get("DAILY_POST_COUNT", 3))
             st.caption("※ '📅 오늘 발행 일정' 탭의 슬롯 수로 자동 결정")
             daily_count = cfg.get("DAILY_POST_COUNT", 3)
-            run_interval = st.number_input("RUN_INTERVAL_HOURS (Legacy 전용)", 1, 168, cfg.get("RUN_INTERVAL_HOURS",24), key="s_ri")
         with col2:
             daily_budget = st.number_input("DAILY_AI_BUDGET (USD)", 1, 100, cfg.get("DAILY_AI_BUDGET",5), key="s_db")
             monthly_budget = st.number_input("MONTHLY_AI_BUDGET (USD)", 10, 1000, cfg.get("MONTHLY_AI_BUDGET",100), key="s_mb")
@@ -1454,7 +1447,6 @@ elif tab == "🔧 설정":
             "RUN_MODE":           "wordpress",
             "ADSENSE_MODE":       adsense_mode,
             "DAILY_POST_COUNT":   int(daily_count),
-            "RUN_INTERVAL_HOURS": int(run_interval),
             "DAILY_AI_BUDGET":    int(daily_budget),
             "MONTHLY_AI_BUDGET":  int(monthly_budget),
             "DLQ_THRESHOLD":      int(dlq_threshold),

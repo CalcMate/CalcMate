@@ -46,7 +46,6 @@ DEFAULT_CONFIG = {
     "DB_ADAPTER":      "sheets",
     "STORAGE_ADAPTER": "drive",
     "SQLITE_PATH":     "data/blog_auto.db",
-    "RUN_INTERVAL_HOURS": 24,
     "DAILY_POST_COUNT":   3,
     "DAILY_AI_BUDGET":    5,
     "MONTHLY_AI_BUDGET":  100,
@@ -367,7 +366,6 @@ def _step_settings():
                                      index=["pre","post"].index(cfg.get("ADSENSE_MODE","pre")),
                                      help="pre=승인 전 (학술형), post=승인 후 (마케팅형)")
         daily_count   = st.number_input("하루 발행 목표", 1, 20, cfg.get("DAILY_POST_COUNT", 3))
-        run_interval  = st.number_input("실행 간격 (시간)", 1, 168, cfg.get("RUN_INTERVAL_HOURS", 24))
     with col2:
         daily_budget  = st.number_input("일 AI 예산 (USD)", 1, 100, cfg.get("DAILY_AI_BUDGET", 5))
         monthly_budget= st.number_input("월 AI 예산 (USD)", 10, 1000, cfg.get("MONTHLY_AI_BUDGET", 100))
@@ -392,7 +390,6 @@ def _step_settings():
             st.session_state.wizard_cfg.update({
                 "ADSENSE_MODE":      adsense_mode,
                 "DAILY_POST_COUNT":  int(daily_count),
-                "RUN_INTERVAL_HOURS": int(run_interval),
                 "DAILY_AI_BUDGET":   int(daily_budget),
                 "MONTHLY_AI_BUDGET": int(monthly_budget),
                 "DLQ_THRESHOLD":     int(dlq_threshold),

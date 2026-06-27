@@ -38,7 +38,6 @@ def parse_args():
     p = argparse.ArgumentParser(description="블로그자동화 v11.6")
     p.add_argument("--dry-run", action="store_true", help="설정 검증만 수행, 실제 API 호출 없음")
     p.add_argument("--once", action="store_true", help="파이프라인 1회만 실행(단발)")
-    p.add_argument("--schedule", action="store_true", help="[Legacy] RUN_INTERVAL_HOURS 주기 반복 실행")
     p.add_argument("--scheduler", action="store_true", help="슬롯 기반 발행 스케줄러 (오늘 일정대로 시각별 1건 발행)")
     p.add_argument("--instance", default=None, help="멀티 인스턴스 ID (config/instances/{id}/config.yaml 로드)")
     p.add_argument("--strategy-room", action="store_true", help="전략회의실 즉시 실행")
@@ -368,30 +367,11 @@ def main():
         run_once(cfg)
         return
 
-    # 운영 방식 결정: 기본 = 예약 발행(스케줄러). RUN_INTERVAL_HOURS는 Legacy.
-    op_mode = cfg.get("OPERATION_MODE", "scheduled")
-    use_scheduler = args.scheduler or (op_mode == "scheduled" and not args.schedule)
-
-    if use_scheduler:
-        # 슬롯 기반 발행 스케줄러 (data/schedule/today_schedule.json)
-        from modules.scheduler import run_scheduler_loop
-        LOG.info("운영 방식: 예약 발행(스케줄러)")
-        run_scheduler_loop(cfg, run_once)
-        return
-
-    # Legacy 반복 실행 모드 (RUN_INTERVAL_HOURS 간격)
-    from modules.backup_manager import BackupManager
-    bm = BackupManager(cfg)
-    interval = cfg.get("RUN_INTERVAL_HOURS", 24) * 3600
-    LOG.info(f"운영 방식: Legacy 반복 실행 — {cfg.get('RUN_INTERVAL_HOURS',24)}시간 간격")
-    while True:
-        run_once(cfg)
-        try:
-            bm.run_daily_backup()
-        except Exception as e:
-            LOG.warning("일일 백업 실패: %s", e)
-        LOG.info(f"다음 실행까지 {interval//3600}시간 대기...")
-        time.sleep(interval)
+    # 운영 방식: 슬롯 기반 예약 발행(스케줄러) 단일화. (Legacy 반복 실행 모드는 v12 Lite에서 제거)
+    from modules.scheduler import run_scheduler_loop
+    LOG.info("운영 방식: 예약 발행(스케줄러)")
+    run_scheduler_loop(cfg, run_once)
+    return
 
 if __name__ == "__main__":
     main()

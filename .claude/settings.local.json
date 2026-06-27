@@ -69,7 +69,11 @@
       "Bash(git add *)",
       "Bash(git commit -q -m 'backup: before v12 lite refactoring *)",
       "Bash(.venv/Scripts/python.exe -m py_compile dashboard.py modules/ai_assistant.py)",
-      "Bash(git commit -q -m 'feat: AI Assistant 탭 추가 \\(채팅/파일도구/메모리/태스크/분석, 승인 게이트\\) *)"
+      "Bash(git commit -q -m 'feat: AI Assistant 탭 추가 \\(채팅/파일도구/메모리/태스크/분석, 승인 게이트\\) *)",
+      "Bash(git rm *)",
+      "Bash(.venv/Scripts/python.exe -m py_compile main.py dashboard.py)",
+      "Bash(rm -f data/_p3.log)",
+      "Bash(git commit -q -m 'refactor\\(slim\\): Legacy 반복 실행/RUN_INTERVAL_HOURS 제거, 예약발행 단일화 *)"
     ]
   }
 }

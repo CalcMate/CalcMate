@@ -33,7 +33,6 @@ PLANNER_PROVIDER: gemini
 RSS_MAX_ITEMS_PER_SOURCE: 20
 RSS_SOURCE_LIST:
 - https://www.korea.kr/rss/policy.xml
-RUN_INTERVAL_HOURS: 24
 RUN_MODE: wordpress
 SQLITE_PATH: data/blog_auto.db
 STORAGE_ADAPTER: drive
