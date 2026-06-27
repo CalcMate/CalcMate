@@ -122,7 +122,7 @@ st.sidebar.markdown(f"**애드센스:** `{cfg.get('ADSENSE_MODE','pre').upper()}
 st.sidebar.markdown(f"**일 예산:** `${cfg.get('DAILY_AI_BUDGET',5)}`")
 
 tab_names = [
-    "🏠 운영센터", "📋 작업 보드", "📅 오늘 발행 일정", "🌐 사이트 관리",
+    "🏠 운영센터", "🤖 AI Assistant", "📋 작업 보드", "📅 오늘 발행 일정", "🌐 사이트 관리",
     "🧮 Calculator Builder", "🧮 계산기 관리", "🏭 App Factory", "💬 AI Workspace", "📊 AI Pipeline",
     "💰 비용 모니터", "⚠️ 오류 로그", "🏥 헬스체크", "📡 실시간 로그",
     "📊 현황", "📋 발행 목록", "🧠 전략회의실", "🔧 설정"
@@ -1006,6 +1006,117 @@ elif tab == "📊 AI Pipeline":
                      hide_index=True, use_container_width=True)
     st.subheader("최근 로그")
     st.code("\n".join(ps["last_lines"]) or "(로그 없음)", language="text")
+
+# ══════════════════════════════════════════════════════════════
+# 탭: 🤖 AI Assistant (운영비서 — 채팅/파일도구/메모리/태스크/분석)
+# ══════════════════════════════════════════════════════════════
+elif tab == "🤖 AI Assistant":
+    st.title("🤖 AI Assistant — 운영비서")
+    st.caption("채팅으로 프로젝트 분석·개선·수정. 파일 쓰기는 승인 후에만, 워크스페이스 내부 한정(삭제/시스템명령 불가).")
+    from modules import ai_assistant as AS
+
+    model_label = st.selectbox("모델", list(AS.CHAT_MODELS.keys()), key="asst_model")
+    qc = st.columns(4)
+    preset_labels = ["현재 프로젝트 분석해", "App Factory 분석해", "문제점 찾아", "개선안 제안해"]
+    quick = None
+    for i, lab in enumerate(preset_labels):
+        if qc[i].button(lab, key=f"asst_qc_{i}"):
+            quick = lab
+
+    if "asst_msgs" not in st.session_state:
+        st.session_state["asst_msgs"] = []
+    for m in st.session_state["asst_msgs"]:
+        with st.chat_message(m["role"]):
+            st.markdown(m["content"])
+    prompt = st.chat_input("명령/질문 (예: config 수정해, 새 계산기 추가해, 최근 오류 분석해)") or quick
+    if prompt:
+        st.session_state["asst_msgs"].append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+        with st.chat_message("assistant"):
+            with st.spinner("분석 중..."):
+                try:
+                    reply, model, tok = AS.chat(cfg, model_label, st.session_state["asst_msgs"])
+                except Exception as e:
+                    reply, model, tok = f"오류: {e}", "", 0
+            st.markdown(reply)
+            st.caption(f"{model} · {tok} tokens")
+        st.session_state["asst_msgs"].append({"role": "assistant", "content": reply})
+
+    st.divider()
+    # ── 파일 수정/생성 (승인 게이트) ──
+    with st.expander("📝 파일 수정/생성 (변경 미리보기 → 승인 후 저장)"):
+        st.caption("워크스페이스 내부만. write 시 원본 자동 백업(data/assistant/backups/).")
+        fpath = st.text_input("대상 경로", "data/workspace/example.txt", key="asst_path")
+        fcontent = st.text_area("새 내용 (AI 답변에서 복사 가능)", height=200, key="asst_content")
+        if st.button("🔍 변경 미리보기", key="asst_preview"):
+            try:
+                st.session_state["asst_diff"] = AS.propose_diff(fpath, fcontent)
+            except Exception as e:
+                st.error(str(e))
+        diff = st.session_state.get("asst_diff")
+        if diff and diff["path"] == fpath:
+            st.write(f"{'✏️ 덮어쓰기' if diff['exists'] else '🆕 신규 생성'} — "
+                     f"기존 {diff['old_len']}자 → 새 {diff['new_len']}자")
+            if diff["exists"]:
+                with st.expander("기존 내용 보기"):
+                    st.code(diff["old"][:3000])
+            c1, c2 = st.columns(2)
+            if c1.button("✅ 승인 후 저장", type="primary", key="asst_apply"):
+                try:
+                    path = AS.write_file(fpath, fcontent) if diff["exists"] else AS.create_file(fpath, fcontent)
+                    st.success(f"저장 완료: {path}")
+                    st.session_state.pop("asst_diff", None)
+                except Exception as e:
+                    st.error(f"저장 실패: {e}")
+            if c2.button("취소", key="asst_cancel"):
+                st.session_state.pop("asst_diff", None); st.rerun()
+
+    # ── 워크스페이스 탐색/읽기 ──
+    with st.expander("📂 워크스페이스 탐색/읽기"):
+        d = st.text_input("디렉터리", ".", key="asst_ls")
+        try:
+            for it in AS.list_directory(d):
+                st.caption(("📁 " if it["type"] == "dir" else "📄 ") + it["path"])
+        except Exception as e:
+            st.error(str(e))
+        rf = st.text_input("파일 읽기 경로", "modules/app_factory.py", key="asst_rf")
+        if st.button("읽기", key="asst_rfb"):
+            try:
+                st.code(AS.read_file(rf, 8000))
+            except Exception as e:
+                st.error(str(e))
+
+    # ── Memory ──
+    with st.expander("🧠 Memory (운영규칙 / TODO / 개발기록)"):
+        mem = AS.load_memory()
+        k = st.selectbox("종류", ["rules", "todo", "dev_log"], key="asst_mk")
+        nt = st.text_input("추가 내용", key="asst_mt")
+        if st.button("메모리 추가", key="asst_ma") and nt.strip():
+            AS.add_memory(k, nt); st.rerun()
+        for kk in ["rules", "todo", "dev_log"]:
+            items = mem.get(kk, [])
+            if items:
+                st.markdown(f"**{kk}** ({len(items)})")
+                for it in items[-10:]:
+                    st.caption("• " + it["text"])
+
+    # ── Task (Lite) ──
+    with st.expander("✅ Task (Lite: 상태만)"):
+        nt2 = st.text_input("새 태스크", key="asst_tt")
+        if st.button("태스크 추가", key="asst_ta") and nt2.strip():
+            AS.add_task(nt2); st.rerun()
+        for t in AS.load_tasks()[-15:]:
+            cols = st.columns([3, 2])
+            cols[0].caption(t["title"])
+            ns = cols[1].selectbox("상태", AS.TASK_STATUS,
+                                   index=AS.TASK_STATUS.index(t["status"]) if t["status"] in AS.TASK_STATUS else 0,
+                                   key="asst_ts_" + t["id"], label_visibility="collapsed")
+            if ns != t["status"]:
+                AS.set_task_status(t["id"], ns); st.rerun()
+
+    if st.button("🗑 대화 초기화", key="asst_clear"):
+        st.session_state["asst_msgs"] = []; st.rerun()
 
 # ══════════════════════════════════════════════════════════════
 # 탭: 🧠 전략회의실 (AI 운영 분석)
