@@ -1362,6 +1362,26 @@ elif tab == "🔧 설정":
         auto_topic = st.toggle("AUTO_TOPIC_EXPANSION", value=cfg.get("AUTO_TOPIC_EXPANSION",False), key="s_ate")
         enable_strategy = st.toggle("ENABLE_STRATEGY_ROOM", value=cfg.get("ENABLE_STRATEGY_ROOM",True), key="s_esr")
 
+        st.divider()
+        st.markdown("**📨 텔레그램 알림** (오류/예산경고/일일요약/발행승인)")
+        tcol1, tcol2 = st.columns(2)
+        tg_token = tcol1.text_input("TELEGRAM_BOT_TOKEN", value=cfg.get("TELEGRAM_BOT_TOKEN",""),
+                                    type="password", placeholder="1234567890:ABC...", key="s_tgtoken")
+        tg_chat = tcol2.text_input("TELEGRAM_CHAT_ID", value=cfg.get("TELEGRAM_CHAT_ID",""),
+                                   placeholder="-1001234567890", key="s_tgchat")
+        st.caption("봇 토큰=@BotFather로 생성 · Chat ID=@userinfobot 또는 그룹에 봇 초대 후 확인. 저장 후 아래 '테스트 전송'으로 확인.")
+        if st.button("📤 텔레그램 테스트 전송", key="s_tgtest"):
+            from modules import telegram_ops as _TG
+            _tcfg = dict(cfg); _tcfg["TELEGRAM_BOT_TOKEN"] = tg_token.strip(); _tcfg["TELEGRAM_CHAT_ID"] = tg_chat.strip()
+            if not tg_token.strip() or not tg_chat.strip():
+                st.warning("토큰과 Chat ID를 먼저 입력하세요.")
+            else:
+                try:
+                    _TG.notify(_tcfg, "✅ SalaryMate 텔레그램 연결 테스트 — 정상")
+                    st.success("전송 시도 완료. 텔레그램 메시지를 확인하세요(미수신 시 토큰/Chat ID 재확인).")
+                except Exception as _e:
+                    st.error(f"전송 실패: {_e}")
+
     # ── AI 역할 체계 (확장 기능 전용 — 기존 파이프라인 모델과 별개) ──
     with st.expander("🧠 AI 역할 체계 (AI Workspace / App Factory 용)", expanded=False):
         st.caption("총괄/리서치/코드/작성/검수/이미지 역할별 모델. 기존 ORCHESTRATOR/PLANNER/WRITER/EDITOR 설정과 별개로 동작합니다.")
@@ -1460,6 +1480,8 @@ elif tab == "🔧 설정":
             "DAILY_AI_BUDGET":    int(daily_budget),
             "MONTHLY_AI_BUDGET":  int(monthly_budget),
             "DLQ_THRESHOLD":      int(dlq_threshold),
+            "TELEGRAM_BOT_TOKEN": tg_token.strip(),
+            "TELEGRAM_CHAT_ID":   tg_chat.strip(),
             "AUTO_TOPIC_EXPANSION": auto_topic,
             "ENABLE_STRATEGY_ROOM": enable_strategy,
             "OPERATION_MODE": operation_mode,
