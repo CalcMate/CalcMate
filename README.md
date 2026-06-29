@@ -64,7 +64,8 @@ SEO기획 STEP6 planner.plan_seo() + 2차 제목 중복검사     [Gemini 2.5-fl
 1. **Python**: 3.11+ (`scripts/install.bat`이 확인). 개발/검증은 3.12 venv.
 2. **의존성**: `python -m venv .venv` → `.venv\Scripts\python.exe -m pip install -r requirements.txt`
    (openai, anthropic, **google-genai**, gspread, google-api-python-client, feedparser, streamlit, pandas, numpy, Pillow, pyyaml, requests)
-3. **config**: `config/config.yaml`(모델/예산/Google/WP), `config/secrets.yaml`(WP 프로필·AI키), `config/score_weights.yaml`, `config/site_mode.yaml`. 최초 미설정 시 대시보드가 설정 마법사 자동 표시.
+3. **config**: `config/config.yaml`(모델/예산/Google/WP URL 등 일반 설정), `config/secrets.yaml`(**API 키·앱 비밀번호·봇 토큰 등 민감정보** + WP 프로필·AI키), `config/score_weights.yaml`, `config/site_mode.yaml`. 최초 미설정 시 대시보드가 설정 마법사 자동 표시.
+   - **🔐 최초 실행(시크릿 준비)**: ① `config/secrets.example.yaml` → `config/secrets.yaml` 복사 → ② 실제 API 키 입력 → ③ 대시보드/파이프라인 실행. `secrets.yaml`은 `.gitignore` 대상(커밋 안 됨). `ConfigLoader`가 런타임에 `config.yaml + secrets.yaml`을 병합(secrets 우선)하므로 기존 코드는 그대로 동작.
 4. **Google Sheets**: `credentials.json`(서비스계정) + `GOOGLE_SHEET_ID`. **시트를 서비스 계정 이메일에 편집자 공유 필수**. 마법사 2단계가 7탭 자동 생성.
 5. **Google Drive**: 같은 서비스 계정 `GOOGLE_DRIVE_ROOT_ID`(이미지 업로드), 폴더도 공유.
 6. **WordPress**: `WORDPRESS_URL`/`WORDPRESS_USERNAME`/`WORDPRESS_APP_PASSWORD`(Application Password). 미설정 시 발행 자동 대기(크래시 없음).

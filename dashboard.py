@@ -53,6 +53,9 @@ def load_cfg():
     cfg_path = BASE / "config" / "config.yaml"
     with open(cfg_path, encoding="utf-8") as f:
         c = yaml.safe_load(f) or {}
+    # 민감정보는 config/secrets.yaml에 분리 저장 → 런타임 병합(secrets 우선)
+    from modules.config_loader import merge_secrets
+    c = merge_secrets(c, str(cfg_path))
     c["_root"] = str(BASE)   # scheduler/backup 경로 기준
     return c
 
@@ -1522,8 +1525,13 @@ elif tab == "🔧 설정":
         }
         new_cfg.update(updates)
 
+        # 민감정보는 config.yaml이 아닌 secrets.yaml에 저장(분리 유지)
+        from modules.config_loader import split_secrets, save_secrets_flat
+        public_cfg, secret_cfg = split_secrets(new_cfg)
+        if secret_cfg:
+            save_secrets_flat(secret_cfg, str(cfg_path))
         with open(cfg_path, "w", encoding="utf-8") as f:
-            yaml.dump(new_cfg, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+            yaml.dump(public_cfg, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
         st.success("✅ 제미나이 안전 규격 및 무료 이미지 옵션이 반영되어 저장되었습니다!")
         st.cache_resource.clear()
 

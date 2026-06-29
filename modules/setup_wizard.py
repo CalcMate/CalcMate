@@ -78,13 +78,24 @@ def config_exists() -> bool:
 
 def save_config(d: dict):
     CFG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    # 민감정보(API 키/앱 비밀번호/봇 토큰)는 config.yaml이 아닌 secrets.yaml로 분리 저장
+    from modules.config_loader import split_secrets, save_secrets_flat
+    public, secret = split_secrets(d)
+    if secret:
+        save_secrets_flat(secret, str(CFG_PATH))
     with open(CFG_PATH, "w", encoding="utf-8") as f:
-        yaml.dump(d, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+        yaml.dump(public, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
 
 def save_secrets(d: dict):
     SECRETS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    # 기존 secrets.yaml(flat 비밀키 등)을 보존하기 위해 덮어쓰기 대신 병합
+    existing = {}
+    if SECRETS_PATH.exists():
+        with open(SECRETS_PATH, encoding="utf-8") as f:
+            existing = yaml.safe_load(f) or {}
+    existing.update(d)
     with open(SECRETS_PATH, "w", encoding="utf-8") as f:
-        yaml.dump(d, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+        yaml.dump(existing, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
     # .gitignore 등록
     gi = BASE / ".gitignore"
     content = gi.read_text(encoding="utf-8") if gi.exists() else ""
