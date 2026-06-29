@@ -753,6 +753,124 @@ elif tab == "🌐 사이트 관리":
                     if okc:
                         st.cache_resource.clear(); st.rerun()
 
+    # ── 🧙 새 사이트 마법사 (5단계: Profile→Platform→Feature→Settings→Pipeline) ──
+    with st.expander("🧙 새 사이트 마법사 (5단계)"):
+        WP_FEATS = ["글 작성", "자동 발행", "SEO", "이미지 업로드", "카테고리"]
+        CALC_FEATS = ["계산기 생성", "계산기 SEO 글", "FAQ 생성", "AI Reviewer", "HTML 생성"]
+        COMMON_FEATS = ["Scheduler", "Telegram", "AI Assistant", "Analytics", "Cost Manager", "Retry Queue"]
+        w = st.session_state.setdefault("wiz6", {"step": 1, "data": {}})
+        step, d = w["step"], w["data"]
+        st.caption(f"진행: {step}/5")
+
+        if step == 1:
+            st.markdown("**Step 1 · Site Profile**")
+            d["site_name"] = st.text_input("사이트명 *", value=d.get("site_name", ""), key="w6_name")
+            d["domain"]    = st.text_input("도메인 *", value=d.get("domain", ""), key="w6_dom")
+            d["wp_url"]    = st.text_input("WordPress URL (선택)", value=d.get("wp_url", ""), key="w6_wpurl")
+            if st.button("다음 →", key="w6_n1"):
+                if d.get("site_name") and d.get("domain"):
+                    w["step"] = 2; st.rerun()
+                else:
+                    st.error("사이트명과 도메인은 필수입니다.")
+
+        elif step == 2:
+            st.markdown("**Step 2 · Platform 선택 (독립 복수)**")
+            pf = d.get("platforms", [])
+            use_wp   = st.checkbox("WordPress", value=("WordPress" in pf), key="w6_pwp")
+            use_calc = st.checkbox("Calculator", value=("Calculator" in pf), key="w6_pcalc")
+            if use_wp:
+                st.caption("WordPress 자격증명 (필수)")
+                d["wp_user"] = st.text_input("WordPress ID *", value=d.get("wp_user", ""), key="w6_wpuser")
+                d["wp_pw"]   = st.text_input("App Password *", type="password", value=d.get("wp_pw", ""), key="w6_wppw")
+            c1, c2 = st.columns(2)
+            if c1.button("← 이전", key="w6_b2"): w["step"] = 1; st.rerun()
+            if c2.button("다음 →", key="w6_n2"):
+                pf = (["WordPress"] if use_wp else []) + (["Calculator"] if use_calc else [])
+                d["platforms"] = pf
+                if use_wp and not (d.get("wp_url") and d.get("wp_user") and d.get("wp_pw")):
+                    st.error("WordPress 선택 시 URL(Step1)/ID/App Password가 필요합니다.")
+                else:
+                    w["step"] = 3; st.rerun()
+
+        elif step == 3:
+            st.markdown("**Step 3 · Feature 선택 (Platform별 + 공통)**")
+            pf, sel = d.get("platforms", []), {}
+            if "WordPress" in pf:
+                st.markdown("*WordPress*")
+                sel["wordpress"] = [f for f in WP_FEATS if st.checkbox(f, value=True, key=f"w6_fw_{f}")]
+            if "Calculator" in pf:
+                st.markdown("*Calculator*")
+                sel["calculator"] = [f for f in CALC_FEATS if st.checkbox(f, value=True, key=f"w6_fc_{f}")]
+            st.markdown("*공통*")
+            sel["common"] = [f for f in COMMON_FEATS if st.checkbox(f, value=True, key=f"w6_fco_{f}")]
+            c1, c2 = st.columns(2)
+            if c1.button("← 이전", key="w6_b3"): w["step"] = 2; st.rerun()
+            if c2.button("다음 →", key="w6_n3"):
+                d["features"] = sel; w["step"] = 4; st.rerun()
+
+        elif step == 4:
+            st.markdown("**Step 4 · Settings (Global 기본값 → Override)**")
+            st.caption("미변경 시 Global 기본값 적용. 상세 항목은 작업7(Site Settings)에서 편집.")
+            a1, a2, a3 = st.columns(3)
+            d["research_ai"] = a1.selectbox("Research AI", AI_PROFILES,
+                index=AI_PROFILES.index(d.get("research_ai", SW.DEFAULT_AI["research_ai"])), key="w6_rai")
+            d["writing_ai"] = a2.selectbox("Writing AI", AI_PROFILES,
+                index=AI_PROFILES.index(d.get("writing_ai", SW.DEFAULT_AI["writing_ai"])), key="w6_wai")
+            d["review_ai"] = a3.selectbox("Review AI", AI_PROFILES,
+                index=AI_PROFILES.index(d.get("review_ai", SW.DEFAULT_AI["review_ai"])), key="w6_vai")
+            d["daily_override"] = st.number_input("일 발행수 (Override)", 1, 20,
+                int(d.get("daily_override", cfg.get("DAILY_POST_COUNT", 3))), key="w6_daily")
+            c1, c2 = st.columns(2)
+            if c1.button("← 이전", key="w6_b4"): w["step"] = 3; st.rerun()
+            if c2.button("다음 →", key="w6_n4"): w["step"] = 5; st.rerun()
+
+        elif step == 5:
+            st.markdown("**Step 5 · Pipeline 연결 확인**")
+            pf = d.get("platforms", [])
+            if "Calculator" in pf and "WordPress" in pf:
+                pipe_msg = "이 Site는 **Calculator Pipeline → WordPress 발행** 순서로 실행됩니다."
+            elif "Calculator" in pf:
+                pipe_msg = "이 Site는 **Calculator Pipeline**으로 실행됩니다."
+            elif "WordPress" in pf:
+                pipe_msg = "이 Site는 **RSS/정책 Pipeline → WordPress 발행**으로 실행됩니다."
+            else:
+                pipe_msg = "Platform 미선택 — 나중에 Platform을 추가하면 Pipeline이 결정됩니다."
+            st.info(pipe_msg)
+            st.json({"profile": {"name": d.get("site_name"), "domain": d.get("domain")},
+                     "platforms": pf, "features": d.get("features", {}),
+                     "override": {"research_ai": d.get("research_ai"), "writing_ai": d.get("writing_ai"),
+                                  "review_ai": d.get("review_ai"), "daily": d.get("daily_override")}})
+            c1, c2 = st.columns(2)
+            if c1.button("← 이전", key="w6_b5"): w["step"] = 4; st.rerun()
+            if c2.button("✅ 사이트 생성", type="primary", key="w6_create"):
+                needs_wp = "WordPress" in pf
+                label = "사용자정의" if needs_wp else "계산기"
+                ok, msg = SW.create_site(cfg, label, {
+                    "site_name": d.get("site_name", ""), "domain": d.get("domain", ""), "category": "",
+                    "wp_url": d.get("wp_url", ""), "wp_user": d.get("wp_user", ""),
+                    "wp_app_password": d.get("wp_pw", ""), "rss_sources": "",
+                    "research_ai": d.get("research_ai", ""), "writing_ai": d.get("writing_ai", ""),
+                    "review_ai": d.get("review_ai", ""),
+                })
+                if ok:
+                    try:  # platforms/features를 신규 컬럼으로 기록(create_site 무변경)
+                        rows = SW.list_sites(cfg)
+                        nm = d.get("site_name", "").strip()
+                        nr = next((x for x in rows if str(x.get("site_name", "")).strip() == nm), None)
+                        if nr:
+                            SW.update_site(cfg, nr.get("site_id", ""), {
+                                "platforms": _json.dumps(pf, ensure_ascii=False),
+                                "features": _json.dumps(d.get("features", {}), ensure_ascii=False),
+                                "daily_override": str(d.get("daily_override", "")),
+                            })
+                    except Exception as e:
+                        st.warning(f"platforms/features 기록 경고: {e}")
+                    st.success(msg + " · Platform/Feature 저장됨")
+                    st.session_state.pop("wiz6", None)
+                    st.cache_resource.clear(); st.rerun()
+                else:
+                    st.error(msg)
+
     # ── ➕ 사이트 추가 ──
     with st.expander("➕ 사이트 추가", expanded=True):
         type_label = st.selectbox("유형 선택", SW.SITE_TYPES, key="sw_type")
