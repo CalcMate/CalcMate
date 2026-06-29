@@ -76,7 +76,13 @@
       "Bash(git commit -q -m 'refactor\\(slim\\): Legacy 반복 실행/RUN_INTERVAL_HOURS 제거, 예약발행 단일화 *)",
       "Bash(rm -f scripts/_shot.py nav8.png data/_p4.log data/_p4b.log)",
       "Bash(git commit -q -m 'refactor\\(ui\\): 18탭 → 8그룹 2단 네비게이션 통합 \\(Calculator Builder 비노출, 계산기생성 App Factory 단일화\\) *)",
-      "Bash(git commit -q -m 'docs: README 갱신 + MIGRATION_NOTES + V12_LITE_TEST_REPORT \\(v12 Lite\\) *)"
+      "Bash(git commit -q -m 'docs: README 갱신 + MIGRATION_NOTES + V12_LITE_TEST_REPORT \\(v12 Lite\\) *)",
+      "Bash(rm -f data/_tg.log)",
+      "Bash(git commit -q -m 'feat\\(settings\\): 대시보드 설정 탭에 텔레그램 토큰/Chat ID + 테스트 전송 추가 *)",
+      "Bash(rm -f data/_wp.log)",
+      "Bash(git commit -q -m 'feat\\(settings\\): 대시보드 설정 탭에 WordPress URL/사용자/앱비밀번호 + 연결 테스트 추가 *)",
+      "Bash(awk -F/ '{print $1}')",
+      "Bash(git commit -q -m ' *)"
     ]
   }
 }

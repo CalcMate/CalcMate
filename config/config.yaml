@@ -43,3 +43,23 @@ WORDPRESS_URL: https://example.com
 WORDPRESS_USERNAME: temp
 WRITER_PROVIDER: openai
 _root: C:\Users\연수\Desktop\블로그자동_v12
+AI_ROLES:
+  orchestrator:
+    provider: openai
+    model: gpt-4o
+  research:
+    provider: gemini
+    model: gemini-2.5-flash
+  code:
+    provider: claude
+    model: claude-sonnet-4-6
+  writer:
+    provider: openai
+    model: gpt-4o
+  review:
+    provider: claude
+    model: claude-sonnet-4-6
+  image:
+    provider: gemini
+    model: gemini-2.5-flash
+OPERATION_MODE: scheduled
