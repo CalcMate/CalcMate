@@ -1,6 +1,6 @@
 # ARCHITECTURE.md — 블로그자동화 v12 / SalaryMate 구조
 
-> 실제 소스 코드 기준(2026-06-23). 5계층 + 데이터 흐름. Python 81개 파일.
+> 실제 소스 코드 기준(2026-06-29, v12 Lite + SPRINT 2A/2B 반영). 5계층 + 데이터 흐름.
 
 ---
 
@@ -8,8 +8,8 @@
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│ UI Layer       dashboard.py(Streamlit 17탭, 다크 SaaS, render_*)    │
-│                dashboard_ui_refactor.py(SaaS 전용 미러) · setup_wizard│
+│ UI Layer       dashboard.py(Streamlit 8그룹 2단 네비, 다크 SaaS, render_*)│
+│                setup_wizard(초기 설정 마법사)                        │
 │                assets/css/dashboard.css · scripts/*.bat              │
 ├──────────────────────────────────────────────────────────────────┤
 │ Business Layer main.py(run_once/_process_one: 12단계)               │
@@ -24,9 +24,12 @@
 │               calculator_seed(er)·app_factory·github_deployer·      │
 │               internal_link_engine·site_mode_manager                │
 │   운영/확장   scheduler·backup_manager·strategy_room·site_wizard·    │
-│               ai_workspace·pipeline_status·dashboard_cache          │
+│               ai_workspace·pipeline_status·dashboard_cache·          │
+│               ai_assistant·cost_manager·retry_queue·image_fallback· │
+│               telegram_ops·telegram_notifier                        │
 │   AI/공통     ai_provider·ai_roles·logger(BudgetTracker)·            │
-│               config_loader·utils/parser(+json_utils shim)          │
+│               config_loader(config.yaml+secrets.yaml 병합)·         │
+│               utils/parser(+json_utils shim)                        │
 ├──────────────────────────────────────────────────────────────────┤
 │ Repository     repositories/{article,site,calculator,template}_repo  │
 │                + 브릿지 sheet_sync·db_manager·site_manager           │
@@ -45,6 +48,7 @@
 - **Repository**: 도메인 CRUD. 브릿지(`sheet_sync` 등)가 기존 호출부 보존.
 - **Adapter**: 저장소 교체 지점. `DB_ADAPTER`/`STORAGE_ADAPTER`로 sheets↔sqlite, drive↔local 무중단 전환. gspread/Drive 직접 호출은 어댑터 내부에 캡슐화.
 - **External**: 실제 외부 API.
+- **보안(SPRINT 2B PRE-01)**: API키/앱비밀번호/봇토큰은 `config/secrets.yaml`(gitignore)에 분리. `config_loader.merge_secrets`가 런타임에 `config.yaml`과 병합(secrets 우선) → 기존 flat 키(`cfg["OPENAI_API_KEY"]` 등) 그대로 사용.
 
 ---
 

@@ -1,6 +1,6 @@
 # ROADMAP.md — 구현 현황 및 로드맵
 
-> 실제 소스 코드 기준(2026-06-23). 구현됨/부분/미구현을 코드 근거로 구분(추측 없음).
+> 실제 소스 코드 기준(2026-06-29, v12 Lite + SPRINT 2A/2B 반영). 구현됨/부분/미구현을 코드 근거로 구분.
 
 ---
 
@@ -17,10 +17,22 @@
 - 헬스체크 · 백업 · 설정 마법사(Sheets/Drive 자동생성)
 
 ### 운영/대시보드
-- Streamlit 17탭 + 다크 SaaS 홈(render_header/kpi/pipeline/quick_actions/recent_activity/dashboard_home)
+- Streamlit **8그룹 2단 네비** + 다크 SaaS 홈(현재 Site 카드/5 KPI/Workflow 시각화/진행현황)
 - 슬롯 스케줄러(평일/주말, 랜덤 예약, today_schedule.json 영속, 실패모드 3종, 즉시발행/재시도)
-- 설정: AI 역할 편집, score_weights 슬라이더, 발행방식(예약/Legacy)
+- 설정: AI 역할 편집, score_weights 슬라이더, 발행방식(**예약발행 단일화**, Legacy 제거)
 - 성능: 2단 캐시(메모리 + SQLite 미러, 라이브 폴백) + 로그 tail + sync_cache 워밍
+
+### 운영 자동화 (v12 Lite)
+- **AI Assistant**(채팅+워크스페이스 파일도구+승인게이트+메모리+태스크+분석)
+- **Cost Manager**(80%경고/100%정지/익일재개) · **Retry Queue**(WP 재발행) · **Image Fallback**(PIL 브랜드 이미지)
+- **Telegram 고도화**: 표준화 헬퍼 + 이벤트 ON/OFF 게이팅(TELEGRAM_EVENTS)
+
+### 보안/구조 (SPRINT 2A/2B)
+- **Secrets 분리**: API키/앱비번/봇토큰 → `config/secrets.yaml`(gitignore), `config_loader.merge_secrets` 런타임 병합
+- **Site Manager**: 현재 Site 셀렉터 · 안전삭제(보관30일/복구/DELETE확인) · 복제 · Export/Import
+- **Site Wizard 5단계**(Profile→Platform 독립복수→Feature→Settings→Pipeline)
+- **Site Settings Override**(Global→Site, 🔵뱃지/초기화) — *저장 완료, 런타임 소비는 후속*
+- **통합 실행 버튼**(선택 Site의 platforms 기반 Pipeline 자동 라우팅, 기존 개별버튼은 고급실행 보존)
 
 ### 계산기 플랫폼 (SalaryMate)
 - **Calculator UI v1**(calculator_v1.html, 변수 치환, 동일 UI)
@@ -50,7 +62,9 @@
 | GitHub 배포(`github_deployer`) | `GITHUB_TOKEN` 필요. 미설정 시 graceful skip |
 | App Factory 이미지 프롬프트 | Gemini 무료키 429 시 fallback |
 | AI Workspace 파일수정 | 샌드박스 기본 + 프로젝트 파일은 백업+확인 게이트 |
-| Multi-site 사이트별 설정 | 생성 시 AI/WP 지정 가능. 생성 후 수정 UI는 이름/도메인/카테고리만 |
+| Multi-site 사이트별 설정 | 생성 후 편집 UI 추가됨(Site Settings Override, 작업7). 단 **저장만 되고 파이프라인 런타임 미소비**(AI 프로필 일부 제외) — 배선은 후속 |
+| Site platforms/features | Wizard에서 sites 컬럼 저장(작업6). 실행 라우팅은 통합 버튼이 소비(작업8). 그 외 Feature 플래그는 런타임 미소비 |
+| Telegram 이벤트 알림 | telegram_ops 경유 이벤트만 게이팅 적용. 발행성공/시작종료/승인요청/일일요약은 **미배선**(파이프라인 호출 추가 필요). 양방향은 설계만(`TELEGRAM_BIDIRECTIONAL_DESIGN.md`) |
 
 ---
 

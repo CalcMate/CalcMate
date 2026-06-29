@@ -1,16 +1,16 @@
 # FILE_STRUCTURE.md — 파일 구조 및 역할
 
-> 실제 소스 코드 기준(2026-06-23). Python 81개. 상태: ✅완료 · 🟡부분 · ❌stub.
+> 실제 소스 코드 기준(2026-06-29, v12 Lite + SPRINT 2A/2B 반영). 상태: ✅완료 · 🟡부분 · ❌stub.
 
 ```
 블로그자동_v12/
 ├─ main.py                  12단계 파이프라인 진입점(플래그 8종)
-├─ dashboard.py             Streamlit 운영센터 17탭(다크 SaaS, render_* 홈)
-├─ dashboard_ui_refactor.py SaaS 전용 미러 UI(별도 실행)
+├─ dashboard.py             Streamlit 운영센터 8그룹 2단 네비(다크 SaaS, render_* 홈)
 ├─ health_check.py          ★실사용 헬스체크(OpenAI/Claude/Gemini/Sheet/Drive/WP/SA)
 ├─ requirements.txt / credentials.json / .gitignore
 ├─ assets/css/dashboard.css 다크/글래스 테마
-├─ config/                  config.yaml · secrets.yaml · score_weights.yaml · site_mode.yaml
+├─ config/                  config.yaml(일반설정) · secrets.yaml(민감정보,gitignore) ·
+│                           secrets.example.yaml · score_weights.yaml · site_mode.yaml
 ├─ prompts/calculator_writer_prompt.txt
 ├─ templates/
 │   ├─ calculators/calculator_v1.html   계산기 공통 UI({{변수}} 치환)
@@ -18,20 +18,19 @@
 ├─ modules/  (아래 표)
 ├─ repositories/  article·site·calculator·template _repository
 ├─ adapters/  db/{sheets,sqlite,postgres*} · storage/{drive,local,s3*}
-├─ scripts/  install·run_pipeline·run_scheduler·run_schedule·run_dryrun·
-│            run_strategy_room·run_dashboard·run_dashboard_new·sync_cache(.bat)·repair_google_setup.py
-├─ data/  logs(pipeline.log,budget.json,health_last.json) · outputs · schedule · cache
-└─ (문서) README·ARCHITECTURE·FILE_STRUCTURE·ROADMAP·CHANGELOG_AI·STABILITY_REPORT·
-          TODO_NEXT·SYSTEM_AUDIT·README_CURRENT·UI_REPORT·OPTIMIZATION_PLAN·PERFORMANCE_REPORT·
-          CALCULATOR_ENGINE/PLATFORM/V1/AI_AUTOGEN_REPORT·dashboard_ui_refactor.md
+├─ scripts/  install·run_pipeline·run_scheduler·run_dryrun·
+│            run_strategy_room·run_dashboard·sync_cache(.bat)·repair_google_setup.py
+├─ data/  logs(pipeline.log,budget.json,health_last.json) · outputs · schedule · cache · assistant(memory/tasks/backups)
+└─ (문서) README·ARCHITECTURE·FILE_STRUCTURE·ROADMAP·MIGRATION_NOTES·CHANGELOG_AI·STABILITY_REPORT·
+          TODO_NEXT·CALCULATOR_*·SPRINT_2A_REPORT·SPRINT_2B_REPORT·
+          AI_ASSISTANT_ANALYSIS·TELEGRAM_BIDIRECTIONAL_DESIGN
 ```
 
 ## 루트
 | 파일 | 역할 | 의존 |
 |------|------|------|
 | `main.py` | `parse_args`(--once/--schedule/--scheduler/--dry-run/--strategy-room/--calculator/--seed-calculators/--instance), `run_once`+`_process_one`(12단계) | 전 파이프라인 모듈, scheduler/calculator_pipeline(지연), health_check |
-| `dashboard.py` | 운영센터 17탭 + render_* SaaS 홈 + 2단 캐시 + CSS 주입 | scheduler/site_wizard/app_*/ai_*/calculator_*/repositories/BudgetTracker/main(지연) |
-| `dashboard_ui_refactor.py` | SaaS 미러 UI(8 nav) | 동일(읽기/트리거) |
+| `dashboard.py` | 운영센터 8그룹 2단 네비 + render_* SaaS 홈(현재Site카드/5KPI/Workflow/진행현황) + Site Manager/Wizard/Settings + 2단 캐시 + CSS 주입 | scheduler/site_wizard/app_*/ai_*/calculator_*/repositories/BudgetTracker/config_loader/main(지연) |
 | `health_check.py` | 6서비스+서비스계정 점검 → health_last.json | openai/anthropic/google.genai/googleapiclient |
 
 ## modules/ — 파이프라인 단계
@@ -82,7 +81,7 @@
 | `ai_provider.py` | OpenAI/Claude/Gemini 추상화 + 역할 라우팅 + retry |
 | `ai_roles.py` | 확장기능 역할표(총괄/리서치/코드/작성/검수/이미지) |
 | `logger.py` | 로깅 + BudgetTracker(모델별 입출력 비용) |
-| `config_loader.py` | 로드/검증 + WP 키 정규화 + is_wordpress_ready |
+| `config_loader.py` | config.yaml+secrets.yaml 병합(merge_secrets, secrets 우선) + 로드/검증 + WP 키 정규화 + is_wordpress_ready + split_secrets/save_secrets_flat |
 | `utils/parser.py` | parse_json_lenient(LLM JSON) — 정규 위치 |
 | `json_utils.py` | 위 shim(하위호환) |
 | `sheet_sync.py`·`db_manager.py`·`site_manager.py` | Repository 브릿지 |
@@ -94,7 +93,12 @@
 | `ai_workspace.py` | 대시보드 AI 채팅 + 파일/Repository 도구 |
 | `pipeline_status.py` | pipeline.log 파싱→단계 상태(tail) |
 | `dashboard_cache.py` | SQLite 미러 읽기 캐시(read/refresh/invalidate, 라이브 폴백) |
-| `telegram_notifier.py` | 텔레그램 알림(키 없으면 무동작) |
+| `telegram_notifier.py` | 텔레그램 알림 저수준 발송(키 없으면 무동작) |
+| `telegram_ops.py` | 텔레그램 표준화 헬퍼 + 이벤트 게이팅(TELEGRAM_EVENTS) |
+| `ai_assistant.py` | AI 운영비서(채팅+워크스페이스 파일도구+승인게이트+메모리+태스크+분석) |
+| `cost_manager.py` | 일 예산 80%경고/100%정지/익일재개 |
+| `retry_queue.py` | WP 발행 실패분 대기열(재발행) |
+| `image_fallback.py` | Pollinations 실패 시 브랜드 템플릿 이미지(PIL) |
 
 ## repositories/ (AbstractDBAdapter 의존)
 | 파일 | 역할 | 사용처 |
@@ -113,6 +117,6 @@
 | `storage/s3_adapter.py` | ❌ stub |
 
 ## scripts/ (.bat = cp949/CRLF, venv 직접호출)
-install · run_pipeline(--once) · run_scheduler(--scheduler) · run_schedule(--schedule) · run_dryrun · run_strategy_room · run_dashboard(dashboard.py) · run_dashboard_new(dashboard_ui_refactor.py) · sync_cache(미러 워밍) · repair_google_setup.py(시트/드라이브 보수)
+install · run_pipeline(--once) · run_scheduler(--scheduler) · run_dryrun · run_strategy_room · run_dashboard(dashboard.py) · sync_cache(미러 워밍) · repair_google_setup.py(시트/드라이브 보수)
 
 > 백업: `dashboard_backup.py`(성능작업 전), `dashboard_backup_ui.py`(UI작업 전).
