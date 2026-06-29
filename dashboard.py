@@ -1864,6 +1864,15 @@ elif tab == "🔧 설정":
                     st.success("전송 시도 완료. 텔레그램 메시지를 확인하세요(미수신 시 토큰/Chat ID 재확인).")
                 except Exception as _e:
                     st.error(f"전송 실패: {_e}")
+        st.markdown("**이벤트별 알림 ON/OFF**")
+        _ev_def = cfg.get("TELEGRAM_EVENTS") or {}
+        _EVENTS = [("error", "오류 발생"), ("budget", "비용 경고"),
+                   ("daily_summary", "일일 요약"), ("publish_request", "발행 승인 요청")]
+        _ecols = st.columns(len(_EVENTS))
+        tg_events = {}
+        for _i, (_k, _lbl) in enumerate(_EVENTS):
+            tg_events[_k] = bool(_ecols[_i].toggle(_lbl, value=bool(_ev_def.get(_k, True)), key=f"s_tgev_{_k}"))
+        st.caption("telegram_ops 경유 이벤트에 적용. 파이프라인 크리티컬 알림(오류/예산/헬스)은 항상 발송.")
 
     # ── AI 역할 체계 (확장 기능 전용 — 기존 파이프라인 모델과 별개) ──
     with st.expander("🧠 AI 역할 체계 (AI Workspace / App Factory 용)", expanded=False):
@@ -1968,6 +1977,7 @@ elif tab == "🔧 설정":
             "DLQ_THRESHOLD":      int(dlq_threshold),
             "TELEGRAM_BOT_TOKEN": tg_token.strip(),
             "TELEGRAM_CHAT_ID":   tg_chat.strip(),
+            "TELEGRAM_EVENTS":    tg_events,
             "AUTO_TOPIC_EXPANSION": auto_topic,
             "ENABLE_STRATEGY_ROOM": enable_strategy,
             "OPERATION_MODE": operation_mode,

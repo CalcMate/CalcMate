@@ -13,12 +13,25 @@ from .logger import get_logger
 
 LOG = get_logger()
 
+# 이벤트별 ON/OFF 게이팅. config.yaml의 TELEGRAM_EVENTS(dict)로 제어.
+# 미설정 시 기본 True(하위호환 — 기존 동작 유지).
+EVENT_KEYS = ("error", "budget", "daily_summary", "publish_request")
+
+
+def _enabled(cfg: dict, event: str) -> bool:
+    """해당 이벤트 알림이 켜져 있는지. 설정 없으면 True(기본 ON)."""
+    return bool((cfg.get("TELEGRAM_EVENTS") or {}).get(event, True))
+
 
 def notify_error(cfg: dict, where: str, err) -> None:
+    if not _enabled(cfg, "error"):
+        return
     TN.send(cfg, f"❌ [오류] {where}\n{str(err)[:300]}")
 
 
 def notify_budget(cfg: dict, used: float, limit: float, level: str = "warn") -> None:
+    if not _enabled(cfg, "budget"):
+        return
     pct = (used / limit * 100) if limit else 0
     icon = "⛔" if level == "stop" else "⚠️"
     msg = ("일 예산 한도 도달 — 자동 일시정지" if level == "stop"
@@ -28,6 +41,8 @@ def notify_budget(cfg: dict, used: float, limit: float, level: str = "warn") -> 
 
 def daily_summary(cfg: dict, stats: dict) -> None:
     """stats: {published, failed, cost, tokens, ...}"""
+    if not _enabled(cfg, "daily_summary"):
+        return
     TN.send(cfg, (
         f"📊 [일일 요약] {date.today().isoformat()}\n"
         f"발행 {stats.get('published', 0)} · 실패 {stats.get('failed', 0)} · "
@@ -37,6 +52,8 @@ def daily_summary(cfg: dict, stats: dict) -> None:
 
 
 def notify_publish_request(cfg: dict, title: str, url: str = "") -> None:
+    if not _enabled(cfg, "publish_request"):
+        return
     TN.send(cfg, f"📝 [발행 승인 요청] {title}\n{url}".strip())
 
 
