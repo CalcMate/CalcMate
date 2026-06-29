@@ -696,8 +696,62 @@ elif tab == "📅 오늘 발행 일정":
 elif tab == "🌐 사이트 관리":
     st.title("🌐 사이트 관리")
     from modules import site_wizard as SW
+    import json as _json
     AI_PROFILES = ["gemini_flash", "gemini_pro", "gpt4o", "gpt4o_mini",
                    "claude_sonnet", "claude_haiku", "claude_opus"]
+
+    # ── 현재 Site 헤더 + 셀렉터 (작업4 세션 공유) ──
+    try:
+        _sm_sites = SW.list_sites(cfg) or []
+    except Exception:
+        _sm_sites = []
+    if _sm_sites:
+        _ids = [s.get("site_id", "") for s in _sm_sites]
+        _labels = [(s.get("site_name") or s.get("site_id") or "(이름없음)") for s in _sm_sites]
+        _cur = st.session_state.get("current_site_id", _ids[0])
+        _idx = _ids.index(_cur) if _cur in _ids else 0
+        hc1, hc2 = st.columns([2, 1])
+        with hc2:
+            _pick = st.selectbox("현재 Site", _labels, index=_idx, key="sm_cur_pick")
+        st.session_state["current_site_id"] = _ids[_labels.index(_pick)]
+        hc1.info(f"현재 선택: **{_pick}**")
+    else:
+        st.caption("등록된 사이트 없음 — 기본 사이트(SalaryMate). 아래에서 새 사이트를 추가하세요.")
+
+    # ── ⬇️⬆️ Export / Import (메타데이터만 · 자격증명 제외) ──
+    with st.expander("⬇️⬆️ Export / Import"):
+        ec1, ec2 = st.columns(2)
+        with ec1:
+            st.download_button(
+                "⬇️ 사이트 Export(JSON)",
+                data=_json.dumps(_sm_sites, ensure_ascii=False, indent=2),
+                file_name="sites_export.json", mime="application/json", key="sm_export")
+            st.caption("WP 자격증명/시크릿은 포함되지 않습니다.")
+        with ec2:
+            up = st.file_uploader("⬆️ Import(JSON) — 검증 경유 신규 등록만", type=["json"], key="sm_import")
+            if up is not None and st.button("Import 실행", key="sm_import_run"):
+                try:
+                    rows = _json.loads(up.read()); assert isinstance(rows, list)
+                except Exception as e:
+                    rows = None; st.error(f"JSON 파싱 실패: {e}")
+                if rows:
+                    okc, errs = 0, []
+                    for r in rows:
+                        stype = r.get("site_type", "custom")
+                        label = next((k for k, v in SW.TYPE_DEFS.items() if v["site_type"] == stype), "사용자정의")
+                        ok, msg = SW.create_site(cfg, label, {
+                            "site_name": r.get("site_name", ""), "domain": r.get("domain", ""),
+                            "category": r.get("site_tags", ""),
+                            "wp_url": r.get("wordpress_url", ""), "wp_user": "", "wp_app_password": "",
+                            "rss_sources": "",
+                        })
+                        okc += 1 if ok else 0
+                        if not ok: errs.append(msg)
+                    st.success(f"Import: {okc}건 등록 (WP 유형은 자격증명 필요 시 실패할 수 있음)")
+                    for e in errs[:8]:
+                        st.warning(e)
+                    if okc:
+                        st.cache_resource.clear(); st.rerun()
 
     # ── ➕ 사이트 추가 ──
     with st.expander("➕ 사이트 추가", expanded=True):
@@ -778,21 +832,75 @@ elif tab == "🌐 사이트 관리":
             new_name = e1.text_input("사이트명", value=s.get("site_name", ""), key=f"ed_name_{sid}")
             new_dom  = e2.text_input("도메인", value=s.get("domain", ""), key=f"ed_dom_{sid}")
             new_cat  = st.text_input("카테고리", value=s.get("site_tags", ""), key=f"ed_cat_{sid}")
+            from datetime import datetime as _dt, timedelta as _td
+            status_l = str(s.get("status", "")).lower()
+            archived = status_l == "archived"
             b1, b2, b3 = st.columns(3)
             if b1.button("💾 수정 저장", key=f"ed_save_{sid}"):
                 ok, msg = SW.update_site(cfg, sid, {
                     "site_name": new_name, "domain": new_dom, "site_tags": new_cat})
                 (st.success if ok else st.error)(msg)
                 if ok: st.rerun()
-            toggle_label = "⏸ 비활성화" if active else "▶ 활성화"
-            if b2.button(toggle_label, key=f"ed_tog_{sid}"):
-                ok, msg = SW.set_site_status(cfg, sid, "inactive" if active else "active")
-                (st.success if ok else st.error)(msg)
-                if ok: st.rerun()
-            if b3.button("🗑️ 삭제", key=f"ed_del_{sid}"):
-                ok, msg = SW.delete_site(cfg, sid)
-                (st.success if ok else st.error)(msg)
-                if ok: st.rerun()
+            if not archived:
+                toggle_label = "⏸ 비활성화" if active else "▶ 활성화"
+                if b2.button(toggle_label, key=f"ed_tog_{sid}"):
+                    ok, msg = SW.set_site_status(cfg, sid, "inactive" if active else "active")
+                    (st.success if ok else st.error)(msg)
+                    if ok: st.rerun()
+                if b3.button("🗑️ 삭제(보관 이동)", key=f"ed_arch_{sid}"):
+                    ok, msg = SW.update_site(cfg, sid, {
+                        "status": "archived", "deleted_at": _dt.now().isoformat()})
+                    (st.success if ok else st.error)(
+                        "보관함으로 이동됨 — 보관기간 내 복구 가능" if ok else msg)
+                    if ok: st.rerun()
+            else:
+                ret_days = int(cfg.get("SITE_RETENTION_DAYS", 30) or 30)
+                da = s.get("deleted_at", "")
+                expired, exp_txt = False, "-"
+                try:
+                    exp = _dt.fromisoformat(da) + _td(days=ret_days)
+                    expired = _dt.now() > exp
+                    exp_txt = exp.strftime("%Y-%m-%d")
+                except Exception:
+                    pass
+                st.warning(f"📦 보관됨 (삭제예정 {exp_txt}, 보관 {ret_days}일)"
+                           + (" · ⚠️ 보관기간 만료 — 영구삭제 가능" if expired else ""))
+                if b2.button("♻️ 복구", key=f"ed_restore_{sid}"):
+                    ok, msg = SW.update_site(cfg, sid, {"status": "inactive", "deleted_at": ""})
+                    (st.success if ok else st.error)("복구됨(비활성 상태)" if ok else msg)
+                    if ok: st.rerun()
+                with b3:
+                    conf = st.text_input('영구삭제: "DELETE" 입력', key=f"ed_delconf_{sid}")
+                    if st.button("⛔ 영구 삭제", key=f"ed_perm_{sid}"):
+                        if conf.strip() == "DELETE":
+                            ok, msg = SW.delete_site(cfg, sid)
+                            (st.success if ok else st.error)(msg)
+                            if ok: st.rerun()
+                        else:
+                            st.error('"DELETE"를 정확히 입력해야 합니다.')
+            # ── 📑 복제(Clone) — 인라인 프리필 폼 ──
+            with st.expander("📑 복제(Clone)"):
+                cl_name = st.text_input("새 사이트명 *", value=f"{s.get('site_name','')} (복사본)",
+                                        key=f"cl_name_{sid}")
+                cl_dom = st.text_input("새 도메인 *", value="", key=f"cl_dom_{sid}")
+                spec_lbl = next((k for k, v in SW.TYPE_DEFS.items()
+                                 if v["site_type"] == s.get("site_type", "custom")), "사용자정의")
+                cwu = cwz = cwp = ""
+                if SW.TYPE_DEFS[spec_lbl]["needs_wp"]:
+                    st.caption("이 유형은 WordPress 자격증명이 필요합니다(복제 시 재입력).")
+                    cwu = st.text_input("WordPress URL *", key=f"cl_wpurl_{sid}")
+                    cwz = st.text_input("WordPress ID *", key=f"cl_wpuser_{sid}")
+                    cwp = st.text_input("App Password *", type="password", key=f"cl_wppw_{sid}")
+                if st.button("📑 복제 실행", key=f"cl_run_{sid}"):
+                    ok, msg = SW.create_site(cfg, spec_lbl, {
+                        "site_name": cl_name, "domain": cl_dom, "category": s.get("site_tags", ""),
+                        "wp_url": cwu, "wp_user": cwz, "wp_app_password": cwp, "rss_sources": "",
+                        "research_ai": s.get("research_ai", ""), "writing_ai": s.get("writing_ai", ""),
+                        "review_ai": s.get("review_ai", ""),
+                    })
+                    (st.success if ok else st.error)(msg)
+                    if ok:
+                        st.cache_resource.clear(); st.rerun()
 
     st.divider()
     # ── 계산기 목록 / 관리 ──
