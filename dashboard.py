@@ -162,24 +162,111 @@ def _kpi_card(col, icon, label, value, sub=""):
         f'<div class="lab">{label}</div><div class="val">{value}</div>'
         f'<div class="sub">{sub}</div></div>', unsafe_allow_html=True)
 
-def render_kpi_cards():
-    try: sites = len(cached_table("sites"))
-    except Exception: sites = "—"
+def _list_sites_safe():
+    """site_wizard.list_sites 안전 호출(읽기 전용). 실패 시 빈 목록."""
     try:
-        posts = cached_posts()
-        articles = sum(1 for p in posts if p.get("상태값") in ("발행완료", "검수대기"))
-        queue = sum(1 for p in posts if p.get("상태값") in ("대기", "검수대기", "작성중", "재처리대기"))
+        from modules import site_wizard as SW
+        return SW.list_sites(cfg) or []
     except Exception:
-        articles = queue = "—"
-    cols = st.columns(4)
-    _kpi_card(cols[0], "🌐", "Sites", sites, "등록 사이트")
-    _kpi_card(cols[1], "📝", "Articles", articles, "발행/검수")
-    _kpi_card(cols[2], "📋", "Queue", queue, "대기 작업")
-    _kpi_card(cols[3], "💰", "Revenue", "—", "AdSense 미연동")
+        return []
+
+def _derive_platforms(has_calc: bool):
+    """현재 설정 기준 활성 Platform 파생(읽기 전용 표시용)."""
+    p = []
+    if cfg.get("RUN_MODE") == "wordpress" or cfg.get("WORDPRESS_URL"):
+        p.append("WordPress")
+    if has_calc:
+        p.append("Calculator")
+    return p or ["—"]
+
+def _derive_features():
+    """현재 설정 기준 활성 공통 Feature 파생(표시용)."""
+    f = ["Scheduler", "AI Assistant", "Cost Manager", "Retry Queue"]
+    if cfg.get("TELEGRAM_BOT_TOKEN") and cfg.get("TELEGRAM_CHAT_ID"):
+        f.append("Telegram")
+    if cfg.get("ENABLE_STRATEGY_ROOM"):
+        f.append("Strategy")
+    return f
+
+def render_current_site_card():
+    """최상단 고정 '현재 Site' 카드 + Site 변경 셀렉터(읽기/세션상태만)."""
+    sites = _list_sites_safe()
+    with st.container(border=True):
+        left, right = st.columns([2.2, 1])
+        if sites:
+            labels = [(s.get("site_name") or s.get("site_id") or "(이름없음)") for s in sites]
+            ids = [s.get("site_id", "") for s in sites]
+            cur = st.session_state.get("current_site_id", ids[0])
+            idx = ids.index(cur) if cur in ids else 0
+            with right:
+                pick = st.selectbox("Site 변경", labels, index=idx, key="cur_site_pick")
+            sel_i = labels.index(pick)
+            st.session_state["current_site_id"] = ids[sel_i]
+            site = sites[sel_i]
+            name = site.get("site_name") or site.get("site_id") or "SalaryMate"
+        else:
+            st.session_state["current_site_id"] = ""
+            site, name = {}, "SalaryMate"
+            with right:
+                st.caption("등록 사이트 없음 — 기본 사이트")
+        try:
+            has_calc = len(cached_table("calculators")) > 0
+        except Exception:
+            has_calc = False
+        with left:
+            st.markdown(f"#### 🏢 현재 Site: **{name}**")
+            st.markdown(f"**Platform:** {'  +  '.join(_derive_platforms(has_calc))}")
+            st.caption("활성 Feature: " + " / ".join(_derive_features()))
+
+def render_kpi_cards():
+    # 1) 시스템 상태 (health_last.json)
+    h = _read_health_cache()
+    crit = [v for v in h.values() if isinstance(v, dict) and v.get("level") == "CRITICAL"]
+    ok_c = sum(1 for v in crit if v.get("status") == "OK")
+    sys_val = "정상" if crit and ok_c == len(crit) else ("주의" if crit else "—")
+    sys_sub = f"{ok_c}/{len(crit)} OK" if crit else "헬스 미실행"
+    # pipeline 상태
+    try:
+        from modules.pipeline_status import get_pipeline_state
+        ps = get_pipeline_state(cfg)
+    except Exception:
+        ps = {"stages": [], "cost_today": 0}
+    stages = ps.get("stages", [])
+    running = next((s for s in stages if s.get("status") == "running"), None)
+    done = [s for s in stages if s.get("status") == "completed"]
+    # 2) 현재 Workflow 단계
+    if running:        wf = running.get("name", "-")
+    elif ps.get("finished"): wf = "완료"
+    elif done:         wf = done[-1].get("name", "-")
+    else:              wf = "대기"
+    # 3) 현재 AI 작업(활성 모델)
+    ai = running.get("model", "-") if running else "대기"
+    # 4) 오늘 운영 현황(발행/생성)
+    try:
+        from modules import scheduler as SCH
+        pub = SCH.summarize(SCH.load_schedule(cfg)).get("completed", 0)
+    except Exception:
+        pub = "—"
+    try:
+        gen = len(cached_posts())
+    except Exception:
+        gen = "—"
+    # 5) 오늘 AI 비용 (Cost Manager / BudgetTracker)
+    try:
+        from modules import cost_manager as CM
+        cs = CM.status(cfg)
+        cost_val, cost_sub = f"${cs['used']:.2f}", f"/ ${cs['limit']} ({cs['pct']:.0f}%)"
+    except Exception:
+        cost_val, cost_sub = f"${ps.get('cost_today', 0)}", "예산 정보"
+    cols = st.columns(5)
+    _kpi_card(cols[0], "🩺", "시스템", sys_val, sys_sub)
+    _kpi_card(cols[1], "⛓️", "Workflow", wf, "현재 단계")
+    _kpi_card(cols[2], "🤖", "AI 작업", ai, "활성 모델")
+    _kpi_card(cols[3], "📦", "오늘", f"{pub}건", f"발행 / 생성 {gen}")
+    _kpi_card(cols[4], "💰", "AI 비용", cost_val, cost_sub)
 
 def render_pipeline_status():
-    steps = [("📥", "수집", ["수집"]), ("🧠", "전략", ["전략", "리서치"]),
-             ("✍", "작성", ["작성"]), ("🔍", "검수", ["검수"]), ("🚀", "발행", ["발행"])]
+    # 라이브 단계 상태(블로그 파이프라인) — pipeline_status.py 기준
     stage_status = {}
     try:
         from modules.pipeline_status import get_pipeline_state
@@ -193,12 +280,25 @@ def render_pipeline_status():
                 return stt
         return "pending"
     cls = {"completed": "done", "running": "run", "error": "run", "pending": ""}
-    cards = "".join(
-        f'<div class="sm-step {cls.get(_stat(keys),"")}"><div class="s-ic">{ic}</div>'
-        f'<div class="s-nm">{nm}</div></div>' for ic, nm, keys in steps)
+    # main.py STEP 순서 기준(추측 아님): 수집→정제→중복→전략→SEO→작성→검수→이미지→발행→기록
+    blog = [("📥", "수집", ["수집"]), ("🧹", "정제", ["정제", "표준"]),
+            ("🔁", "중복검사", ["중복", "유사"]), ("🧠", "전략", ["전략", "리서치"]),
+            ("🔎", "SEO기획", ["SEO", "기획", "리서치"]), ("✍", "작성", ["작성"]),
+            ("🔍", "검수", ["검수"]), ("🖼", "이미지", ["이미지"]),
+            ("🚀", "발행", ["발행"]), ("🗂", "기록", ["기록", "DB"])]
+    calc = [("🔑", "키워드", []), ("🔎", "SEO", []), ("❓", "FAQ", []),
+            ("📝", "본문", []), ("🤖", "Reviewer", []), ("🧩", "HTML", []), ("🌐", "배포", [])]
+    def _row(title, steps, live):
+        cards = "".join(
+            f'<div class="sm-step {cls.get(_stat(keys), "") if live else ""}">'
+            f'<div class="s-ic">{ic}</div><div class="s-nm">{nm}</div></div>'
+            for ic, nm, keys in steps)
+        return f'<h4 style="margin:8px 0 8px;font-size:13px" class="sm-dim">{title}</h4><div class="sm-pipe">{cards}</div>'
     st.markdown(
-        '<div class="sm-card"><h3 style="margin:0 0 12px">⛓️ Pipeline Status</h3>'
-        f'<div class="sm-pipe">{cards}</div></div>', unsafe_allow_html=True)
+        '<div class="sm-card"><h3 style="margin:0 0 8px">⛓️ Workflow</h3>'
+        + _row("📰 블로그 파이프라인 (현재 단계 강조)", blog, True)
+        + _row("🧮 계산기 파이프라인", calc, False)
+        + '</div>', unsafe_allow_html=True)
 
 def render_quick_actions():
     import main as PIPE
@@ -224,14 +324,41 @@ def render_recent_activity():
         else:
             st.caption("No Activity")
 
+def render_progress():
+    """진행 현황: 오늘 일정 진행률 + Retry/실패/진행중/ETA (읽기 전용)."""
+    try:
+        from modules import scheduler as SCH
+        sm = SCH.summarize(SCH.load_schedule(cfg))
+    except Exception:
+        sm = {}
+    try:
+        from modules.retry_queue import list_pending
+        retry_n = len(list_pending())
+    except Exception:
+        retry_n = "—"
+    total = sm.get("total", 0) or 0
+    comp = sm.get("completed", 0) or 0
+    pct = int(comp / total * 100) if total else 0
+    with st.container(border=True):
+        st.markdown("**📈 진행 현황**")
+        st.progress((pct / 100) if total else 0.0, text=f"오늘 일정 {comp}/{total} ({pct}%)")
+        m = st.columns(4)
+        m[0].metric("Retry 대기", retry_n)
+        m[1].metric("실패", sm.get("failed", 0))
+        m[2].metric("진행중", sm.get("running", 0))
+        m[3].metric("다음 발행(ETA)", sm.get("next") or "-")
+
 def render_dashboard_home():
     a = st.session_state.pop("_last_action", None)
     if a:
         (st.success if a[0] else st.error)(a[1])
     render_header()
-    render_kpi_cards()
+    render_current_site_card()        # 최상단 고정 '현재 Site' 카드 + 셀렉터
+    render_kpi_cards()                # 운영 현황 5카드
     st.markdown("<br>", unsafe_allow_html=True)
-    render_pipeline_status()
+    render_pipeline_status()          # 블로그 + 계산기 Workflow
+    st.markdown("<br>", unsafe_allow_html=True)
+    render_progress()                 # 진행 현황 패널
     st.markdown("<br>", unsafe_allow_html=True)
     c1, c2 = st.columns([1, 1.5])
     with c1:
