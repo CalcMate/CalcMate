@@ -300,20 +300,73 @@ def render_pipeline_status():
         + _row("🧮 계산기 파이프라인", calc, False)
         + '</div>', unsafe_allow_html=True)
 
+def _resolve_run_site():
+    """선택된 Site와 활성 platforms 반환. (site|None, platforms[list])"""
+    site, platforms = None, []
+    try:
+        _sid = st.session_state.get("current_site_id", "")
+        for s in (cached_table("sites") or []):
+            if s.get("site_id") == _sid:
+                site = s; break
+    except Exception:
+        site = None
+    if site:
+        try:
+            platforms = json.loads(site.get("platforms") or "[]")
+        except Exception:
+            platforms = []
+    return site, platforms
+
 def render_quick_actions():
     import main as PIPE
+    def _run_blog():
+        return PIPE.run_once(cfg)
+    def _run_calc():
+        from modules.calculator_pipeline import run_calculator_once
+        return run_calculator_once(cfg, max_count=1)
+    def _run_seq():
+        _run_calc(); _run_blog(); return "계산기→블로그 순차 완료"
+
     with st.container(border=True):
-        st.markdown("**⚡ Quick Actions**")
-        if st.button("▶ 파이프라인 실행", use_container_width=True, key="qa_pipe"):
-            _run_action("파이프라인 실행", lambda: PIPE.run_once(cfg)); st.rerun()
-        if st.button("🧮 계산기 생성", use_container_width=True, key="qa_calc"):
-            from modules.calculator_pipeline import run_calculator_once
-            _run_action("계산기 글 생성", lambda: run_calculator_once(cfg, max_count=1)); st.rerun()
-        if st.button("📝 글 생성", use_container_width=True, key="qa_post"):
-            _run_action("글 생성(1건)", lambda: PIPE.run_once(cfg, max_count=1)); st.rerun()
-        if st.button("🌐 워드프레스 발행", use_container_width=True, key="qa_wp"):
-            from modules import scheduler as SCH
-            _run_action("즉시 발행", lambda: SCH.immediate_publish(cfg, PIPE.run_once, "pull")[1]); st.rerun()
+        st.markdown("**⚡ 실행**")
+        site, platforms = _resolve_run_site()
+        has_wp, has_calc = ("WordPress" in platforms), ("Calculator" in platforms)
+        sname = site.get("site_name") if site else "기본(SalaryMate)"
+        if not platforms:
+            st.caption(f"대상: **{sname}** · Platform 미설정 → 기본 블로그 파이프라인 실행")
+        else:
+            st.caption(f"대상: **{sname}** · Platform: {' + '.join(platforms)}")
+        # 둘 다 활성 시 실행 방식 선택
+        order = None
+        if has_wp and has_calc:
+            order = st.radio("실행 방식", ["순차(Calculator→WordPress)", "Calculator만", "WordPress만"],
+                             key="qa_order", horizontal=True)
+        # ── 통합 실행 버튼: 활성 Platform 기반 Pipeline 자동 결정 ──
+        if st.button("▶ 실행", type="primary", use_container_width=True, key="qa_run"):
+            if has_wp and has_calc:
+                if order == "Calculator만":
+                    _run_action("계산기 실행", _run_calc)
+                elif order == "WordPress만":
+                    _run_action("블로그 파이프라인 실행", _run_blog)
+                else:
+                    _run_action("순차 실행(Calc→WP)", _run_seq)
+            elif has_calc:
+                _run_action("계산기 실행", _run_calc)
+            else:
+                _run_action("블로그 파이프라인 실행", _run_blog)  # WP-only 또는 미설정 fallback
+            st.rerun()
+        # ── 고급 실행(수동) — 기존 개별 버튼 보존 ──
+        with st.expander("🔧 고급 실행(수동)"):
+            if st.button("▶ 파이프라인 실행(전량)", use_container_width=True, key="qa_pipe"):
+                _run_action("파이프라인 실행", lambda: PIPE.run_once(cfg)); st.rerun()
+            if st.button("🧮 계산기 생성", use_container_width=True, key="qa_calc"):
+                from modules.calculator_pipeline import run_calculator_once
+                _run_action("계산기 글 생성", lambda: run_calculator_once(cfg, max_count=1)); st.rerun()
+            if st.button("📝 글 생성(1건)", use_container_width=True, key="qa_post"):
+                _run_action("글 생성(1건)", lambda: PIPE.run_once(cfg, max_count=1)); st.rerun()
+            if st.button("🌐 워드프레스 발행", use_container_width=True, key="qa_wp"):
+                from modules import scheduler as SCH
+                _run_action("즉시 발행", lambda: SCH.immediate_publish(cfg, PIPE.run_once, "pull")[1]); st.rerun()
 
 def render_recent_activity():
     with st.container(border=True):
