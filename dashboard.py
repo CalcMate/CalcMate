@@ -753,6 +753,102 @@ elif tab == "🌐 사이트 관리":
                     if okc:
                         st.cache_resource.clear(); st.rerun()
 
+    # ── ⚙️ Site Settings (Global → Override) · 현재 선택 Site 대상 ──
+    with st.expander("⚙️ Site Settings (Override)"):
+        _cur_id = st.session_state.get("current_site_id", "")
+        _site = next((s for s in _sm_sites if s.get("site_id") == _cur_id),
+                     (_sm_sites[0] if _sm_sites else None))
+        if not _site:
+            st.caption("선택된 Site가 없습니다. 먼저 사이트를 추가하세요.")
+        else:
+            GLOB = "(Global 기본값)"
+            st.caption(f"대상: **{_site.get('site_name','-')}** ({_site.get('site_id','')}) · "
+                       "빈 값=Global 상속, 값 있으면 🔵 Override")
+            def _ai_box(col, label, gdef, colobj):
+                cur = _site.get(col, "")
+                opts = [GLOB] + AI_PROFILES
+                idx = opts.index(cur) if cur in AI_PROFILES else 0
+                v = colobj.selectbox(label + (" 🔵" if cur in AI_PROFILES else ""),
+                                     opts, index=idx, key=f"ss_{col}")
+                colobj.caption(f"Global: {gdef}")
+                return "" if v == GLOB else v
+            st.markdown("**AI**")
+            a1, a2, a3 = st.columns(3)
+            o_res = _ai_box("research_ai", "Research AI", SW.DEFAULT_AI["research_ai"], a1)
+            o_wri = _ai_box("writing_ai", "Writing AI", SW.DEFAULT_AI["writing_ai"], a2)
+            o_rev = _ai_box("review_ai", "Review AI", SW.DEFAULT_AI["review_ai"], a3)
+
+            st.markdown("**WordPress / SEO**")
+            w1, w2 = st.columns(2)
+            o_wpurl = w1.text_input("WordPress URL" + (" 🔵" if _site.get("wordpress_url") else ""),
+                                    value=_site.get("wordpress_url", ""), key="ss_wpurl",
+                                    placeholder=cfg.get("WORDPRESS_URL", ""))
+            o_cat = w2.text_input("카테고리(site_tags)" + (" 🔵" if _site.get("site_tags") else ""),
+                                  value=_site.get("site_tags", ""), key="ss_cat")
+            s1, s2 = st.columns(2)
+            o_kwc = s1.text_input("SEO 키워드 수" + (" 🔵" if _site.get("seo_keyword_count") else ""),
+                                  value=str(_site.get("seo_keyword_count", "")), key="ss_kwc", placeholder="Global 5")
+            o_len = s2.text_input("SEO 글 길이" + (" 🔵" if _site.get("seo_length") else ""),
+                                  value=str(_site.get("seo_length", "")), key="ss_len", placeholder="Global 1500")
+
+            st.markdown("**Scheduler / Image**")
+            sc1, sc2 = st.columns(2)
+            o_daily = sc1.text_input("일 발행수" + (" 🔵" if _site.get("daily_override") else ""),
+                                     value=str(_site.get("daily_override", "")), key="ss_daily",
+                                     placeholder=f"Global {cfg.get('DAILY_POST_COUNT',3)}")
+            _img_opts = [GLOB, "free_pollinations", "openai", "none"]
+            _imgcur = _site.get("image_mode", "")
+            o_img = sc2.selectbox("이미지 생성 방식" + (" 🔵" if _imgcur else ""), _img_opts,
+                                  index=_img_opts.index(_imgcur) if _imgcur in _img_opts else 0, key="ss_img")
+            sc2.caption(f"Global 이미지: {cfg.get('IMAGE_PROVIDER','free_pollinations')}")
+
+            st.markdown("**Telegram / Analytics**")
+            t1, t2 = st.columns(2)
+            _onoff = [GLOB, "ON", "OFF"]
+            _tgcur = _site.get("telegram_enabled", "")
+            o_tg = t1.selectbox("Telegram 알림" + (" 🔵" if _tgcur else ""), _onoff,
+                                index=_onoff.index(_tgcur) if _tgcur in _onoff else 0, key="ss_tg")
+            _ancur = _site.get("analytics_enabled", "")
+            o_an = t2.selectbox("Analytics" + (" 🔵" if _ancur else ""), _onoff,
+                                index=_onoff.index(_ancur) if _ancur in _onoff else 0, key="ss_an")
+
+            st.markdown("**Calculator (활성 계산기)**")
+            try:
+                _allcalc = [c.get("name", "") for c in SW.list_calculators(cfg) if c.get("name")]
+            except Exception:
+                _allcalc = []
+            try:
+                _cursel = _json.loads(_site.get("calc_active") or "[]")
+            except Exception:
+                _cursel = []
+            o_calc = st.multiselect("활성 계산기 목록", _allcalc,
+                                    default=[c for c in _cursel if c in _allcalc], key="ss_calc")
+
+            st.markdown("**Feature Flags (작업6 설정 — 표시)**")
+            st.code(_site.get("features", "{}"), language="json")
+
+            bc1, bc2 = st.columns(2)
+            if bc1.button("💾 Override 저장", type="primary", key="ss_save"):
+                ok, msg = SW.update_site(cfg, _site.get("site_id", ""), {
+                    "research_ai": o_res, "writing_ai": o_wri, "review_ai": o_rev,
+                    "wordpress_url": o_wpurl.strip(), "site_tags": o_cat.strip(),
+                    "seo_keyword_count": o_kwc.strip(), "seo_length": o_len.strip(),
+                    "daily_override": o_daily.strip(),
+                    "image_mode": "" if o_img == GLOB else o_img,
+                    "telegram_enabled": "" if o_tg == GLOB else o_tg,
+                    "analytics_enabled": "" if o_an == GLOB else o_an,
+                    "calc_active": _json.dumps(o_calc, ensure_ascii=False),
+                })
+                (st.success if ok else st.error)("Override 저장됨" if ok else msg)
+                if ok: st.cache_resource.clear(); st.rerun()
+            if bc2.button("↩️ Override 초기화(Global 복귀)", key="ss_reset"):
+                # 코어 필드(wordpress_url/site_tags)는 보존, Override 전용 필드만 비움
+                ok, msg = SW.update_site(cfg, _site.get("site_id", ""), {k: "" for k in [
+                    "research_ai", "writing_ai", "review_ai", "seo_keyword_count", "seo_length",
+                    "daily_override", "image_mode", "telegram_enabled", "analytics_enabled", "calc_active"]})
+                (st.success if ok else st.error)("Global 기본값으로 초기화" if ok else msg)
+                if ok: st.cache_resource.clear(); st.rerun()
+
     # ── 🧙 새 사이트 마법사 (5단계: Profile→Platform→Feature→Settings→Pipeline) ──
     with st.expander("🧙 새 사이트 마법사 (5단계)"):
         WP_FEATS = ["글 작성", "자동 발행", "SEO", "이미지 업로드", "카테고리"]
