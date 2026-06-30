@@ -12,7 +12,7 @@ modules/calculator_reviewer.py — 계산기 AI 검수 (SalaryMate)
 import json
 from datetime import datetime
 
-from .ai_provider import build_provider_for_role
+from .ai_provider import build_provider_for_role, build_provider
 from .utils.parser import parse_json_lenient
 from .logger import get_logger, BudgetTracker
 
@@ -52,7 +52,8 @@ def review_calculator(cfg: dict, calc: dict) -> dict:
               '{"scores":{"seo":0,"faq":0,"article":0,"input_form":0,"formula":0,"result_explain":0},'
               '"total":0,"reason":"100자 이내"}')
     try:
-        provider, model = build_provider_for_role("review", cfg)   # MODEL_EDITOR
+        provider = build_provider(cfg.get("CALC_REVIEW_PROVIDER", "openai"), cfg)
+        model    = cfg.get("CALC_REVIEW_MODEL", "gpt-4o")   # 계산기 검수 전용(블로그 editor와 분리)
         text, tokens = provider.chat(system, _summary(calc), model, max_tokens=400)
         try: BudgetTracker(cfg).record(model, tokens)
         except Exception: pass
