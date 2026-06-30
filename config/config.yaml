@@ -1,7 +1,7 @@
 ADSENSE_MODE: pre
 AUTO_TOPIC_EXPANSION: true
 DAILY_AI_BUDGET: 5
-DAILY_POST_COUNT: 3
+DAILY_POST_COUNT: 2
 DB_ADAPTER: sheets
 DLQ_THRESHOLD: 3
 DUPLICATE_THRESHOLD: 0.85
@@ -33,9 +33,9 @@ RSS_SOURCE_LIST:
 RUN_MODE: wordpress
 SQLITE_PATH: data/blog_auto.db
 STORAGE_ADAPTER: drive
-TELEGRAM_CHAT_ID: ''
-WORDPRESS_URL: https://example.com
-WORDPRESS_USERNAME: temp
+TELEGRAM_CHAT_ID: 'REDACTED'
+WORDPRESS_URL: http://testblog.test/
+WORDPRESS_USERNAME: geminia
 WRITER_PROVIDER: openai
 _root: C:\Users\연수\Desktop\블로그자동_v12
 AI_ROLES:
@@ -58,3 +58,16 @@ AI_ROLES:
     provider: gemini
     model: gemini-2.5-flash
 OPERATION_MODE: scheduled
+PUBLISH_SCHEDULE:
+  enabled: true
+  failure_mode: retry_in_slot
+  weekday:
+  - start: 09:00
+    end: '10:00'
+  - start: '13:00'
+    end: '14:00'
+  weekend:
+  - start: 09:00
+    end: '10:00'
+  - start: '13:00'
+    end: '14:00'

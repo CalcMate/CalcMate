@@ -82,7 +82,8 @@
       "Bash(rm -f data/_wp.log)",
       "Bash(git commit -q -m 'feat\\(settings\\): 대시보드 설정 탭에 WordPress URL/사용자/앱비밀번호 + 연결 테스트 추가 *)",
       "Bash(awk -F/ '{print $1}')",
-      "Bash(git commit -q -m ' *)"
+      "Bash(git commit -q -m ' *)",
+      "Bash(.venv/Scripts/python.exe -c \"import modules.retry_queue as r; print\\([n for n in dir\\(r\\) if not n.startswith\\('_'\\)]\\)\")"
     ]
   }
 }
