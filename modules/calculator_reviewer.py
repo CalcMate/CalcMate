@@ -59,11 +59,10 @@ def review_calculator(cfg: dict, calc: dict) -> dict:
         except Exception: pass
         d = parse_json_lenient(text)
         scores = d.get("scores", {}) or {}
-        total = d.get("total")
-        if not isinstance(total, (int, float)) or total == 0:
-            vals = [float(scores.get(k, 0)) for k in DIMENSIONS]
-            total = round(sum(vals) / len(vals)) if vals else 0
-        total = int(round(total))
+        # total은 항목 점수 평균으로 산출(GPT raw total 무시) + 0~100 클램프
+        vals = [float(scores.get(k, 0)) for k in DIMENSIONS]
+        total = round(sum(vals) / len(vals)) if vals else 0
+        total = int(max(0, min(100, total)))
         status = "PASS" if total >= PASS_THRESHOLD else "REWRITE"
         return {"review_score": total, "review_status": status,
                 "review_reason": str(d.get("reason", ""))[:200], "scores": scores}
