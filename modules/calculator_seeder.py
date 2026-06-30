@@ -45,7 +45,7 @@ def seed_default_calculators(cfg: dict) -> dict:
             skipped += 1
             continue
         formula = DEFAULT_FORMULAS.get(c["slug"], "")
-        repo.create({
+        repo.upsert_by_slug({
             "name": c["name"], "slug": c["slug"], "category": c["category"],
             "calculator_type": c["calculator_type"],
             "seo_title": c["seo_title"], "seo_desc": c["seo_desc"],

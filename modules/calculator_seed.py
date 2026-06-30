@@ -117,7 +117,7 @@ def seed_calculators(cfg: dict) -> int:
     for c in SAMPLE_CALCULATORS:
         if c["name"] in existing:
             continue
-        repo.create({
+        repo.upsert_by_slug({
             "name": c["name"], "slug": c["slug"], "category": c["category"],
             "calculator_type": c["calculator_type"],
             "seo_title": c["seo_title"], "seo_desc": c["seo_desc"],

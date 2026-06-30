@@ -39,6 +39,24 @@ class CalculatorRepository:
         calc.setdefault("status", "active")
         return self.save(calc)
 
+    def get_by_slug(self, slug: str) -> dict | None:
+        rows = self._db.get_where(self.TABLE, {"slug": slug})
+        return rows[0] if rows else None
+
+    def upsert_by_slug(self, calc: dict) -> str:
+        """slug로 기존 행을 찾으면 '비어있는 필드만' 채워 보존 update,
+        없으면 create. 기존 비어있지 않은 값(article_content 등)은 덮지 않는다.
+        시드 멱등성 + 생성 콘텐츠 보존용."""
+        slug = (calc.get("slug") or "").strip()
+        existing = self.get_by_slug(slug) if slug else None
+        if not existing:
+            return self.create(calc)
+        fill = {k: v for k, v in calc.items()
+                if k != "id" and not str(existing.get(k, "")).strip()}
+        if fill:
+            self.update(existing.get("id", ""), fill)
+        return existing.get("id", "")
+
     def update(self, calc_id: str, data: dict):
         data["updated_at"] = datetime.now().isoformat()
         self._db.update(self.TABLE, calc_id, data)
