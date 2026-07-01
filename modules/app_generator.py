@@ -183,11 +183,6 @@ def _related_html(calc):
     return "\n".join(blocks)
 
 
-def _update_html(calc):
-    when = calc.get("reviewed_at") or calc.get("generated_at") or datetime.now().strftime("%Y-%m-%d")
-    return f"<ul><li>{_html.escape(str(when)[:10])} 콘텐츠 생성/검수</li></ul>"
-
-
 # ── HTML (v1 템플릿 치환, 없으면 인라인 폴백) ─────────────────────
 def generate_html(calc: dict, cfg: dict = None) -> str:
     name = _html.escape(calc.get("name", "계산기"))
@@ -197,7 +192,7 @@ def generate_html(calc: dict, cfg: dict = None) -> str:
         "TITLE": title, "DESCRIPTION": desc,
         "FORM_HTML": _form_html(calc, cfg), "RESULT_HTML": _result_html(calc),
         "EXPLANATION_HTML": _explanation_html(calc), "FAQ_HTML": _faq_html(calc),
-        "RELATED_HTML": _related_html(calc), "UPDATE_HTML": _update_html(calc),
+        "RELATED_HTML": _related_html(calc),
     }
     if _TPL.exists():
         html = _TPL.read_text(encoding="utf-8")
