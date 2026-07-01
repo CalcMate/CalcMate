@@ -14,8 +14,8 @@ from . import calculator_prompt_manager as PM
 LOG = get_logger()
 
 
-def generate_faq(cfg, name_or_calc, n: int = 5, n_max: int = 10) -> list:
-    """name(str) 또는 calc(dict) 입력 모두 허용. FAQ 5~10개 반환."""
+def generate_faq(cfg, name_or_calc, n: int = 6, n_max: int = 8) -> list:
+    """name(str) 또는 calc(dict) 입력 모두 허용. FAQ 6~8개 반환(6필수항목 포함)."""
     calc = name_or_calc if isinstance(name_or_calc, dict) else {"name": str(name_or_calc)}
     name = calc.get("name", "")
     try:
