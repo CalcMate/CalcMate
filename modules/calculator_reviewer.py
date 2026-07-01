@@ -18,7 +18,9 @@ from .logger import get_logger, BudgetTracker
 
 LOG = get_logger()
 PASS_THRESHOLD = 80
-DIMENSIONS = ["seo", "faq", "article", "input_form", "formula", "result_explain"]
+# 연도 동적 주입(calculator_prompt_manager와 동일 방식). 하드코딩 금지.
+CURRENT_YEAR = datetime.now().year
+DIMENSIONS = ["seo", "faq", "article", "input_form", "formula", "result_explain", "html_quality"]
 
 
 def _repo(cfg: dict):
@@ -46,11 +48,48 @@ def _summary(calc: dict) -> str:
 def review_calculator(cfg: dict, calc: dict) -> dict:
     """계산기 생성물 검수. 반환 {review_score, review_status, review_reason, scores}.
     status: PASS(>=80) / REWRITE(<80)."""
-    system = ("너는 콘텐츠 품질 검수자다. 아래 계산기 생성물을 항목(SEO/FAQ/본문/입력폼/계산수식/결과해설)별 "
-              "0~100으로 평가하라. AI 티 표현·키워드 스팸·빈약한 정보·수식 오류는 감점. "
-              "순수 JSON만 반환: "
-              '{"scores":{"seo":0,"faq":0,"article":0,"input_form":0,"formula":0,"result_explain":0},'
-              '"total":0,"reason":"100자 이내"}')
+    system = (
+        "너는 계산기 콘텐츠 품질 심사위원이다.\n"
+        "절대 후하게 점수를 주지 말 것.\n"
+        "실제 사용자가 사용할 계산기라고 가정하고 엄격하게 평가한다.\n"
+        "80점 이상이라도 개선점이 있으면 반드시 reason에 기록한다.\n"
+        "95점 이상은 거의 완벽한 경우에만 부여한다. 애매하면 감점한다.\n\n"
+        "[항목별 평가 기준]\n"
+        "SEO (0~100):\n"
+        f"  - 제목에 현재 연도({CURRENT_YEAR}) 외 고정 연도 포함 시 -20\n"
+        "  - 키워드 스팸/과도한 반복 -15\n"
+        "  - 메타설명이 70자 미만이거나 120자 초과 시 -10\n\n"
+        "FAQ (0~100):\n"
+        "  - 6개 미만 -20\n"
+        "  - 지급조건/예외/계산기준/자주틀리는부분/법적근거/실무팁 중 누락 항목당 -10\n"
+        "  - 답변이 추상적이고 수치/조건 없음 -20\n\n"
+        "본문(article) (0~100):\n"
+        "  - AI 티 표현(ChatGPT, Claude, AI가 작성 등) -20\n"
+        "  - 업데이트 내역/생성일/검수일 포함 시 -10\n"
+        "  - Hero/입력/결과/계산원리/주의사항/FAQ/CTA 구조 미준수 시 -15\n"
+        "  - 분량 2000자 미만 -15\n\n"
+        "계산식(formula) (0~100):\n"
+        "  - 수식 오류 -40\n"
+        "  - 확인되지 않은 법령·요율 추측 사용 -30\n\n"
+        "결과 해설(result_explain) (0~100):\n"
+        "  - 계산식이 코드 형태(변수명, 수식 기호)로 그대로 노출 -30\n"
+        "  - 예시 계산 없음 -20\n"
+        "  - 한국어 설명이 아닌 기술적 표현 사용 -20\n\n"
+        "입력폼(input_form) (0~100):\n"
+        "  - 필수 입력 항목 누락 -20\n"
+        "  - label 미연결 -10\n\n"
+        "HTML 구조 (0~100, html_quality 키로 추가):\n"
+        "  - h1 중복 -20\n"
+        "  - h2 순서 오류 -10\n"
+        "  - label-input 연결 누락 -10\n"
+        "  - aria 속성 누락 -10\n"
+        "  - 모바일 버튼/CTA 누락 -15\n"
+        "  - schema.org 마크업 누락 -10\n\n"
+        "순수 JSON만 반환:\n"
+        '{"scores":{"seo":0,"faq":0,"article":0,"input_form":0,'
+        '"formula":0,"result_explain":0,"html_quality":0},'
+        '"total":0,"reason":"200자 이내 — 주요 감점 이유와 개선점 명시"}'
+    )
     try:
         provider = build_provider(cfg.get("CALC_REVIEW_PROVIDER", "openai"), cfg)
         model    = cfg.get("CALC_REVIEW_MODEL", "gpt-4o")   # 계산기 검수 전용(블로그 editor와 분리)
