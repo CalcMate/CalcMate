@@ -25,7 +25,7 @@ def _image_pair(cfg: dict, calc: dict) -> dict:
     for role in ("research", "writing"):   # research=Gemini Flash, writing=Writer
         try:
             provider, model = build_provider_for_role(role, cfg)
-            text, tokens = provider.chat(system, user, model, max_tokens=300)
+            text, tokens = provider.chat(system, user, model, max_tokens=1500, json_mode=True)
             try:
                 BudgetTracker(cfg).record(model, tokens)
             except Exception as _e:

@@ -20,8 +20,9 @@ AI_PROFILE_MAP = {
 # ── Provider 클래스 ────────────────────────────────────────────────────────────
 class AIProvider(ABC):
     @abstractmethod
-    def chat(self, system: str, user: str, model: str, max_tokens: int = 4000) -> tuple[str, int]:
-        """Returns (response_text, total_tokens)"""
+    def chat(self, system: str, user: str, model: str, max_tokens: int = 4000,
+             json_mode: bool = False) -> tuple[str, int]:
+        """Returns (response_text, total_tokens). json_mode=True면 구조화 JSON 출력(지원 provider만)."""
 
 
 class GPTProvider(AIProvider):
@@ -29,7 +30,7 @@ class GPTProvider(AIProvider):
         from openai import OpenAI
         self.client = OpenAI(api_key=api_key)
 
-    def chat(self, system: str, user: str, model: str, max_tokens: int = 4000):
+    def chat(self, system: str, user: str, model: str, max_tokens: int = 4000, json_mode: bool = False):
         resp = self.client.chat.completions.create(
             model=model,
             messages=[{"role": "system", "content": system},
@@ -44,7 +45,7 @@ class ClaudeProvider(AIProvider):
         import anthropic
         self.client = anthropic.Anthropic(api_key=api_key)
 
-    def chat(self, system: str, user: str, model: str, max_tokens: int = 4000):
+    def chat(self, system: str, user: str, model: str, max_tokens: int = 4000, json_mode: bool = False):
         resp = self.client.messages.create(
             model=model, max_tokens=max_tokens,
             system=system,
@@ -60,15 +61,15 @@ class GeminiProvider(AIProvider):
         from google import genai
         self.client = genai.Client(api_key=api_key)
 
-    def chat(self, system: str, user: str, model: str, max_tokens: int = 4000):
+    def chat(self, system: str, user: str, model: str, max_tokens: int = 4000, json_mode: bool = False):
         from google.genai import types
+        _cfg = dict(system_instruction=system, max_output_tokens=max_tokens)
+        if json_mode:
+            _cfg["response_mime_type"] = "application/json"   # 구조화 JSON 출력 강제(잘림/malformed 완화)
         resp = self.client.models.generate_content(
             model=model,
             contents=user,
-            config=types.GenerateContentConfig(
-                system_instruction=system,
-                max_output_tokens=max_tokens,
-            ),
+            config=types.GenerateContentConfig(**_cfg),
         )
         usage = getattr(resp, "usage_metadata", None)
         tokens = getattr(usage, "total_token_count", 0) or 0

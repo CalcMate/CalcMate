@@ -70,7 +70,7 @@ def plan_seo(clean_data: dict, strategy: dict,
     )
 
     def _call():
-        text, tokens = provider.chat(SYSTEM_M1, user_msg, model, max_tokens=1000)
+        text, tokens = provider.chat(SYSTEM_M1, user_msg, model, max_tokens=3000, json_mode=True)
         return parse_json_lenient(text), tokens
 
     result, tokens = retry_call(_call, cfg.get("MAX_RETRY_COUNT", 3))
