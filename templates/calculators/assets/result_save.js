@@ -12,10 +12,10 @@
   }
   function ts(sep) {
     var n = new Date(), p = function (x) { return (x < 10 ? "0" : "") + x; };
-    var date = "" + n.getFullYear() + p(n.getMonth() + 1) + p(n.getDate());
-    var time = "" + p(n.getHours()) + p(n.getMinutes()) + p(n.getSeconds());
-    return sep ? (n.getFullYear() + "-" + p(n.getMonth() + 1) + "-" + p(n.getDate()) + " " + p(n.getHours()) + ":" + p(n.getMinutes()))
-               : (date + "_" + time);
+    // 파일명용: YYYYMMDD_HHMM (초 제외)
+    var fname = "" + n.getFullYear() + p(n.getMonth() + 1) + p(n.getDate()) + "_" + p(n.getHours()) + p(n.getMinutes());
+    var human = n.getFullYear() + "-" + p(n.getMonth() + 1) + "-" + p(n.getDate()) + " " + p(n.getHours()) + ":" + p(n.getMinutes());
+    return sep ? human : fname;
   }
   w.saveResultPng = function () {
     var card = d.getElementById("result-card");
