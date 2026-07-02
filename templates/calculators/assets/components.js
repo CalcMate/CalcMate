@@ -58,7 +58,7 @@
     (CFG.outputs || []).forEach(function (o) {
       rows.push([o.label || o.key, comma(num(outputs[o.key])) + (o.unit || "")]);
     });
-    if ((CFG.show || {}).detail !== false) {
+    if (CFG.show_detail !== false) {
       var host = d.getElementById("detail-rows");
       if (host) {
         host.innerHTML = rows.map(function (r) {
@@ -89,18 +89,17 @@
 
   // 초기화: show_* 플래그 반영 + 기능 모듈 init
   function init() {
-    var show = CFG.show || {};
-    // 광고/CPA: 설정 시에만 노출(기본 숨김)
-    if (show.adsense) toggleAll(".sm-adsense", true);
-    if (show.cpa) toggleAll(".sm-cpa", true);
+    // 광고/CPA: 설정 시에만 노출(기본 숨김) — SM_CONFIG(대시보드/ SITE_MODE) 값으로만 제어
+    if (CFG.show_adsense) toggleAll(".sm-adsense", true);
+    if (CFG.show_cpa) toggleAll(".sm-cpa", true);
     // 결과 액션 버튼: 플래그로 개별 노출
-    hideActionIf("result_save", show.result_save === false);
-    hideActionIf("share", show.share === false);
-    hideActionIf("pwa", show.pwa === false);
+    hideActionIf("result_save", CFG.show_result_save === false);
+    hideActionIf("share", CFG.show_share === false);
+    hideActionIf("pwa", CFG.show_pwa === false);
     // 섹션 노출 제어(FAQ/안내문/관련계산기) — 기본 노출, 설정 false면 숨김
-    if (show.faq === false) hideEl("#faq-card");
-    if (show.notice === false) hideEl(".sm-notice");
-    if (show.related === false) hideEl("#related-card");
+    if (CFG.show_faq === false) hideEl("#faq-card");
+    if (CFG.show_notice === false) hideEl(".sm-notice");
+    if (CFG.show_related === false) hideEl("#related-card");
     if (w.smInitNumberInputs) w.smInitNumberInputs();
     if (w.smInitPwa) w.smInitPwa();
   }

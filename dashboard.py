@@ -1927,6 +1927,56 @@ elif tab == "🔧 설정":
             tg_events[_k] = bool(_ecols[_i].toggle(_lbl, value=bool(_ev_def.get(_k, True)), key=f"s_tgev_{_k}"))
         st.caption("telegram_ops 경유 이벤트에 적용. 파이프라인 크리티컬 알림(오류/예산/헬스)은 항상 발송.")
 
+    # ── 🎨 계산기 노출 설정 (Design v2) — SM_CONFIG 연동 ──
+    with st.expander("🎨 계산기 노출 설정 (v2)"):
+        st.caption("생성되는 계산기 앱의 노출/정책. 저장 시 config.yaml에 반영되어 재생성물에 적용됩니다. (UI/계산식 무변경)")
+        _SITE_MODES = ["pre_adsense", "adsense", "cpa", "full"]
+        _cur_sm = cfg.get("SITE_MODE", "pre_adsense")
+        v2_site = st.selectbox("SITE_MODE", _SITE_MODES,
+                               index=_SITE_MODES.index(_cur_sm) if _cur_sm in _SITE_MODES else 0,
+                               help="pre_adsense=광고/CPA off · adsense=광고 · cpa=CPA · full=둘 다")
+        _c = st.columns(3)
+        v2_share = _c[0].toggle("SHOW_SHARE", value=bool(cfg.get("SHOW_SHARE", True)), key="v2_share")
+        v2_pwa = _c[1].toggle("SHOW_PWA", value=bool(cfg.get("SHOW_PWA", True)), key="v2_pwa")
+        v2_save = _c[2].toggle("SHOW_RESULT_SAVE", value=bool(cfg.get("SHOW_RESULT_SAVE", True)), key="v2_save")
+        _c2 = st.columns(3)
+        v2_faq = _c2[0].toggle("SHOW_FAQ", value=bool(cfg.get("SHOW_FAQ", True)), key="v2_faq")
+        v2_notice = _c2[1].toggle("SHOW_NOTICE", value=bool(cfg.get("SHOW_NOTICE", True)), key="v2_notice")
+        v2_related = _c2[2].toggle("SHOW_RELATED", value=bool(cfg.get("SHOW_RELATED", True)), key="v2_related")
+        _c3 = st.columns(3)
+        v2_detail = _c3[0].toggle("SHOW_DETAIL", value=bool(cfg.get("SHOW_DETAIL", True)), key="v2_detail")
+        v2_ads = _c3[1].toggle("SHOW_ADSENSE(오버라이드)", value=bool(cfg.get("SHOW_ADSENSE", False)), key="v2_ads")
+        v2_cpa = _c3[2].toggle("SHOW_CPA(오버라이드)", value=bool(cfg.get("SHOW_CPA", False)), key="v2_cpa")
+        _c4 = st.columns(2)
+        _EXP = ["png", "pdf", "both", "none"]
+        _cur_exp = cfg.get("RESULT_EXPORT_TYPE", "png")
+        v2_exp = _c4[0].selectbox("RESULT_EXPORT_TYPE", _EXP,
+                                  index=_EXP.index(_cur_exp) if _cur_exp in _EXP else 0,
+                                  help="현재 png만 구현. pdf/both/none은 구조만 준비.")
+        v2_kakao = _c4[1].text_input("KAKAO_JS_KEY", value=cfg.get("KAKAO_JS_KEY", ""),
+                                     help="카카오 JS 키(클라이언트용). 입력 시 카카오 공유 SDK 연동 준비.")
+        _c5 = st.columns(2)
+        v2_calcver = _c5[0].text_input("CALCULATOR_VERSION", value=cfg.get("CALCULATOR_VERSION", "2.0.0"))
+        v2_lawver = _c5[1].text_input("LAW_VERSION", value=cfg.get("LAW_VERSION", "2026-07"))
+        if st.button("💾 계산기 노출 설정 저장", key="v2_save_btn"):
+            _p = BASE / "config" / "config.yaml"
+            with open(_p, encoding="utf-8") as f:
+                _raw = yaml.safe_load(f) or {}
+            _raw.update({
+                "SITE_MODE": v2_site,
+                "SHOW_ADSENSE": bool(v2_ads), "SHOW_CPA": bool(v2_cpa),
+                "SHOW_SHARE": bool(v2_share), "SHOW_PWA": bool(v2_pwa),
+                "SHOW_RESULT_SAVE": bool(v2_save), "SHOW_FAQ": bool(v2_faq),
+                "SHOW_NOTICE": bool(v2_notice), "SHOW_RELATED": bool(v2_related),
+                "SHOW_DETAIL": bool(v2_detail),
+                "RESULT_EXPORT_TYPE": v2_exp, "KAKAO_JS_KEY": v2_kakao.strip(),
+                "CALCULATOR_VERSION": v2_calcver.strip(), "LAW_VERSION": v2_lawver.strip(),
+            })
+            with open(_p, "w", encoding="utf-8") as f:
+                yaml.dump(_raw, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+            st.success("✅ 저장 완료. 계산기 재생성 시 SM_CONFIG에 반영됩니다.")
+            st.cache_resource.clear()
+
     # ── AI 역할 체계 (확장 기능 전용 — 기존 파이프라인 모델과 별개) ──
     with st.expander("🧠 AI 역할 체계 (AI Workspace / App Factory 용)", expanded=False):
         st.caption("총괄/리서치/코드/작성/검수/이미지 역할별 모델. 기존 ORCHESTRATOR/PLANNER/WRITER/EDITOR 설정과 별개로 동작합니다.")

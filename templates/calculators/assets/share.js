@@ -7,7 +7,7 @@
     var val = valEl ? valEl.textContent : "";
     var text = (cfg.name || "계산 결과") + " 결과: " + val + (cfg.resultUnit || "");
     try {
-      if (cfg.kakao && cfg.kakao.enabled && w.Kakao && w.Kakao.Share &&
+      if (cfg.kakao_js_key && w.Kakao && w.Kakao.Share &&
           w.Kakao.isInitialized && w.Kakao.isInitialized()) {
         w.Kakao.Share.sendDefault({
           objectType: "text", text: text,

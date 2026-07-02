@@ -128,17 +128,34 @@ def _sm_config(calc, cfg) -> dict:
     outputs = [{"key": k, "label": _split_label(k)[0], "unit": _split_label(k)[1] or "원"} for k in outs]
     primary = list(outs.keys())[0] if outs else "result"
     c = cfg if isinstance(cfg, dict) else {}
-    def g(key, default):
+    def b(key, default):
         return bool(c.get(key, default))
-    show = {"adsense": g("SHOW_ADSENSE", False), "cpa": g("SHOW_CPA", False),
-            "share": g("SHOW_SHARE", True), "pwa": g("SHOW_PWA", True),
-            "result_save": g("SHOW_RESULT_SAVE", True), "faq": g("SHOW_FAQ", True),
-            "notice": g("SHOW_NOTICE", True), "related": g("SHOW_RELATED", True),
-            "detail": g("SHOW_DETAIL", True)}
-    kakao = {"enabled": bool(c.get("KAKAO_JS_KEY")), "appKey": c.get("KAKAO_JS_KEY", "")}
-    return {"name": calc.get("name", "계산기"), "primaryOutput": primary,
-            "resultUnit": (outputs[0]["unit"] if outputs else "원"),
-            "inputs": inputs, "outputs": outputs, "show": show, "kakao": kakao}
+    # SITE_MODE로 광고/CPA 파생(설정값만으로 제어). SHOW_ADSENSE/SHOW_CPA 명시 시 그 값 우선.
+    site_mode = str(c.get("SITE_MODE", "pre_adsense"))
+    mode_ads = site_mode in ("adsense", "full")
+    mode_cpa = site_mode in ("cpa", "full")
+    return {
+        # 기능(계산/렌더용)
+        "name": calc.get("name", "계산기"), "primaryOutput": primary,
+        "resultUnit": (outputs[0]["unit"] if outputs else "원"),
+        "inputs": inputs, "outputs": outputs,
+        # 노출 플래그(flat, 대시보드 설정 연동)
+        "show_adsense": b("SHOW_ADSENSE", mode_ads),
+        "show_cpa": b("SHOW_CPA", mode_cpa),
+        "show_share": b("SHOW_SHARE", True),
+        "show_pwa": b("SHOW_PWA", True),
+        "show_result_save": b("SHOW_RESULT_SAVE", True),
+        "show_faq": b("SHOW_FAQ", True),
+        "show_notice": b("SHOW_NOTICE", True),
+        "show_related": b("SHOW_RELATED", True),
+        "show_detail": b("SHOW_DETAIL", True),
+        # 정책/메타
+        "site_mode": site_mode,
+        "result_export_type": str(c.get("RESULT_EXPORT_TYPE", "png")),
+        "kakao_js_key": str(c.get("KAKAO_JS_KEY", "")),
+        "calculator_version": str(c.get("CALCULATOR_VERSION", "2.0.0")),
+        "law_version": str(c.get("LAW_VERSION", "2026-07")),
+    }
 
 
 def _read_assets_js() -> str:
