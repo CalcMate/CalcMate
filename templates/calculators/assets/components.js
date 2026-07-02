@@ -58,13 +58,15 @@
     (CFG.outputs || []).forEach(function (o) {
       rows.push([o.label || o.key, comma(num(outputs[o.key])) + (o.unit || "")]);
     });
-    var host = d.getElementById("detail-rows");
-    if (host) {
-      host.innerHTML = rows.map(function (r) {
-        return '<div class="sm-detail-row"><span class="sm-detail-label">' + esc(r[0]) +
-          '</span><span class="sm-detail-value">' + esc(r[1]) + "</span></div>";
-      }).join("");
-      var dc = d.getElementById("detail-card"); if (dc) dc.style.display = "block";
+    if ((CFG.show || {}).detail !== false) {
+      var host = d.getElementById("detail-rows");
+      if (host) {
+        host.innerHTML = rows.map(function (r) {
+          return '<div class="sm-detail-row"><span class="sm-detail-label">' + esc(r[0]) +
+            '</span><span class="sm-detail-value">' + esc(r[1]) + "</span></div>";
+        }).join("");
+        var dc = d.getElementById("detail-card"); if (dc) dc.style.display = "block";
+      }
     }
   }
 
@@ -95,9 +97,14 @@
     hideActionIf("result_save", show.result_save === false);
     hideActionIf("share", show.share === false);
     hideActionIf("pwa", show.pwa === false);
+    // 섹션 노출 제어(FAQ/안내문/관련계산기) — 기본 노출, 설정 false면 숨김
+    if (show.faq === false) hideEl("#faq-card");
+    if (show.notice === false) hideEl(".sm-notice");
+    if (show.related === false) hideEl("#related-card");
     if (w.smInitNumberInputs) w.smInitNumberInputs();
     if (w.smInitPwa) w.smInitPwa();
   }
+  function hideEl(sel) { var el = d.querySelector(sel); if (el) el.style.display = "none"; }
   function toggleAll(sel, on) { d.querySelectorAll(sel).forEach(function (el) { el.style.display = on ? "block" : "none"; }); }
   function hideActionIf(action, hide) {
     if (!hide) return;

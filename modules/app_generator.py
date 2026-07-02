@@ -55,6 +55,124 @@ def _to_js(expr: str) -> str:
     return s
 
 
+# ── Design System v2 (마스터 시안 + assets) ──────────────────────────
+_BASE_DIR = Path(__file__).resolve().parent.parent
+_TPL_V2 = _BASE_DIR / "templates" / "calculators" / "calculator_v2.html"
+_ASSETS = _BASE_DIR / "templates" / "calculators" / "assets"
+# components.js는 init을 실행하므로 마지막(다른 모듈 정의 후)
+_JS_ORDER = ["number_input.js", "result_save.js", "share.js", "pwa.js",
+             "faq.js", "related.js", "components.js"]
+_RELATED = [("weekly-holiday-allowance", "💰", "주휴수당 계산기"),
+            ("severance-pay", "💼", "퇴직금 계산기"),
+            ("annual-leave-allowance", "📅", "연차수당 계산기"),
+            ("unemployment-benefit", "📋", "실업급여 계산기"),
+            ("four-insurances", "🏢", "4대보험 계산기")]
+
+
+def _split_label(k):
+    """_LABELS의 '시급(원)' → ('시급','원'). 괄호 없으면 (label,'')."""
+    lab = _label(k)
+    m = re.match(r"^(.*)\((.+)\)\s*$", lab)
+    return (m.group(1).strip(), m.group(2).strip()) if m else (lab, "")
+
+
+def _form_fields_v2(ins) -> str:
+    rows = []
+    for k, spec in ins.items():
+        label, unit = _split_label(k)
+        if "date" in str(spec).lower():
+            rows.append(
+                f'<div class="sm-field"><label class="sm-label" for="in_{k}">{_html.escape(label)}</label>'
+                f'<div class="sm-input-wrap"><input class="sm-input" type="date" id="in_{k}"></div></div>')
+        else:
+            u = f'<span class="sm-unit">{_html.escape(unit)}</span>' if unit else ""
+            rows.append(
+                f'<div class="sm-field"><label class="sm-label" for="in_{k}">{_html.escape(label)}</label>'
+                f'<div class="sm-input-wrap"><input class="sm-input" type="text" inputmode="numeric" '
+                f'data-comma id="in_{k}" placeholder="0">{u}</div></div>')
+    return "\n".join(rows)
+
+
+def _faq_items_v2(calc) -> str:
+    faq = _pj(calc.get("faq"), [])
+    if not isinstance(faq, list) or not faq:
+        return '<p style="font-size:14px;color:#6B7280">등록된 FAQ가 없습니다.</p>'
+    items = []
+    for f in faq:
+        if not isinstance(f, dict):
+            continue
+        q = _html.escape(str(f.get("question", f.get("q", ""))))
+        a = _html.escape(str(f.get("answer", f.get("a", ""))))
+        items.append(
+            f'<div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">{q}'
+            f'<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">{a}</div></div>')
+    return "\n".join(items)
+
+
+def _related_items_v2(calc) -> str:
+    cur = str(calc.get("slug", ""))
+    items = [f'<a class="sm-related-item" href="#"><span class="sm-related-emoji">{emoji}</span>'
+             f'<span class="sm-related-name">{_html.escape(nm)}</span></a>'
+             for slug, emoji, nm in _RELATED if slug != cur]
+    return "\n".join(items[:4])
+
+
+def _sm_config(calc, cfg) -> dict:
+    ins = _pj(calc.get("input_schema"), {})
+    outs = _pj(calc.get("output_schema"), {})
+    inputs = []
+    for k, spec in ins.items():
+        label, unit = _split_label(k)
+        inputs.append({"name": k, "label": label,
+                       "type": ("date" if "date" in str(spec).lower() else "number"), "unit": unit})
+    outputs = [{"key": k, "label": _split_label(k)[0], "unit": _split_label(k)[1] or "원"} for k in outs]
+    primary = list(outs.keys())[0] if outs else "result"
+    c = cfg if isinstance(cfg, dict) else {}
+    def g(key, default):
+        return bool(c.get(key, default))
+    show = {"adsense": g("SHOW_ADSENSE", False), "cpa": g("SHOW_CPA", False),
+            "share": g("SHOW_SHARE", True), "pwa": g("SHOW_PWA", True),
+            "result_save": g("SHOW_RESULT_SAVE", True), "faq": g("SHOW_FAQ", True),
+            "notice": g("SHOW_NOTICE", True), "related": g("SHOW_RELATED", True),
+            "detail": g("SHOW_DETAIL", True)}
+    kakao = {"enabled": bool(c.get("KAKAO_JS_KEY")), "appKey": c.get("KAKAO_JS_KEY", "")}
+    return {"name": calc.get("name", "계산기"), "primaryOutput": primary,
+            "resultUnit": (outputs[0]["unit"] if outputs else "원"),
+            "inputs": inputs, "outputs": outputs, "show": show, "kakao": kakao}
+
+
+def _read_assets_js() -> str:
+    parts = []
+    for f in _JS_ORDER:
+        p = _ASSETS / f
+        parts.append(p.read_text(encoding="utf-8") if p.exists() else "")
+    return "\n".join(parts)
+
+
+def _compute_js(calc) -> str:
+    """계산기별 computeResult(inputs) 생성. 기존 formula/퇴직금 date분기 로직 유지."""
+    slug = str(calc.get("slug", ""))
+    if slug == "severance-pay":   # 날짜 기반(입사일/퇴사일 → total_days) — 로직 무변경
+        return (
+            'window.computeResult = function(inputs){\n'
+            '  var s = new Date(inputs["start_date"]); var e = new Date(inputs["end_date"]);\n'
+            '  var total_days = Math.floor((e - s) / (1000*60*60*24));\n'
+            '  var avg_monthly_wage = inputs["avg_monthly_wage"] || 0;\n'
+            '  var out = {};\n'
+            '  out["severance_pay"] = (total_days > 0) ? avg_monthly_wage * (total_days / 365) : 0;\n'
+            '  out._detail = [{label:"재직일수", value:(total_days > 0 ? total_days : 0) + "일"}];\n'
+            '  return out;\n};\n'
+        )
+    ins = _pj(calc.get("input_schema"), {})
+    outs = _pj(calc.get("output_schema"), {})
+    formula = _pj(calc.get("formula"), calc.get("formula", ""))
+    fmap = _formula_map(formula, outs)
+    reads = "".join(f'  var {n} = inputs["{n}"] || 0;\n' for n in ins.keys())
+    body = "  var out = {};\n" + "".join(
+        f'  out["{k}"] = ({_to_js(expr)});\n' for k, expr in fmap.items())
+    return "window.computeResult = function(inputs){\n" + reads + body + "  return out;\n};\n"
+
+
 def _formula_map(formula, output_schema) -> dict:
     if isinstance(formula, dict):
         return formula
@@ -77,65 +195,18 @@ def _effective_form(calc: dict, cfg: dict = None):
     return sch, [f.get("name") for f in sch.get("fields", [])]
 
 
-# ── JS ────────────────────────────────────────────────────────────
+# ── JS (design v2: 공통 컴포넌트 모듈 + 계산기별 computeResult) ────
 def generate_js(calc: dict, cfg: dict = None) -> str:
-    _, names = _effective_form(calc, cfg)
-    outs = _pj(calc.get("output_schema"), {})
-    # ── 퇴직금 전용(날짜 기반): start_date/end_date → total_days. 다른 계산기는 아래 기존 로직 유지 ──
-    if str(calc.get("slug", "")) == "severance-pay":
-        return (
-            "function calculate() {\n"
-            '  const s = new Date((document.getElementById("in_start_date")||{}).value);\n'
-            '  const e = new Date((document.getElementById("in_end_date")||{}).value);\n'
-            '  const total_days = Math.floor((e - s) / (1000*60*60*24));\n'
-            '  const avg_monthly_wage = parseFloat((document.getElementById("in_avg_monthly_wage")||{}).value) || 0;\n'
-            '  const out_severance_pay = avg_monthly_wage * (total_days / 365);\n'
-            '  var el = document.getElementById("out_severance_pay");\n'
-            '  if (el) el.textContent = (isFinite(out_severance_pay) && total_days > 0) ? Math.round(out_severance_pay).toLocaleString() + "원" : "-";\n'
-            "}\n"
-        )
-    formula = _pj(calc.get("formula"), calc.get("formula", ""))
-    fmap = _formula_map(formula, outs)
-    read_lines = [f'  const {n} = parseFloat((document.getElementById("in_{n}")||{{}}).value) || 0;'
-                  for n in names]
-    calc_lines, set_lines = [], []
-    for out_key, expr in fmap.items():
-        calc_lines.append(f'  const out_{out_key} = ({_to_js(expr)});')
-        set_lines.append(
-            f'  var el_{out_key}=document.getElementById("out_{out_key}");'
-            f' if(el_{out_key}) el_{out_key}.textContent = isFinite(out_{out_key}) '
-            f'? Math.round(out_{out_key}).toLocaleString() : "-";')
-    return ("function calculate() {\n" + "\n".join(read_lines) +
-            "\n  try {\n" + "\n".join("  " + c for c in calc_lines) + "\n" +
-            "\n".join("  " + s for s in set_lines) +
-            '\n  } catch (e) { console.error(e); }\n}\n')
+    """script.js = 공통 컴포넌트 모듈 전체 + 계산기별 computeResult().
+    calculate()/renderResult()는 공통(불변). 수식/퇴직금 date분기만 계산기별."""
+    return _read_assets_js() + "\n\n" + _compute_js(calc)
 
 
 # ── CSS (공개 계산기용 라이트 테마) ───────────────────────────────
 def generate_css(calc: dict = None) -> str:
-    return """*{box-sizing:border-box}body{font-family:system-ui,'Malgun Gothic',sans-serif;background:#f6f8fb;margin:0;padding:0;color:#1f2937}
-.sm-wrap{max-width:680px;margin:0 auto;padding:20px 16px 90px}
-.sm-hero{padding:22px 4px 8px}.sm-hero h1{font-size:26px;margin:0 0 6px;letter-spacing:-.5px}
-.sm-sub{color:#6b7280;font-size:14px;margin:0}
-.sm-card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:20px;margin:14px 0;box-shadow:0 1px 4px rgba(0,0,0,.04)}
-.sm-card h2{font-size:17px;margin:0 0 12px}
-.sm-row{display:flex;justify-content:space-between;align-items:center;margin:10px 0;gap:10px}
-.sm-row label{font-size:14px;color:#374151}.sm-inp{display:flex;align-items:center;gap:6px}
-.sm-row input,.sm-row select{width:180px;max-width:55vw;padding:9px;border:1px solid #cbd5e1;border-radius:9px}
-.sm-unit{color:#9ca3af;font-size:13px}.sm-rdo{margin-right:10px;font-size:14px}
-.sm-btn{width:100%;margin-top:14px;padding:13px;border:0;border-radius:11px;background:#2563eb;color:#fff;font-size:16px;cursor:pointer}
-.sm-btn:hover{background:#1d4ed8}
-.sm-result .r,.r{display:flex;justify-content:space-between;padding:7px 0;font-size:16px;border-bottom:1px dashed #eef2f7}
-.sm-result strong{color:#2563eb}
-.sm-faq details{margin:8px 0;background:#f9fafb;border-radius:10px;padding:10px 12px}
-.sm-faq summary{cursor:pointer;font-weight:600}
-.sm-related a{display:inline-block;margin:4px 8px 4px 0;color:#2563eb}
-.sm-ad{background:#fffbe6;border:1px dashed #facc15;border-radius:10px;padding:14px;text-align:center;color:#92660a}
-.sm-foot{color:#9ca3af;font-size:12px;text-align:center;margin-top:18px}
-.sm-mobile-cta{position:fixed;left:0;right:0;bottom:0;padding:10px 16px;background:rgba(255,255,255,.96);border-top:1px solid #e5e7eb}
-.sm-mobile-cta button{width:100%;padding:13px;border:0;border-radius:11px;background:#16a34a;color:#fff;font-size:16px}
-@media(min-width:700px){.sm-mobile-cta{display:none}}
-"""
+    """style.css = design_system.css(공식 마스터 시안). 모든 계산기 공통(UI 불변)."""
+    p = _ASSETS / "design_system.css"
+    return p.read_text(encoding="utf-8") if p.exists() else ""
 
 
 # ── 섹션 빌더 ─────────────────────────────────────────────────────
@@ -197,31 +268,45 @@ def _related_html(calc):
     return "\n".join(blocks)
 
 
-# ── HTML (v1 템플릿 치환, 없으면 인라인 폴백) ─────────────────────
+# ── HTML (design v2 마스터 시안 치환) ─────────────────────────────
 def generate_html(calc: dict, cfg: dict = None) -> str:
-    name = _html.escape(calc.get("name", "계산기"))
-    title = _html.escape(calc.get("seo_title") or name)
-    desc = _html.escape(calc.get("seo_description") or calc.get("seo_desc") or f"{name} 자동 계산")
+    """index.html = calculator_v2.html 시안에 계산기 데이터만 치환. UI는 모든 계산기 동일."""
+    name = calc.get("name", "계산기")
+    title = calc.get("seo_title") or name
+    desc = calc.get("seo_description") or calc.get("seo_desc") or f"{name} 자동 계산"
+    ins = _pj(calc.get("input_schema"), {})
+    outs = _pj(calc.get("output_schema"), {})
+    primary = list(outs.keys())[0] if outs else "result"
+    plabel, punit = _split_label(primary)
+    category = calc.get("category", "") or "계산기"
+    emoji = ("💰" if ("급여" in category or "노무" in category)
+             else "🏢" if ("보험" in category or "고용" in category) else "🧮")
+    short = name.replace(" 계산기", "").replace("계산기", "").strip() or name
+    article = str(calc.get("article_content", "") or "") \
+        or f"<h2>{_html.escape(name)}</h2><p>{_html.escape(desc)}</p>"
     repl = {
-        "TITLE": title, "DESCRIPTION": desc,
-        "FORM_HTML": _form_html(calc, cfg), "RESULT_HTML": _result_html(calc),
-        "EXPLANATION_HTML": _explanation_html(calc), "FAQ_HTML": _faq_html(calc),
-        "RELATED_HTML": _related_html(calc),
+        "TITLE": _html.escape(title), "DESCRIPTION": _html.escape(desc),
+        "CATEGORY": f"{emoji} {_html.escape(category)}", "NAME": _html.escape(name),
+        "HERO_SUB": _html.escape(desc), "FORM_FIELDS": _form_fields_v2(ins),
+        "CALC_BTN": _html.escape(f"{short} 계산하기"),
+        "RESULT_LABEL": _html.escape(f"예상 {plabel}"),
+        "PRIMARY_OUT": _html.escape(primary), "RESULT_UNIT": _html.escape(punit or "원"),
+        "NOTICE": "본 계산 결과는 참고용이며, 실제 지급액은 근로계약·관련 법령에 따라 달라질 수 있습니다.",
+        "ARTICLE_HTML": article,
+        "FAQ_ITEMS": _faq_items_v2(calc), "RELATED_ITEMS": _related_items_v2(calc),
+        "SM_CONFIG": json.dumps(_sm_config(calc, cfg), ensure_ascii=False),
     }
-    if _TPL.exists():
-        html = _TPL.read_text(encoding="utf-8")
+    if _TPL_V2.exists():
+        html = _TPL_V2.read_text(encoding="utf-8")
         for k, v in repl.items():
             html = html.replace("{{" + k + "}}", v)
         return html
-    # 폴백(템플릿 없을 때) — 최소 구조
+    # 폴백(v2 템플릿 없을 때) — 최소 구조
     return (f'<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8">'
             f'<meta name="viewport" content="width=device-width,initial-scale=1">'
-            f'<title>{title}</title><link rel="stylesheet" href="style.css"></head><body>'
-            f'<div class="sm-wrap"><div class="sm-hero"><h1>{name}</h1><p class="sm-sub">{desc}</p></div>'
-            f'<section class="sm-card sm-form">{repl["FORM_HTML"]}'
-            f'<button class="sm-btn" onclick="calculate()">계산하기</button></section>'
-            f'<section class="sm-card sm-result">{repl["RESULT_HTML"]}</section>'
-            f'<section class="sm-card sm-faq">{repl["FAQ_HTML"]}</section></div>'
+            f'<title>{_html.escape(title)}</title><link rel="stylesheet" href="style.css"></head><body>'
+            f'<div class="sm-wrap"><h1>{_html.escape(name)}</h1></div>'
+            f'<script>window.SM_CONFIG={repl["SM_CONFIG"]};</script>'
             f'<script src="script.js"></script></body></html>')
 
 
