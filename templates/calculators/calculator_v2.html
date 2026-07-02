@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2563EB">
+<meta name="description" content="{{DESCRIPTION}}">
+<title>{{TITLE}}</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="sm-wrap">
+
+  <!-- ① Hero -->
+  <header class="sm-hero">
+    <div class="sm-hero-badge">{{CATEGORY}}</div>
+    <h1>{{NAME}}</h1>
+    <p class="sm-hero-sub">{{HERO_SUB}}</p>
+  </header>
+
+  <!-- ② 계산 입력 -->
+  <section class="sm-card">
+    <h2 class="sm-card-title">계산 입력</h2>
+    {{FORM_FIELDS}}
+    <button class="sm-btn" onclick="calculate()">{{CALC_BTN}}</button>
+  </section>
+
+  <!-- ④ 결과 카드 -->
+  <div class="sm-result-card" id="result-card">
+    <div class="sm-result-label">{{RESULT_LABEL}}</div>
+    <div>
+      <span class="sm-result-value" id="out_{{PRIMARY_OUT}}">-</span>
+      <span class="sm-result-unit">{{RESULT_UNIT}}</span>
+    </div>
+    <div class="sm-result-sub" id="result-formula"></div>
+  </div>
+
+  <!-- ⑤ 결과 액션 버튼 (계산 후에만 표시) -->
+  <div class="sm-result-actions" id="result-actions">
+    <button class="sm-action-btn" data-action="result_save" onclick="saveResultPng()">
+      <span class="sm-action-icon">📄</span>결과 저장
+    </button>
+    <button class="sm-action-btn" data-action="share" onclick="kakaoShare()">
+      <span class="sm-action-icon">💬</span>카카오 공유
+    </button>
+    <button class="sm-action-btn" data-action="pwa" id="pwa-btn" onclick="pwaInstall()">
+      <span class="sm-action-icon">📱</span>홈 화면 추가
+    </button>
+  </div>
+
+  <!-- ⑥ 계산 상세 (결과 항목 수만큼 자동 생성) -->
+  <section class="sm-card" id="detail-card" style="display:none">
+    <h2 class="sm-card-title">계산 상세</h2>
+    <div id="detail-rows"></div>
+  </section>
+
+  <!-- ⑦ 안내사항 -->
+  <div class="sm-notice">
+    <span class="sm-notice-icon">⚠️</span>
+    <span>{{NOTICE}}</span>
+  </div>
+
+  <!-- [광고 슬롯 — 기본 숨김, 대시보드 show_adsense로만 노출] -->
+  <div class="sm-adsense"><!-- 애드센스 승인 후 활성화 --></div>
+
+  <!-- ⑧ 본문 -->
+  <section class="sm-card sm-article">
+    {{ARTICLE_HTML}}
+  </section>
+
+  <!-- [CPA 슬롯 — 기본 숨김, 대시보드 show_cpa로만 노출] -->
+  <div class="sm-cpa"><!-- 수익화 단계 2 이후 활성화 --></div>
+
+  <!-- ⑨ FAQ -->
+  <section class="sm-card">
+    <h2 class="sm-card-title">자주 묻는 질문</h2>
+    {{FAQ_ITEMS}}
+  </section>
+
+  <!-- ⑩ 관련 계산기 -->
+  <section class="sm-card">
+    <h2 class="sm-card-title">관련 계산기</h2>
+    <div class="sm-related-grid">
+      {{RELATED_ITEMS}}
+    </div>
+  </section>
+
+  <!-- ⑪ Footer -->
+  <footer class="sm-foot">
+    본 계산기는 참고용이며 실제 지급액과 다를 수 있습니다.<br>
+    Powered by SalaryMate
+  </footer>
+
+</div>
+
+<!-- Mobile Fixed CTA -->
+<div class="sm-mobile-cta">
+  <button class="sm-btn" onclick="calculate();setTimeout(function(){var c=document.getElementById('result-card');if(c)c.scrollIntoView({behavior:'smooth',block:'center'});},100)">
+    지금 계산하기
+  </button>
+</div>
+
+<!-- 계산기 설정(파라미터) — app_generator가 주입 -->
+<script>window.SM_CONFIG = {{SM_CONFIG}};</script>
+<script src="script.js"></script>
+</body>
+</html>
