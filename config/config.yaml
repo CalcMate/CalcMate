@@ -36,7 +36,7 @@ RUN_MODE: wordpress
 SQLITE_PATH: data/blog_auto.db
 STORAGE_ADAPTER: drive
 TELEGRAM_CHAT_ID: 'REDACTED'
-WORDPRESS_URL: http://testblog.test/
+WORDPRESS_URL: http://salarymate.test
 WORDPRESS_USERNAME: geminia
 WRITER_PROVIDER: openai
 _root: C:\Users\연수\Desktop\블로그자동_v12
@@ -73,3 +73,8 @@ PUBLISH_SCHEDULE:
     end: '10:00'
   - start: '13:00'
     end: '14:00'
+TELEGRAM_EVENTS:
+  error: true
+  budget: true
+  daily_summary: true
+  publish_request: true
