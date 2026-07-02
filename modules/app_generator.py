@@ -66,7 +66,8 @@ def _effective_form(calc: dict, cfg: dict = None):
     """(form_schema, [field_names]) 반환. input_schema 우선, 없으면 Form Engine."""
     ins = _pj(calc.get("input_schema"), {})
     if ins:
-        fields = [{"type": "number", "label": _label(k), "name": k} for k in ins]
+        fields = [{"type": ("date" if "date" in str(ins[k]).lower() else "number"),
+                   "label": _label(k), "name": k} for k in ins]
         return {"fields": fields}, list(ins.keys())
     try:
         from .calculator_form_engine import generate_form_schema
@@ -80,6 +81,19 @@ def _effective_form(calc: dict, cfg: dict = None):
 def generate_js(calc: dict, cfg: dict = None) -> str:
     _, names = _effective_form(calc, cfg)
     outs = _pj(calc.get("output_schema"), {})
+    # ── 퇴직금 전용(날짜 기반): start_date/end_date → total_days. 다른 계산기는 아래 기존 로직 유지 ──
+    if str(calc.get("slug", "")) == "severance-pay":
+        return (
+            "function calculate() {\n"
+            '  const s = new Date((document.getElementById("in_start_date")||{}).value);\n'
+            '  const e = new Date((document.getElementById("in_end_date")||{}).value);\n'
+            '  const total_days = Math.floor((e - s) / (1000*60*60*24));\n'
+            '  const avg_monthly_wage = parseFloat((document.getElementById("in_avg_monthly_wage")||{}).value) || 0;\n'
+            '  const out_severance_pay = avg_monthly_wage * (total_days / 365);\n'
+            '  var el = document.getElementById("out_severance_pay");\n'
+            '  if (el) el.textContent = (isFinite(out_severance_pay) && total_days > 0) ? Math.round(out_severance_pay).toLocaleString() + "원" : "-";\n'
+            "}\n"
+        )
     formula = _pj(calc.get("formula"), calc.get("formula", ""))
     fmap = _formula_map(formula, outs)
     read_lines = [f'  const {n} = parseFloat((document.getElementById("in_{n}")||{{}}).value) || 0;'

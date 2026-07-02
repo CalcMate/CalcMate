@@ -19,7 +19,7 @@ LOG = get_logger()
 
 # 기본 수식(formula_engine 규격) — SAMPLE_CALCULATORS slug 기준 매핑
 DEFAULT_FORMULAS = {
-    "severance-pay":            "(avg_monthly_wage/30)*30*years",                 # 퇴직금
+    "severance-pay":            "avg_monthly_wage * (total_days / 365)",          # 퇴직금(입사일~퇴사일 → total_days)
     "weekly-holiday-allowance": "hourly_wage*(weekly_hours/40*8)",                # 주휴수당(주40h 기준 1일)
     "annual-leave-allowance":   "daily_wage*unused_days",                         # 연차수당
     "unemployment-benefit":     "avg_daily_wage*0.6",                             # 실업급여 1일
