@@ -1403,11 +1403,16 @@ elif tab == "🧮 계산기 관리":
                 repo.update(cid, {"status": "inactive" if str(c.get("status")).lower() == "active" else "active"})
                 st.rerun()
             if b[2].button("📥 파일 저장", key=f"cm_dl_{cid}"):
-                from modules.ai_workspace import write_workspace_file
-                slug = c.get("slug", cid)
+                import os
+                # 계산기별 폴더 생성 후 3파일 저장(옵션 A). 상대경로(style.css/script.js) 유지 →
+                # 로컬 더블클릭·GitHub Pages 구조 동일. app_generator/템플릿/CSS는 무변경.
+                slug = str(c.get("slug", cid)).strip().replace("/", "_").replace("\\", "_").replace("..", "_") or cid
+                outdir = BASE / "data" / "workspace" / slug
+                os.makedirs(outdir, exist_ok=True)
                 for fn in ("index.html", "style.css", "script.js"):
-                    write_workspace_file(f"calc_{slug}_{fn}", files[fn])
-                st.success(f"data/workspace/ 에 calc_{slug}_*.* 저장")
+                    (outdir / fn).write_text(files[fn], encoding="utf-8")
+                st.success(f"✅ 저장: data/workspace/{slug}/ (index.html · style.css · script.js). "
+                           f"index.html 더블클릭 시 CSS/JS 상대경로 연결 정상 — GitHub Pages와 동일 구조.")
             if b[3].button("🗑 삭제", key=f"cm_del_{cid}"):
                 repo.delete(cid); st.rerun()
 
