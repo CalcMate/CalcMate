@@ -334,7 +334,12 @@ def generate_calculator(calc: dict, cfg: dict = None) -> dict:
     """index.html / style.css / script.js 3파일 dict 반환(+수식 검증). cfg 선택(Form Engine용)."""
     ins = _pj(calc.get("input_schema"), {})
     formula = _pj(calc.get("formula"), calc.get("formula", ""))
-    ok, msg = validate_formula(formula, ins) if formula else (True, "수식 없음")
+    if str(calc.get("slug", "")) == "severance-pay":
+        # 날짜기반: _compute_js가 start_date/end_date로 계산(formula 필드 미사용) →
+        # 옛 formula의 total_days 등 미존재 변수 참조로 뜨는 불필요 경고 제외(DB formula는 무변경)
+        ok, msg = True, "날짜기반 계산(코드 내장) — 수식 검증 제외"
+    else:
+        ok, msg = validate_formula(formula, ins) if formula else (True, "수식 없음")
     return {
         "index.html": generate_html(calc, cfg),
         "style.css": generate_css(calc),
