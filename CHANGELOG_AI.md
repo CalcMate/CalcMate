@@ -6,6 +6,16 @@
 
 ---
 
+## [2026-07-04] 계산기 "파일 저장" 버그 수정 (커밋 `3ca475a`)
+
+| 파일 | 변경 | 이유 / 영향 |
+|------|------|-------------|
+| ✏️ `dashboard.py` | "📥 파일 저장"(cm_dl) 콜백을 **계산기별 폴더 저장**으로 변경: `data/workspace/{slug}/index.html·style.css·script.js`(원본 파일명 유지, slug의 `/`·`\`·`..` sanitize) | **증상**: 대시보드 미리보기와 저장 파일 렌더 불일치. **원인**: `calc_{slug}_style.css` 형태로 저장되어 index.html의 `href="style.css"` 상대경로와 불일치 → CSS/JS 미적용. **수정**: 폴더 구조 + 원본 파일명 → 로컬 더블클릭·GitHub Pages 동일 렌더. `app_generator`/`calculator_v2.html`/`design_system.css`/`ai_workspace` 무변경(콜백 한정) |
+
+검증: 폴더 생성 확인, 상대링크(style.css/script.js) 유지, 로컬 더블클릭 시 시안과 동일 렌더링 확인.
+
+---
+
 ## 1. Gemini SDK 최신화 (google-generativeai → google-genai)
 
 | 파일 | 변경 | 이유 / 영향 |
