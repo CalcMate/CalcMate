@@ -111,7 +111,10 @@ def _faq_items_v2(calc) -> str:
 
 def _related_items_v2(calc) -> str:
     cur = str(calc.get("slug", ""))
-    items = [f'<a class="sm-related-item" href="#"><span class="sm-related-emoji">{emoji}</span>'
+    # href: 형제 계산기 폴더 상대경로(../{slug}/). target=_self: 미리보기 iframe 자체가 이동
+    # (대시보드 상위 프레임은 안 튐). ※ 지시서의 _top은 §2 의도와 반대라 _self로 적용함.
+    items = [f'<a class="sm-related-item" href="../{slug}/" target="_self">'
+             f'<span class="sm-related-emoji">{emoji}</span>'
              f'<span class="sm-related-name">{_html.escape(nm)}</span></a>'
              for slug, emoji, nm in _RELATED if slug != cur]
     return "\n".join(items[:4])
