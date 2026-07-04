@@ -27,6 +27,16 @@ def _slug(text: str) -> str:
     return s or datetime.now().strftime("%H%M%S")
 
 
+def _pj(v, default=None):
+    """JSON 문자열/딕셔너리 안전 파싱(기존 계산기 input_schema 요약용)."""
+    if isinstance(v, dict):
+        return v
+    try:
+        return json.loads(v) if v else (default if default is not None else {})
+    except Exception:
+        return default if default is not None else {}
+
+
 def _strip_fence(text: str) -> str:
     """```html ... ``` 코드블록 펜스 제거."""
     s = (text or "").strip()
@@ -52,10 +62,23 @@ def generate_app(cfg: dict, name: str, category: str = "", desc: str = "") -> di
         raise ValueError("계산기명을 입력하세요.")
     steps = []  # (단계, 모델, 토큰)
 
+    # [1] 기존 계산기 목록 요약(중복 회피 컨텍스트) — sys1에 주입
+    try:
+        existing = CalculatorRepository(get_db_adapter(cfg)).get_all()
+    except Exception:
+        existing = []
+    existing_summary = "\n".join(
+        f"- {c.get('name','')} ({c.get('category','')}): 입력항목 {list(_pj(c.get('input_schema'), {}).keys())}"
+        for c in existing
+    ) or "(없음)"
+
     # 1) 총괄(GPT): 스펙 설계 (입력/출력 스키마 + 산식)
     sys1 = ("너는 웹 계산기 기획자다. 주어진 계산기에 대해 입력/출력 스키마와 산식을 설계하라. "
             "순수 JSON만 반환: "
-            '{"calculator_type":"","input_schema":{},"output_schema":{},"formula":""}')
+            '{"calculator_type":"","input_schema":{},"output_schema":{},"formula":""}\n'
+            f"다음은 이미 등록된 계산기 목록이다:\n{existing_summary}\n"
+            "위 목록과 기능·입력항목이 실질적으로 겹치지 않도록 설계하라. "
+            "겹칠 경우 차별화된 입력/출력 스키마를 사용하라.")
     u1 = f"계산기명: {name}\n카테고리: {category}\n설명: {desc}"
     t1, m1, k1 = _chat(cfg, "orchestrator", sys1, u1, 800)
     spec = parse_json_lenient(t1)
@@ -116,9 +139,14 @@ def save_app(cfg: dict, app: dict, site_id: str = "") -> tuple:
     tpl_repo = TemplateRepository(db)
     name = app.get("name", "")
     try:
-        # 중복 체크
-        if any(str(c.get("name", "")).strip().lower() == name.lower() for c in calc_repo.get_all()):
+        _all = calc_repo.get_all()
+        # 중복 체크(이름)
+        if any(str(c.get("name", "")).strip().lower() == name.lower() for c in _all):
             return False, f"중복 계산기명: '{name}' 이미 등록됨"
+        # 중복 체크(slug) — 이름은 달라도 slug가 겹치면 차단(배포 폴더/링크 충돌 방지)
+        new_slug = _slug(name)
+        if any(_slug(str(c.get("name", ""))) == new_slug for c in _all):
+            return False, f"중복 슬러그: '{new_slug}' 이미 등록됨 (이름은 다르지만 slug 충돌)"
     except Exception as e:
         return False, f"기존 계산기 조회 실패(시트 권한 확인): {e}"
 
