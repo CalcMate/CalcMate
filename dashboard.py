@@ -1424,6 +1424,21 @@ elif tab == "🏭 App Factory":
     st.caption("자동 생성 흐름: GPT 스펙 → Claude 코드(HTML) → GPT SEO/FAQ/초안 → Gemini 이미지 프롬프트 → 저장")
     from modules import app_factory as AF
 
+    # 🔍 키워드 기반 아이디어 제안 — 키워드를 중심으로 이름/카테고리/설명 자동채움.
+    k1, k2 = st.columns([3, 1])
+    af_keyword = k1.text_input("키워드로 아이디어 생성",
+                               placeholder="예: 육아휴직, 4대보험, 연차",
+                               key="af_keyword")
+    if k2.button("🔍 키워드로 제안", key="af_suggest_kw"):
+        with st.spinner("키워드 기반 아이디어 생성 중..."):
+            try:
+                idea = AF.suggest_idea(cfg, keyword=af_keyword)
+                st.session_state["af_name"] = idea.get("name", "")
+                st.session_state["af_cat"] = idea.get("category", "")
+                st.session_state["af_desc"] = idea.get("desc", "")
+            except Exception as e:
+                st.warning(f"AI 제안 실패(직접 입력해주세요): {e}")
+
     # 💡 AI 아이디어 제안(수동 버튼) — 클릭 시에만 입력칸 자동채움. 위젯 키를 직접 세팅해야
     # 재클릭 시에도 갱신됨(text_input의 value= 방식은 위젯 생성 후 무시되는 Streamlit 제약 회피).
     if st.button("💡 AI 아이디어 제안", key="af_suggest"):

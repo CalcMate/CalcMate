@@ -163,8 +163,9 @@ def generate_app(cfg: dict, name: str, category: str = "", desc: str = "") -> di
     }
 
 
-def suggest_idea(cfg: dict) -> dict:
-    """기존 계산기 목록을 참고해 AI가 새 계산기 아이디어(이름/카테고리/설명)를 제안."""
+def suggest_idea(cfg: dict, keyword: str = "") -> dict:
+    """기존 계산기 목록을 참고해 AI가 새 계산기 아이디어(이름/카테고리/설명)를 제안.
+    keyword가 주어지면 그 키워드를 중심으로 구체화, 없으면 자유 제안."""
     try:
         existing = CalculatorRepository(get_db_adapter(cfg)).get_all()
     except Exception:
@@ -172,12 +173,19 @@ def suggest_idea(cfg: dict) -> dict:
     existing_summary = "\n".join(
         f"- {c.get('name','')} ({c.get('category','')})" for c in existing
     ) or "(없음)"
+    keyword = (keyword or "").strip()
+    keyword_line = (
+        f"\n사용자가 준 키워드: \"{keyword}\" — 이 키워드를 중심으로 "
+        "계산기 아이디어를 구체화하라." if keyword else
+        "\n키워드가 주어지지 않았으므로 자유롭게 새 아이디어를 제안하라."
+    )
     sys0 = (
         "너는 대한민국 노무/급여/세금/정부혜택 분야 웹 계산기 기획자다. "
         "아래는 이미 존재하는 계산기 목록이다:\n" + existing_summary + "\n"
         "이 목록과 겹치지 않는 새로운 실용적인 계산기 아이디어 1개를 제안하라. "
-        "직장인이 실제로 검색할 만한 주제로 한정한다. "
-        "순수 JSON만 반환: {\"name\":\"\",\"category\":\"\",\"desc\":\"\"}"
+        "직장인이 실제로 검색할 만한 주제로 한정한다."
+        + keyword_line +
+        "\n순수 JSON만 반환: {\"name\":\"\",\"category\":\"\",\"desc\":\"\"}"
     )
     # 기존 sys1과 동일 provider/모델(orchestrator) 재사용
     text, _m, _k = _chat(cfg, "orchestrator", sys0, "새 계산기 아이디어 1개를 제안하라.", 400)
