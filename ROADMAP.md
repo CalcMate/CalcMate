@@ -1,7 +1,7 @@
 # ROADMAP.md — 구현 현황 및 로드맵
 
-> 실제 소스 코드 기준(2026-06-30, Sprint 2A/2B + Calculator Reviewer 개선 반영).
-> Completed / In Progress / Planned 3그룹으로만 구분.
+> 실제 소스 코드 기준(2026-07-04, Sprint 2A/2B + Calculator Reviewer + 계산기 v2/App
+> Factory/WordPress 발행·수정 반영). Completed / In Progress / Planned 3그룹으로만 구분.
 
 ---
 
@@ -41,15 +41,25 @@
 - Site Settings Override(Global→Site, 🔵뱃지/초기화) — 저장
 - 통합 실행 버튼(platforms 기반 Pipeline 자동 라우팅)
 
+### 계산기 v2 · App Factory · WordPress (2026-07-04)
+- **Design System v2 확정** + 버그 4건 수정(파일저장 경로 · 관련링크 · 퇴직금 수식경고 · 노출설정 cfg)
+- **App Factory**: 중복방지(프롬프트+slug/name) · AI/키워드 아이디어 제안 · formula 검증(1회 재시도) · 계산기별 한국어 labels · 저장→관리 자동이동
+- **위젯 엔진 통일**: WP 삽입 위젯을 v2(`generate_html`)로 — 구 naive 합산 제거. `render_inline_calculator()`를 대시보드 미리보기와 WP가 공유
+- **파이프라인 콘텐츠 버그 4건**: CTA중복 · 숨김섹션 소스잔존(→`render_*`+`show_*` 서버단 생략) · 죽은링크(→`is_active`) · 계산기당 중복발행(→`count_active_articles`)
+- **WordPress 발행 메타데이터**: post_id/permalink/status/published_at/history/calculator_id 저장
+- **WordPress 글 수정(Update)**: `publisher.update_post` + 대시보드 ✏️수정 UI (성공 시에만 로컬 갱신)
+- 아키텍처 원칙 확립: 상태판단=Repository 계층 / WP REST=`publisher.py`만 / 섹션노출=`render_*`+`show_*`
+
 ### 문서/안정화
 - Sprint 2A 감사 보고 · Sprint 2B 보고 · AI Assistant 분석 · Calculator Reviewer Fix 결과
+- `docs/BUGFIX_CALC_DESIGN_V2.md` · `docs/CALC_QUALITY_IMPROVEMENT_RESULT.md`
 - Gemini google-genai 마이그레이션 · WordPress 키 단일화 · JSON 파서 공통화
 
 ---
 
 ## 🟡 In Progress / 부분 구현
 
-- **WordPress 실전 배포**: `publisher` 동작하나 실서버 미구축(example.com) → `WORDPRESS_APP_PASSWORD` 입력 시 발행. 미설정 시 graceful skip
+- **WordPress**: 로컬(Laragon `salarymate.test`) 발행·수정 실환경 검증 완료(post_id/history 저장). **실서버(공개 도메인) 배포는 미완**. 글 삭제/복원은 3·4차 예정
 - **Site Settings Override 런타임 소비**: 저장은 되나 파이프라인이 site 값을 아직 읽지 않음(AI 프로필 일부 제외) — 배선 필요
 - **Site Manager 고도화**: 안전삭제/복제/Export·Import UI 완료, 자동 만료삭제·일괄작업은 미구현
 - **Dashboard 운영센터**: 카드/시각화 완료, 실시간성·일부 KPI(Revenue=AdSense 미연동)는 보강 여지
@@ -60,6 +70,13 @@
 
 ## 🔭 Planned
 
+### WordPress 글 관리 (계산기 파이프라인 후속)
+- **3차: WordPress 글 삭제**(휴지통 이동, 영구삭제 아님) — `publisher.delete_post` + 대시보드 삭제버튼 + article "삭제됨" 전환(실제 WP 반영)
+- **4차: 휴지통 복원**
+- **계산기 글 품질 시스템**: 품질 기준서 → writer 프롬프트 개선(§7 관련계산기 중복 등) → 자동 검수
+- 정책 RSS 소스 갱신(`korea.kr` 404 → 유효 피드로 교체 또는 복수화)
+
+### 플랫폼/인프라
 - **RSS Platform** 확장(수집원/카테고리 다변화)
 - **Affiliate Platform**(`collector/affiliate.py` stub 실구현)
 - **Shorts Platform**(영상/숏폼 콘텐츠)
@@ -71,4 +88,4 @@
 - AI Assistant 툴콜 에이전트화 · 대화 영속화
 - 테스트 스위트(pytest) 정식화 · 노출 키 재발급
 
-> 상세 이력: `SPRINT_2A_REPORT.md` · `SPRINT_2B_REPORT.md` · `docs/CALCULATOR_REVIEWER_FIX_RESULT.md`
+> 상세 이력: `SPRINT_2A_REPORT.md` · `SPRINT_2B_REPORT.md` · `docs/CALCULATOR_REVIEWER_FIX_RESULT.md` · `docs/BUGFIX_CALC_DESIGN_V2.md` · `docs/CALC_QUALITY_IMPROVEMENT_RESULT.md`

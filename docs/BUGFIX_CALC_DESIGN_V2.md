@@ -56,3 +56,65 @@
 - 브라우저 전용(로컬 더블클릭 이동, PNG 저장, 카카오, PWA, 모바일)은 실제 브라우저·**배포 후** 확인.
 
 > 관련 이력: `CHANGELOG_AI.md`(2026-07-04) · 커밋 `3ca475a`/`a4224f6`/`8827a88`/`da49650`/`8e91990`.
+
+---
+
+# 2026-07-04 세션 전체 요약 + 다음 세션 핸드오프
+
+> 위 디자인 v2 버그 4건 이후 진행된 계산기/App Factory/WordPress 작업 전체 정리.
+> 파이프라인/WP 상세는 `docs/CALC_QUALITY_IMPROVEMENT_RESULT.md` 참조.
+
+## 오늘 완료된 것
+- **계산기 v2 디자인 확정** + 저장/링크/노출설정 버그 수정(위 4건 + 관련 이력)
+- **App Factory**: 중복방지(프롬프트 주입+slug/name 체크) · AI 아이디어 제안 · 키워드 기반
+  제안 · formula 검증(저장전 validate+1회 재시도, 실패해도 저장허용+경고) · 계산기별 한국어
+  labels · RESULT_LABEL "예상 예상" 중복수정 · 저장→계산기관리 자동이동/자동펼침
+  — `ddfa528`/`80ee386`/`c748555`/`e3f184b`/`8641c67`/`40da576`
+- **WordPress 발행 메타데이터 구조**: post_id/permalink/status/published_at/history/
+  calculator_id 저장 — `9a39edd`/`0502d92`
+- **치명적 버그 수정**: WP 삽입 위젯이 구버전 계산엔진(단순합산) 사용 → v2 엔진으로 통일
+  (`render_inline_calculator` 공유) — `e489eb1`
+- **파이프라인 콘텐츠 버그 4건**: CTA중복 / 숨김섹션 소스잔존 / 죽은링크(`#`) /
+  계산기당 중복발행 — `fae1cb5`/`93f2656`/`6bbeac1`/`ab33988`
+- **WordPress 글 수정(Update) 기능** — `update_post` + 대시보드 수정 UI — `5f621c0`
+- 전부 **실환경(로컬 WordPress) 검증 완료**.
+
+## 다음 할 것
+1. **3차: WordPress 글 삭제**(휴지통 이동, 영구삭제 아님) — `publisher.delete_post` +
+   대시보드 삭제버튼 + article "삭제됨" 전환. (현재 "삭제됨"은 DB만 바뀌고 WP 글은 남음)
+2. **4차: 휴지통 복원**.
+3. **품질 개선**: 계산기 글 품질 기준서 → 프롬프트 개선 → 자동 검수 시스템.
+
+## 반드시 전달할 컨텍스트 (새 대화창)
+- SalaryMate: 노무/급여 계산기 + WordPress 블로그 자동화. 스택: Streamlit 대시보드 /
+  Google Sheets DB / Claude·GPT·Gemini 멀티모델.
+- **계산기 렌더링은 `app_generator.generate_html()` 단일 엔진** (계산기관리/미리보기/
+  파일저장/GitHub Pages/WordPress 전부 공유). 조각화는 `render_inline_calculator()`.
+- **아키텍처 원칙(오늘 확립)**:
+  - 상태값 판단은 **Repository 계층에서만**(Pipeline/Engine은 상태값 문자열 비교 금지 →
+    `is_active()`/`count_active_articles()` 헬퍼 사용).
+  - **WordPress REST API 호출은 `publisher.py`에만** 존재.
+  - 섹션 노출은 `render_*()` 분리 + `show_*` 플래그로 **서버단 생략**(display:none 아님).
+- 로컬 WordPress: Laragon, `http://salarymate.test`.
+- `sheets_adapter.insert()`는 헤더 자동추가 안 됨(`update()`는 됨) → 새 필드 추가 시 시트
+  헤더 **수동 추가** 필요.
+
+## 백로그 (급하지 않음, 순서 무관)
+- 프롬프트 §7 "관련 계산기" AI작성 vs `internal_link_engine` 중복(본문 `href="#"` 3개 원인)
+- `MAX_ARTICLES_PER_CALCULATOR>1`일 때 유사 제목/의도 자동배제
+- 본문 80% 이상 유사 시 자동 재생성
+- 동시수정 감지(2차 TODO) · 본문 편집 UI 개선(2차 TODO)
+- WordPress 연결테스트(`dashboard.py:1957` GET users/me)도 `publisher` 계층으로 이관
+- seed→v2 이관 후 `calculator_template_engine.py` 제거
+- PWA는 실배포(https) 후에만 확인 가능(로컬 미동작 정상)
+- 정책 RSS 404(`korea.kr` 경로 변경/중단 추정) → `RSS_SOURCE_LIST` 갱신 필요
+- 자동배포 Phase 2(안정화 후 스케줄 무인 배포 전환)
+- "🧮 계산기 생성" 버튼명 → "🧮 계산기 글 발행"으로 개선(혼란 방지)
+
+## 오늘 커밋 (시간순)
+`ddfa528` App Factory 중복방지 → `80ee386` AI제안 → `e3f184b` formula검증+labels →
+`c748555` 키워드제안 → `8641c67` RESULT_LABEL → `40da576` 자동이동 →
+`9a39edd` WP메타(1차) → `0502d92` 계산기파이프라인 WP메타 →
+`e489eb1` 위젯 v2 통일 →
+`fae1cb5` CTA중복제거 → `93f2656` 섹션 render 분리 → `6bbeac1` 죽은링크 →
+`ab33988` 계산기당 중복방지 → `5f621c0` WP 글 수정(2차)
