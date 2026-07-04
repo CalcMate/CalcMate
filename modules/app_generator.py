@@ -44,7 +44,10 @@ def _pj(v, default):
         return default
 
 
-def _label(k):
+def _label(k, labels=None):
+    # 계산기별 labels(예: {"monthly_salary":"월급"}) 우선, 없으면 기존 _LABELS fallback
+    if labels and k in labels and str(labels[k]).strip():
+        return str(labels[k])
     return _LABELS.get(k, str(k).replace("_", " "))
 
 
@@ -69,17 +72,17 @@ _RELATED = [("weekly-holiday-allowance", "💰", "주휴수당 계산기"),
             ("four-insurances", "🏢", "4대보험 계산기")]
 
 
-def _split_label(k):
-    """_LABELS의 '시급(원)' → ('시급','원'). 괄호 없으면 (label,'')."""
-    lab = _label(k)
+def _split_label(k, labels=None):
+    """_LABELS의 '시급(원)' → ('시급','원'). 괄호 없으면 (label,''). labels(계산기별) 우선."""
+    lab = _label(k, labels)
     m = re.match(r"^(.*)\((.+)\)\s*$", lab)
     return (m.group(1).strip(), m.group(2).strip()) if m else (lab, "")
 
 
-def _form_fields_v2(ins) -> str:
+def _form_fields_v2(ins, labels=None) -> str:
     rows = []
     for k, spec in ins.items():
-        label, unit = _split_label(k)
+        label, unit = _split_label(k, labels)
         if "date" in str(spec).lower():
             rows.append(
                 f'<div class="sm-field"><label class="sm-label" for="in_{k}">{_html.escape(label)}</label>'
@@ -123,12 +126,13 @@ def _related_items_v2(calc) -> str:
 def _sm_config(calc, cfg) -> dict:
     ins = _pj(calc.get("input_schema"), {})
     outs = _pj(calc.get("output_schema"), {})
+    labels = _pj(calc.get("labels"), {})
     inputs = []
     for k, spec in ins.items():
-        label, unit = _split_label(k)
+        label, unit = _split_label(k, labels)
         inputs.append({"name": k, "label": label,
                        "type": ("date" if "date" in str(spec).lower() else "number"), "unit": unit})
-    outputs = [{"key": k, "label": _split_label(k)[0], "unit": _split_label(k)[1] or "원"} for k in outs]
+    outputs = [{"key": k, "label": _split_label(k, labels)[0], "unit": _split_label(k, labels)[1] or "원"} for k in outs]
     primary = list(outs.keys())[0] if outs else "result"
     c = cfg if isinstance(cfg, dict) else {}
     def b(key, default):
@@ -296,8 +300,9 @@ def generate_html(calc: dict, cfg: dict = None) -> str:
     desc = calc.get("seo_description") or calc.get("seo_desc") or f"{name} 자동 계산"
     ins = _pj(calc.get("input_schema"), {})
     outs = _pj(calc.get("output_schema"), {})
+    labels = _pj(calc.get("labels"), {})
     primary = list(outs.keys())[0] if outs else "result"
-    plabel, punit = _split_label(primary)
+    plabel, punit = _split_label(primary, labels)
     category = calc.get("category", "") or "계산기"
     emoji = ("💰" if ("급여" in category or "노무" in category)
              else "🏢" if ("보험" in category or "고용" in category) else "🧮")
@@ -307,7 +312,7 @@ def generate_html(calc: dict, cfg: dict = None) -> str:
     repl = {
         "TITLE": _html.escape(title), "DESCRIPTION": _html.escape(desc),
         "CATEGORY": f"{emoji} {_html.escape(category)}", "NAME": _html.escape(name),
-        "HERO_SUB": _html.escape(desc), "FORM_FIELDS": _form_fields_v2(ins),
+        "HERO_SUB": _html.escape(desc), "FORM_FIELDS": _form_fields_v2(ins, labels),
         "CALC_BTN": _html.escape(f"{short} 계산하기"),
         "RESULT_LABEL": _html.escape(f"예상 {plabel}"),
         "PRIMARY_OUT": _html.escape(primary), "RESULT_UNIT": _html.escape(punit or "원"),

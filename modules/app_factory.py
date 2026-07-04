@@ -73,16 +73,44 @@ def generate_app(cfg: dict, name: str, category: str = "", desc: str = "") -> di
     ) or "(없음)"
 
     # 1) 총괄(GPT): 스펙 설계 (입력/출력 스키마 + 산식)
-    sys1 = ("너는 웹 계산기 기획자다. 주어진 계산기에 대해 입력/출력 스키마와 산식을 설계하라. "
-            "순수 JSON만 반환: "
-            '{"calculator_type":"","input_schema":{},"output_schema":{},"formula":""}\n'
-            f"다음은 이미 등록된 계산기 목록이다:\n{existing_summary}\n"
-            "위 목록과 기능·입력항목이 실질적으로 겹치지 않도록 설계하라. "
-            "겹칠 경우 차별화된 입력/출력 스키마를 사용하라.")
+    sys1 = (
+        "너는 웹 계산기 기획자다. 주어진 계산기에 대해 입력/출력 스키마와 산식을 설계하라.\n"
+        "요구사항:\n"
+        "1. formula는 반드시 input_schema의 변수명만 사용한 '단일 산술 표현식'이어야 한다. "
+        "대입문(=), 세미콜론(;), 함수 정의, 정의되지 않은 함수 호출 금지. "
+        "허용 함수: min, max, round, abs, int, float 만 사용 가능. "
+        "여러 단계 계산이 필요하면 하나의 표현식 안에 괄호로 중첩해서 표현하라.\n"
+        "2. input_schema/output_schema의 모든 키는 반드시 한국어 라벨을 'labels' 필드에 매핑하라 "
+        '(예: {"monthly_salary": "월급"}).\n'
+        "3. 순수 JSON만 반환: "
+        '{"calculator_type":"","input_schema":{},"output_schema":{},"formula":"","labels":{}}\n'
+        f"다음은 이미 등록된 계산기 목록이다:\n{existing_summary}\n"
+        "위 목록과 기능·입력항목이 실질적으로 겹치지 않도록 설계하라."
+    )
     u1 = f"계산기명: {name}\n카테고리: {category}\n설명: {desc}"
     t1, m1, k1 = _chat(cfg, "orchestrator", sys1, u1, 800)
     spec = parse_json_lenient(t1)
     steps.append(("총괄(스펙)", m1, k1))
+
+    # [2] 저장 전 formula 검증 (실패 시 실패사유 알려주고 1회 재시도)
+    from .formula_engine import validate_formula
+    ok, msg = validate_formula(spec.get("formula", ""), spec.get("input_schema", {}))
+    if not ok:
+        retry_sys = sys1 + (f"\n\n[재설계] 직전 응답의 formula가 검증 실패했다(사유: {msg}). "
+                            "요구사항(단일 산술 표현식 · input_schema 변수만 · 허용 함수만)을 반드시 지켜 다시 설계하라.")
+        try:
+            t1b, m1b, k1b = _chat(cfg, "orchestrator", retry_sys, u1, 800)
+            steps.append(("총괄(재시도)", m1b, k1b))
+            spec2 = parse_json_lenient(t1b)
+            ok2, msg2 = validate_formula(spec2.get("formula", ""), spec2.get("input_schema", {}))
+            if ok2:
+                spec, ok, msg = spec2, ok2, msg2   # 유효하면 재시도 결과 채택
+            else:
+                ok, msg = ok2, msg2                # 여전히 실패 → 원 spec 유지, 검증결과만 갱신
+        except Exception as e:
+            msg = f"{msg} / 재시도 오류: {e}"
+    spec["_formula_valid"] = ok
+    spec["_formula_msg"] = msg
 
     # 2) 코드(Claude): 단일 자가완결 HTML (인라인 CSS/JS) — JSON 미사용(견고)
     sys2 = ("너는 프론트엔드 개발자다. 아래 스펙으로 동작하는 계산기를 "
@@ -122,11 +150,14 @@ def generate_app(cfg: dict, name: str, category: str = "", desc: str = "") -> di
         "input_schema": spec.get("input_schema", {}),
         "output_schema": spec.get("output_schema", {}),
         "formula": spec.get("formula", ""),
+        "labels": spec.get("labels", {}),
         "html": code.get("html", ""), "css": code.get("css", ""), "js": code.get("js", ""),
         "seo_title": seo.get("seo_title", ""), "seo_desc": seo.get("seo_desc", ""),
         "faq": seo.get("faq", []), "blog_draft": seo.get("blog_draft", ""),
         "image_prompt_thumbnail": imgp.get("image_prompt_thumbnail", ""),
         "image_prompt_body": imgp.get("image_prompt_body", ""),
+        "_formula_valid": spec.get("_formula_valid", True),
+        "_formula_msg": spec.get("_formula_msg", ""),
         "_steps": steps,
         "_tokens": sum(s[2] for s in steps),
     }
@@ -189,6 +220,7 @@ def save_app(cfg: dict, app: dict, site_id: str = "") -> tuple:
             "calculator_type": app.get("calculator_type", "general"),
             "template_id": tpl_id, "site_id": site_id,
             "formula": app.get("formula", ""),
+            "labels": json.dumps(app.get("labels", {}), ensure_ascii=False),
             "faq": json.dumps(app.get("faq", []), ensure_ascii=False),
             "input_schema": json.dumps(app.get("input_schema", {}), ensure_ascii=False),
             "output_schema": json.dumps(app.get("output_schema", {}), ensure_ascii=False),

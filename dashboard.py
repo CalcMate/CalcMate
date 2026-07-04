@@ -1453,6 +1453,8 @@ elif tab == "🏭 App Factory":
     app = st.session_state.get("af_result")
     if app:
         st.success(f"생성 완료 — 토큰 {app['_tokens']}")
+        if not app.get("_formula_valid", True):
+            st.error(f"⚠️ 수식 검증 실패: {app.get('_formula_msg', '')}\n\n(저장은 가능하나 생성물 계산이 정상 동작하지 않을 수 있습니다. 운영자 확인 필요.)")
         st.write("**단계:** " + " → ".join(f"{s[0]}({s[1]})" for s in app["_steps"]))
         m = st.columns(3)
         m[0].metric("HTML 길이", len(app["html"]))
