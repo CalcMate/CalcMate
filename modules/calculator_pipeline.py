@@ -138,17 +138,26 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
                                      "tags_list": seo.get("seo_keywords", [])},
                                     final_html, {}, cfg)
             pub_status = pub.get("status", "published")
-            art_repo.save({
+            article_id = art_repo.save({
                 "정책명": keyword,
                 "최종추천제목": seo.get("seo_title"),
                 "메타설명": seo.get("seo_description"),
                 "태그": ", ".join(seo.get("seo_keywords", []) or []),
                 "발행 URL": pub.get("wordpress", ""),
+                "wp_post_id": pub.get("wp_post_id", ""),
+                "wp_permalink": pub.get("wp_permalink", ""),
+                "wp_status": pub.get("wp_status", ""),
+                "published_at": pub.get("published_at", ""),
                 "발행일시": datetime.now().isoformat(),
                 "원본출처": calc.get("published_url", ""),
                 "상태값": "발행완료" if pub_status == "published" else "검수대기",
                 "site_id": it.get("site_id", ""),
             })
+            # history "publish" 이벤트 기록(발행 흐름 무영향 — 실패해도 무시)
+            try:
+                art_repo.append_history(article_id, "publish", {"wp_post_id": pub.get("wp_post_id", "")})
+            except Exception as _e:
+                LOG.warning("history(publish) 기록 실패(무시): %s", _e)
             existing.add(seo.get("seo_title"))
             stats["produced"] += 1
             if pub_status != "published":
