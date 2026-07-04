@@ -134,7 +134,7 @@ NAV_GROUPS = {
     "🔧 Settings":     ["🔧 설정"],
     "🤖 AI Assistant": ["🤖 AI Assistant"],
 }
-_group = st.sidebar.radio("메뉴", list(NAV_GROUPS.keys()))
+_group = st.sidebar.radio("메뉴", list(NAV_GROUPS.keys()), key="nav_group")
 _subs = NAV_GROUPS[_group]
 if len(_subs) > 1:
     tab = st.sidebar.radio(_group, _subs, key=f"sub_{_group}")
@@ -1305,12 +1305,14 @@ elif tab == "🧮 계산기 관리":
                                         f'<style>{files["style.css"]}</style>')
         return h.replace('<script src="script.js"></script>', f'<script>{files["script.js"]}</script>')
 
+    _just_saved = st.session_state.get("af_just_saved_name")
     for c in calcs:
         cid = c.get("id", "")
         url = c.get("published_url", "")
         status_icon = "🟢" if str(c.get("status")).lower() == "active" else "⚪"
+        _auto_expand = bool(_just_saved) and c.get("name") == _just_saved
         with st.expander(f"{status_icon} {c.get('name','(이름없음)')} — {c.get('status','')}"
-                         + (f" · 배포됨" if url else "")):
+                         + (f" · 배포됨" if url else ""), expanded=_auto_expand):
             if url:
                 st.markdown(f"**배포 URL:** [{url}]({url})")
             # 수식 편집(검증 후 저장)
@@ -1416,6 +1418,10 @@ elif tab == "🧮 계산기 관리":
             if b[3].button("🗑 삭제", key=f"cm_del_{cid}"):
                 repo.delete(cid); st.rerun()
 
+    # 자동펼침 플래그는 한 번 사용 후 제거(다음 렌더부터는 평소처럼 접힌 채)
+    if _just_saved:
+        st.session_state["af_just_saved_name"] = None
+
 # ══════════════════════════════════════════════════════════════
 # 탭: 🏭 App Factory (계산기 자동 생성)
 # ══════════════════════════════════════════════════════════════
@@ -1488,9 +1494,15 @@ elif tab == "🏭 App Factory":
                 components.html(app["html"], height=420, scrolling=True)
         if st.button("💾 calculators + app_templates 저장", type="primary", key="af_save"):
             ok, msg = AF.save_app(cfg, app)
-            (st.success if ok else st.error)(msg)
             if ok:
                 st.session_state["af_result"] = None
+                st.session_state["af_just_saved_name"] = app.get("name", "")
+                st.session_state["nav_group"] = "🧮 Calculator"
+                st.session_state["sub_🧮 Calculator"] = "🧮 계산기 관리"
+                st.success(f"{msg} — 계산기 관리로 이동합니다.")
+                st.rerun()
+            else:
+                st.error(msg)
 
 # ══════════════════════════════════════════════════════════════
 # 탭: 💬 AI Workspace (대시보드 내 AI 대화 + 파일/데이터 도구)
