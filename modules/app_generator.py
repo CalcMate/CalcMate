@@ -123,6 +123,30 @@ def _related_items_v2(calc) -> str:
     return "\n".join(items[:4])
 
 
+def _show_flags(cfg) -> dict:
+    """show_* 노출 플래그 단일 소스. _sm_config(SM_CONFIG)와 render_* 섹션 함수가 공유.
+    SITE_MODE로 광고/CPA 기본값 파생, SHOW_* 명시 시 그 값 우선."""
+    c = cfg if isinstance(cfg, dict) else {}
+    def b(key, default):
+        return bool(c.get(key, default))
+    site_mode = str(c.get("SITE_MODE", "pre_adsense"))
+    mode_ads = site_mode in ("adsense", "full")
+    mode_cpa = site_mode in ("cpa", "full")
+    return {
+        "show_adsense": b("SHOW_ADSENSE", mode_ads),
+        "show_cpa": b("SHOW_CPA", mode_cpa),
+        "show_share": b("SHOW_SHARE", True),
+        "show_pwa": b("SHOW_PWA", True),
+        "show_result_save": b("SHOW_RESULT_SAVE", True),
+        "show_faq": b("SHOW_FAQ", True),
+        "show_notice": b("SHOW_NOTICE", True),
+        "show_related": b("SHOW_RELATED", True),
+        "show_detail": b("SHOW_DETAIL", True),
+        "show_article": b("SHOW_ARTICLE", True),
+        "_site_mode": site_mode,  # 내부용(SM_CONFIG에는 site_mode로 별도 노출)
+    }
+
+
 def _sm_config(calc, cfg) -> dict:
     ins = _pj(calc.get("input_schema"), {})
     outs = _pj(calc.get("output_schema"), {})
@@ -135,30 +159,25 @@ def _sm_config(calc, cfg) -> dict:
     outputs = [{"key": k, "label": _split_label(k, labels)[0], "unit": _split_label(k, labels)[1] or "원"} for k in outs]
     primary = list(outs.keys())[0] if outs else "result"
     c = cfg if isinstance(cfg, dict) else {}
-    def b(key, default):
-        return bool(c.get(key, default))
-    # SITE_MODE로 광고/CPA 파생(설정값만으로 제어). SHOW_ADSENSE/SHOW_CPA 명시 시 그 값 우선.
-    site_mode = str(c.get("SITE_MODE", "pre_adsense"))
-    mode_ads = site_mode in ("adsense", "full")
-    mode_cpa = site_mode in ("cpa", "full")
+    flags = _show_flags(cfg)
     return {
         # 기능(계산/렌더용)
         "name": calc.get("name", "계산기"), "primaryOutput": primary,
         "resultUnit": (outputs[0]["unit"] if outputs else "원"),
         "inputs": inputs, "outputs": outputs,
-        # 노출 플래그(flat, 대시보드 설정 연동)
-        "show_adsense": b("SHOW_ADSENSE", mode_ads),
-        "show_cpa": b("SHOW_CPA", mode_cpa),
-        "show_share": b("SHOW_SHARE", True),
-        "show_pwa": b("SHOW_PWA", True),
-        "show_result_save": b("SHOW_RESULT_SAVE", True),
-        "show_faq": b("SHOW_FAQ", True),
-        "show_notice": b("SHOW_NOTICE", True),
-        "show_related": b("SHOW_RELATED", True),
-        "show_detail": b("SHOW_DETAIL", True),
-        "show_article": b("SHOW_ARTICLE", True),
+        # 노출 플래그(flat, 대시보드 설정 연동) — _show_flags 단일 소스
+        "show_adsense": flags["show_adsense"],
+        "show_cpa": flags["show_cpa"],
+        "show_share": flags["show_share"],
+        "show_pwa": flags["show_pwa"],
+        "show_result_save": flags["show_result_save"],
+        "show_faq": flags["show_faq"],
+        "show_notice": flags["show_notice"],
+        "show_related": flags["show_related"],
+        "show_detail": flags["show_detail"],
+        "show_article": flags["show_article"],
         # 정책/메타
-        "site_mode": site_mode,
+        "site_mode": flags["_site_mode"],
         "result_export_type": str(c.get("RESULT_EXPORT_TYPE", "png")),
         "kakao_js_key": str(c.get("KAKAO_JS_KEY", "")),
         "calculator_version": str(c.get("CALCULATOR_VERSION", "2.0.0")),
@@ -293,6 +312,59 @@ def _related_html(calc):
     return "\n".join(blocks)
 
 
+# ── 섹션 렌더 함수(show_*=False면 감싸는 태그 포함 전체 생략) ────────
+# 원칙: HTML 생성 경로는 generate_html() 하나. 이 함수들은 조각만 반환하고
+# generate_html이 플레이스홀더에 조립. show=True 산출물은 기존 템플릿과 byte 동일.
+def render_adsense_slot(cfg: dict = None) -> str:
+    if not _show_flags(cfg)["show_adsense"]:
+        return ""
+    return ('  <!-- [광고 슬롯 — 기본 숨김, 대시보드 show_adsense로만 노출] -->\n'
+            '  <div class="sm-adsense"><!-- 애드센스 승인 후 활성화 --></div>')
+
+
+def render_article(calc: dict, cfg: dict = None) -> str:
+    if not _show_flags(cfg)["show_article"]:
+        return ""
+    name = calc.get("name", "계산기")
+    desc = calc.get("seo_description") or calc.get("seo_desc") or f"{name} 자동 계산"
+    article = str(calc.get("article_content", "") or "") \
+        or f"<h2>{_html.escape(name)}</h2><p>{_html.escape(desc)}</p>"
+    return ('  <!-- ⑧ 본문 -->\n'
+            '  <section class="sm-card sm-article">\n'
+            f'    {article}\n'
+            '  </section>')
+
+
+def render_cpa_slot(cfg: dict = None) -> str:
+    if not _show_flags(cfg)["show_cpa"]:
+        return ""
+    return ('  <!-- [CPA 슬롯 — 기본 숨김, 대시보드 show_cpa로만 노출] -->\n'
+            '  <div class="sm-cpa"><!-- 수익화 단계 2 이후 활성화 --></div>')
+
+
+def render_faq(calc: dict, cfg: dict = None) -> str:
+    if not _show_flags(cfg)["show_faq"]:
+        return ""
+    return ('  <!-- ⑨ FAQ -->\n'
+            '  <section class="sm-card" id="faq-card">\n'
+            '    <h2 class="sm-card-title">자주 묻는 질문</h2>\n'
+            f'    {_faq_items_v2(calc)}\n'
+            '  </section>')
+
+
+def render_related(calc: dict, cfg: dict = None, related_items: str = None) -> str:
+    if not _show_flags(cfg)["show_related"]:
+        return ""
+    items = related_items if related_items is not None else _related_items_v2(calc)
+    return ('  <!-- ⑩ 관련 계산기 -->\n'
+            '  <section class="sm-card" id="related-card">\n'
+            '    <h2 class="sm-card-title">관련 계산기</h2>\n'
+            '    <div class="sm-related-grid">\n'
+            f'      {items}\n'
+            '    </div>\n'
+            '  </section>')
+
+
 # ── HTML (design v2 마스터 시안 치환) ─────────────────────────────
 def generate_html(calc: dict, cfg: dict = None) -> str:
     """index.html = calculator_v2.html 시안에 계산기 데이터만 치환. UI는 모든 계산기 동일."""
@@ -308,8 +380,6 @@ def generate_html(calc: dict, cfg: dict = None) -> str:
     emoji = ("💰" if ("급여" in category or "노무" in category)
              else "🏢" if ("보험" in category or "고용" in category) else "🧮")
     short = name.replace(" 계산기", "").replace("계산기", "").strip() or name
-    article = str(calc.get("article_content", "") or "") \
-        or f"<h2>{_html.escape(name)}</h2><p>{_html.escape(desc)}</p>"
     repl = {
         "TITLE": _html.escape(title), "DESCRIPTION": _html.escape(desc),
         "CATEGORY": f"{emoji} {_html.escape(category)}", "NAME": _html.escape(name),
@@ -318,8 +388,12 @@ def generate_html(calc: dict, cfg: dict = None) -> str:
         "RESULT_LABEL": _html.escape(plabel if plabel.startswith("예상") else f"예상 {plabel}"),
         "PRIMARY_OUT": _html.escape(primary), "RESULT_UNIT": _html.escape(punit or "원"),
         "NOTICE": "본 계산 결과는 참고용이며, 실제 지급액은 근로계약·관련 법령에 따라 달라질 수 있습니다.",
-        "ARTICLE_HTML": article,
-        "FAQ_ITEMS": _faq_items_v2(calc), "RELATED_ITEMS": _related_items_v2(calc),
+        # 섹션은 render_* 함수가 조립(show_*=False면 태그 포함 전체 생략)
+        "ADSENSE_SLOT": render_adsense_slot(cfg),
+        "ARTICLE_SECTION": render_article(calc, cfg),
+        "CPA_SLOT": render_cpa_slot(cfg),
+        "FAQ_SECTION": render_faq(calc, cfg),
+        "RELATED_SECTION": render_related(calc, cfg),
         "SM_CONFIG": json.dumps(_sm_config(calc, cfg), ensure_ascii=False),
     }
     if _TPL_V2.exists():
