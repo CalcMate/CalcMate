@@ -79,3 +79,24 @@ TELEGRAM_EVENTS:
   budget: true
   daily_summary: true
   publish_request: true
+QUALITY_GATE:
+  MIN_LENGTH: 1800
+  MAX_LENGTH: 2500
+  MIN_H2: 5
+  MAX_H2: 7
+  MIN_FAQ: 5
+  MIN_EXAMPLES: 2
+  CTA_COUNT: 1
+  MIN_INTERNAL_LINKS: 2
+QUALITY_SCORE:
+  PASS_THRESHOLD: 90
+  WARN_THRESHOLD: 80
+QUALITY_RETRY:
+  CRITICAL_RETRY_LIMIT: 2
+AI_STYLE_BLOCKLIST:
+- 알아보겠습니다
+- 알아보도록 하겠습니다
+- 살펴보겠습니다
+- 완벽하게 이해
+- 이해하셨을 것입니다
+- 다양한 조건에 따라 달라질 수 있습니다
