@@ -25,6 +25,12 @@ class CalculatorRepository:
         rows = self._db.get_where(self.TABLE, {"id": calc_id})
         return rows[0] if rows else None
 
+    def is_active(self, calc_id: str) -> bool:
+        """계산기가 활성 상태인지. 상태값 문자열 비교는 이 Repository 내부에만 둔다
+        (엔진/파이프라인은 이 헬퍼로만 판단). 존재하지 않으면(하드삭제 등) False."""
+        row = self.get_by_id(calc_id)
+        return bool(row) and str(row.get("status", "")).strip().lower() == "active"
+
     def save(self, calc: dict) -> str:
         if not calc.get("id"):
             calc["id"] = "calc_" + datetime.now().strftime("%Y%m%d%H%M%S") + "_" + uuid.uuid4().hex[:4]

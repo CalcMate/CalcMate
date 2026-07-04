@@ -29,9 +29,15 @@ def generate_related_calculators(cfg: dict, calculator_id: str = "", n: int = 3)
     others = [c for c in calcs if c.get("id") != calculator_id]
     others.sort(key=lambda c: 0 if c.get("category") == my_cat and my_cat else 1)
     out = []
-    for c in others[:n]:
-        out.append({"id": c.get("id", ""), "name": c.get("name", ""),
-                    "url": c.get("published_url", "")})
+    for c in others:
+        if len(out) >= n:
+            break
+        url = c.get("published_url", "")
+        # 죽은 링크 방지: published_url이 있고 상태가 활성일 때만 링크 생성
+        # (상태 판단은 Repository.is_active — 엔진은 상태값 문자열을 직접 비교하지 않음)
+        if not url or not repo.is_active(c.get("id", "")):
+            continue
+        out.append({"id": c.get("id", ""), "name": c.get("name", ""), "url": url})
     return out
 
 
@@ -71,17 +77,19 @@ def inject_internal_links(html_body: str, related_calcs: list = None,
     """본문 끝에 관련 계산기/관련 글 내부링크 블록을 추가."""
     blocks = []
     if related_calcs:
+        # url 없는 항목은 렌더 생략(href="#" 죽은 링크 금지)
         items = "".join(
-            f'<li><a href="{_html.escape(c.get("url","") or "#")}">{_html.escape(c.get("name",""))}</a></li>'
-            for c in related_calcs if c.get("name"))
+            f'<li><a href="{_html.escape(c.get("url",""))}">{_html.escape(c.get("name",""))}</a></li>'
+            for c in related_calcs if c.get("name") and c.get("url"))
         if items:
             blocks.append(f"<h3>관련 계산기</h3><ul>{items}</ul>")
     if related_articles:
         items = "".join(
-            f'<li><a href="{_html.escape(a.get("url","") or "#")}">{_html.escape(a.get("title",""))}</a></li>'
-            for a in related_articles if a.get("title"))
+            f'<li><a href="{_html.escape(a.get("url",""))}">{_html.escape(a.get("title",""))}</a></li>'
+            for a in related_articles if a.get("title") and a.get("url"))
         if items:
             blocks.append(f"<h3>함께 보면 좋은 글</h3><ul>{items}</ul>")
+    # 관련 항목이 0개면 섹션 헤딩도 표시하지 않음
     if not blocks:
         return html_body
     return html_body + '\n<hr/>\n<div class="internal-links">' + "".join(blocks) + "</div>"
