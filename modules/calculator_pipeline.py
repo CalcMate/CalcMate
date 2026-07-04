@@ -20,7 +20,6 @@ from .collector.factory import get_collector
 from .ai_roles import make_provider
 from .calculator_seo_generator import generate_seo
 from .calculator_faq_generator import generate_faq
-from .calculator_template_engine import build_calculator_html
 from .strategist_calculator import score_keywords
 from . import cleaner
 from . import publisher
@@ -115,10 +114,13 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
                 faq = generate_faq(cfg, calc.get("name", keyword))
 
             body_html, _ = _write_article(cfg, calc, keyword, seo, faq)
-            widget = build_calculator_html(
-                calc.get("name", keyword),
-                calc.get("input_schema", {}), calc.get("output_schema", {}),
-            )
+            # 계산기 위젯: app_generator(v2)로 실제 formula/퇴직금 날짜로직 반영(구 naive 합산 제거).
+            # 블로그 본문과 중복되는 섹션(본문/FAQ/관련계산기/광고/PWA)은 위젯에서 숨김.
+            from .app_generator import generate_calculator, render_inline_calculator
+            widget_cfg = dict(cfg)
+            widget_cfg.update({"SHOW_ARTICLE": False, "SHOW_FAQ": False, "SHOW_RELATED": False,
+                               "SHOW_ADSENSE": False, "SHOW_CPA": False, "SHOW_PWA": False})
+            widget = render_inline_calculator(generate_calculator(calc, widget_cfg))
             final_html = (f"{body_html}\n<hr/>\n<h2>계산기 사용하기</h2>\n"
                           f"<p>{CTA_TEXT}</p>\n{widget}")
             # 내부링크: 관련 계산기/관련 글 자동 연결 (신규)

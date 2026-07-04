@@ -100,6 +100,7 @@
     if (CFG.show_faq === false) hideEl("#faq-card");
     if (CFG.show_notice === false) hideEl(".sm-notice");
     if (CFG.show_related === false) hideEl("#related-card");
+    if (CFG.show_article === false) hideEl(".sm-article");
     if (w.smInitNumberInputs) w.smInitNumberInputs();
     if (w.smInitPwa) w.smInitPwa();
   }

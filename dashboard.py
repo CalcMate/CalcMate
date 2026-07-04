@@ -1301,9 +1301,9 @@ elif tab == "🧮 계산기 관리":
         st.info("등록된 계산기 없음 — 위 시드 버튼 또는 🧮 Calculator Builder / 🏭 App Factory로 등록")
 
     def _inline(files):
-        h = files["index.html"].replace('<link rel="stylesheet" href="style.css">',
-                                        f'<style>{files["style.css"]}</style>')
-        return h.replace('<script src="script.js"></script>', f'<script>{files["script.js"]}</script>')
+        # 공통 렌더 함수 1개 공유(대시보드 미리보기 = WordPress 삽입 동일 산출물)
+        from modules.app_generator import render_inline_calculator
+        return render_inline_calculator(files)
 
     _just_saved = st.session_state.get("af_just_saved_name")
     for c in calcs:

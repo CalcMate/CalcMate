@@ -156,6 +156,7 @@ def _sm_config(calc, cfg) -> dict:
         "show_notice": b("SHOW_NOTICE", True),
         "show_related": b("SHOW_RELATED", True),
         "show_detail": b("SHOW_DETAIL", True),
+        "show_article": b("SHOW_ARTICLE", True),
         # 정책/메타
         "site_mode": site_mode,
         "result_export_type": str(c.get("RESULT_EXPORT_TYPE", "png")),
@@ -352,3 +353,23 @@ def generate_calculator(calc: dict, cfg: dict = None) -> dict:
         "_formula_valid": ok,
         "_formula_msg": msg,
     }
+
+
+def render_inline_calculator(files: dict) -> str:
+    """generate_calculator()의 {index.html, style.css, script.js}를 문서 골격 없는
+    자체완결 조각으로 변환. 대시보드 미리보기와 WordPress 삽입이 공유하는 단일 함수.
+
+    - <link rel=stylesheet href=style.css> → 인라인 <style>{css}</style>
+    - <script src=script.js> → 인라인 <script>{js}</script>
+    - <html>/<head>/<body> 골격 제거, <body> 내부(=sm-wrap 조각 + SM_CONFIG + 스크립트)만 반환.
+    """
+    html = files.get("index.html", "") or ""
+    css = files.get("style.css", "") or ""
+    js = files.get("script.js", "") or ""
+    # 외부 참조 인라인화(css는 골격 제거 후 <style>로 prepend, js는 그 자리 치환)
+    html = html.replace('<link rel="stylesheet" href="style.css">', "")
+    html = html.replace('<script src="script.js"></script>', f"<script>{js}</script>")
+    # 문서 골격 제거: <body>...</body> 내부만 취함
+    m = re.search(r"<body[^>]*>(.*)</body>", html, re.S)
+    inner = m.group(1).strip() if m else html
+    return f"<style>{css}</style>\n{inner}"
