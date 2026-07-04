@@ -12,6 +12,10 @@ VALID_STATUSES = {
     "발행완료", "발행실패", "복구대기", "보류", "만료", "재처리대기",
 }
 
+# 유효 발행 카운트에서 제외할 비활성 상태(삭제/휴지통 등). 상태 종류가 늘어나면
+# 이 집합만 수정하면 되도록 Repository 계층에 둔다(파이프라인/엔진은 개수만 사용).
+INACTIVE_ARTICLE_STATUSES = {"삭제됨", "휴지통", "발행취소"}
+
 
 class ArticleRepository:
     TABLE = "articles"
@@ -36,6 +40,17 @@ class ArticleRepository:
         published = [r for r in rows if r.get("상태값") == "발행완료"]
         published.sort(key=lambda r: r.get("발행일시") or "", reverse=True)
         return [r.get("최종추천제목", "") for r in published[:n]]
+
+    def count_active_articles(self, calculator_id) -> int:
+        """해당 계산기로 발행된 글 중 비활성('삭제됨' 등)을 제외한 유효 발행 건수.
+        상태값 문자열 판단은 이 Repository 내부(INACTIVE_ARTICLE_STATUSES)에만 둔다 —
+        파이프라인은 이 개수를 MAX_ARTICLES_PER_CALCULATOR와 비교만 한다."""
+        cid = str(calculator_id or "").strip()
+        if not cid:
+            return 0
+        rows = self._db.get_where(self.TABLE, {"calculator_id": cid})
+        return sum(1 for r in rows
+                   if str(r.get("상태값", "")).strip() not in INACTIVE_ARTICLE_STATUSES)
 
     def get_by_id(self, article_id: str) -> dict | None:
         rows = self._db.get_where(self.TABLE, {"ID": article_id})

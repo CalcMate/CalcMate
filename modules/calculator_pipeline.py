@@ -100,6 +100,13 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
         calc = repo.get_by_id(it.get("calculator_id", "")) or {"name": keyword}
         stats["processed"] += 1
         try:
+            # 계산기당 발행 상한(설정값) — 상태 판단은 Repository(count_active_articles)에 위임.
+            # 파이프라인은 개수만 비교하고 상태값 문자열을 직접 다루지 않는다.
+            cid = it.get("calculator_id", "")
+            max_per = int(cfg.get("MAX_ARTICLES_PER_CALCULATOR", 1) or 1)
+            if cid and art_repo.count_active_articles(cid) >= max_per:
+                stats["dup"] += 1
+                continue
             seo = generate_seo(cfg, calc.get("name", keyword), keyword)
             if seo.get("seo_title") in existing:
                 stats["dup"] += 1
@@ -155,6 +162,7 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
                 "원본출처": calc.get("published_url", ""),
                 "상태값": "발행완료" if pub_status == "published" else "검수대기",
                 "site_id": it.get("site_id", ""),
+                "calculator_id": cid,
             })
             # history "publish" 이벤트 기록(발행 흐름 무영향 — 실패해도 무시)
             try:
