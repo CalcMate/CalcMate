@@ -36,8 +36,9 @@ def _load_prompt() -> str:
     try:
         return _PROMPT.read_text(encoding="utf-8")
     except Exception:
-        return ("너는 SEO 에디터다. 주어진 키워드로 2500~3500자 한국어 블로그 글을 작성하고 "
-                "계산기 CTA를 포함하라. [BODY_HTML_START]...[BODY_HTML_END]로 감싸라.")
+        return ("너는 SEO 에디터다. 주어진 키워드로 2500~3500자 한국어 블로그 글을 작성하라. "
+                "계산기 CTA/위젯은 시스템이 본문 뒤에 자동 삽입한다. "
+                "[BODY_HTML_START]...[BODY_HTML_END]로 감싸라.")
 
 
 def _write_article(cfg: dict, calc: dict, keyword: str, seo: dict, faq: list) -> tuple:
@@ -49,8 +50,8 @@ def _write_article(cfg: dict, calc: dict, keyword: str, seo: dict, faq: list) ->
         f"SEO 제목: {seo.get('seo_title')}\n"
         f"메타설명: {seo.get('seo_description')}\n"
         f"계산 공식: {calc.get('formula','')}\n"
-        f"FAQ: {json.dumps(faq, ensure_ascii=False)}\n"
-        f"CTA 문구(필수 포함): {CTA_TEXT}"
+        f"FAQ: {json.dumps(faq, ensure_ascii=False)}"
+        # CTA/위젯은 시스템이 본문 뒤에 자동 삽입하므로 AI 본문에 CTA를 요구하지 않는다(중복 방지).
     )
     text, tokens = provider.chat(system, user, model, max_tokens=3500)
     try:
