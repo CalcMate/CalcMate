@@ -27,11 +27,12 @@ def publish(post_id: str, seo_data: dict, html_body: str,
         preview = _save_preview(seo_data, html_body, link="(WordPress 미구성 — 미발행)")
         return {"wordpress": "", "status": "skipped_no_wp", "preview": str(preview)}
 
-    url = _wordpress_api(seo_data, html_body, image_urls, cfg)
-    return {"wordpress": url, "status": "published"}
+    res = _wordpress_api(seo_data, html_body, image_urls, cfg)
+    res["status"] = "published"
+    return res
 
 
-def _wordpress_api(seo, html, imgs, cfg) -> str:
+def _wordpress_api(seo, html, imgs, cfg) -> dict:
     url = cfg.get("WORDPRESS_URL", "").rstrip("/") + "/wp-json/wp/v2/posts"
     imgs = imgs or {}
     thumb = imgs.get("thumbnail_url", "")
@@ -57,9 +58,16 @@ def _wordpress_api(seo, html, imgs, cfg) -> str:
         timeout=30,
     )
     resp.raise_for_status()
-    link = resp.json().get("link", "")
+    data = resp.json()
+    link = data.get("link", "")
     _save_preview(seo, html, link=link)
-    return link
+    return {
+        "wordpress": link,                                  # 하위호환 유지(기존 키)
+        "wp_post_id": data.get("id", ""),                   # WordPress 숫자 글 ID
+        "wp_permalink": data.get("link", ""),               # 영구링크(명확한 이름)
+        "wp_status": data.get("status", ""),                # publish/draft 등
+        "published_at": data.get("date") or datetime.now().isoformat(),
+    }
 
 
 def _save_preview(seo, html, link: str) -> Path:

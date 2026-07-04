@@ -2,6 +2,7 @@
 repositories/article_repository.py — ArticleRepository
 마스터_DB CRUD. 기존 db_manager / sheet_sync 대체.
 """
+import json
 import uuid
 from datetime import datetime
 from adapters.db.base import AbstractDBAdapter
@@ -66,6 +67,24 @@ class ArticleRepository:
             "우선발행점수": score,
             "site_id": site_id,
         })
+
+    def append_history(self, article_id, event, extra=None):
+        """기존 history(JSON 문자열)를 읽어 이벤트 1건 append 후 update_status의
+        extra로 저장. article이 없거나 history가 비어있으면 빈 배열에서 시작."""
+        row = self.get_by_id(article_id)
+        hist = []
+        try:
+            hist = json.loads(row.get("history") or "[]") if row else []
+        except Exception:
+            hist = []
+        entry = {"event": event, "at": datetime.now().isoformat()}
+        if extra:
+            entry.update(extra)
+        hist.append(entry)
+        # 상태값 검증(VALID_STATUSES)을 타지 않도록 update_status 대신 저수준 update 사용.
+        # 상태값은 그대로 두고 history 필드만 갱신 → "검수대기" 등 어떤 상태에서도 안전.
+        return self._db.update(self.TABLE, article_id,
+                               {"history": json.dumps(hist, ensure_ascii=False)})
 
     def increment_fail(self, article_id: str) -> int:
         row = self.get_by_id(article_id)

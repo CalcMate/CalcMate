@@ -225,11 +225,20 @@ def _process_one(item: dict, cfg: dict, budget, site_mgr,
         pub_result = publisher.publish(post_id, seo, final_html, image_urls, pub_cfg)
         pub_status = pub_result.get("status", "published")
         pub_url = pub_result.get("wordpress", "")
+        wp_post_id   = pub_result.get("wp_post_id", "")
+        wp_permalink = pub_result.get("wp_permalink", "")
+        wp_status    = pub_result.get("wp_status", "")
+        published_at = pub_result.get("published_at", "")
         LOG.info("STEP 11 완료: %s", pub_status)
 
         # ── STEP 12: DB/로그 ──
         article_status = "발행완료" if pub_status == "published" else "검수대기"
-        sheet_sync.append_row(cfg, {
+        # sheet_sync.append_row(무ID)와 동작 동일(=repo.save)이나, 신규 행 ID를 확보해
+        # wp 메타 저장 + history("publish") 기록에 사용하기 위해 repo를 직접 사용.
+        from repositories.article_repository import ArticleRepository
+        from adapters.db.factory import get_db_adapter
+        _art_repo = ArticleRepository(get_db_adapter(cfg))
+        article_id = _art_repo.save({
             "상태값": article_status,
             "정책명": clean.get("clean_policy_name"),
             "최종추천제목": seo.get("seo_title"),
@@ -239,7 +248,16 @@ def _process_one(item: dict, cfg: dict, budget, site_mgr,
             "발행 URL": pub_url,
             "발행일시": datetime.now().isoformat(),
             "원본출처": clean.get("source_url"),
+            "wp_post_id": wp_post_id,
+            "wp_permalink": wp_permalink,
+            "wp_status": wp_status,
+            "published_at": published_at,
         })
+        # history "publish" 이벤트 기록(발행 흐름 무영향 — 실패해도 무시)
+        try:
+            _art_repo.append_history(article_id, "publish", {"wp_post_id": wp_post_id})
+        except Exception as e:
+            LOG.warning("history(publish) 기록 실패(무시): %s", e)
         _flush_costs(budget, costs)
 
         # 같은 실행 내 중복 방지 (메모리 갱신)
