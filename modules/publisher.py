@@ -32,6 +32,60 @@ def publish(post_id: str, seo_data: dict, html_body: str,
     return res
 
 
+def update_post(cfg, wp_post_id, title=None, content=None, excerpt=None) -> dict:
+    """POST /wp-json/wp/v2/posts/{wp_post_id} — 기존 글 수정.
+
+    None인 필드는 요청에서 아예 제외(미전송) → 해당 필드 수정 안 함.
+    빈 문자열("")로 넘어온 필드는 그대로 전송 → 해당 필드를 비우는 의도로 처리한다.
+    즉 None(미전송)과 ""(명시적 삭제/비움)를 구분한다.
+
+    WordPress REST API 직접 호출은 이 함수와 _wordpress_api 에만 존재한다
+    (dashboard 등 다른 계층은 publisher.update_post 만 호출).
+
+    성공: {"success": True, "wp_post_id", "link", "modified", "status"}
+    실패: {"success": False, "error": "..."}
+
+    TODO(동시 수정 감지): 저장 직전 GET /posts/{id}로 현재 modified를 조회하여,
+    편집 시작 시점의 modified와 다르면 "다른 곳에서 이미 수정됨" 경고 후 저장 중단
+    (낙관적 잠금). 이번 범위 제외.
+    """
+    if not is_wordpress_ready(cfg):
+        return {"success": False, "error": "WordPress 미구성 — 수정할 수 없습니다."}
+    if not str(wp_post_id or "").strip():
+        return {"success": False, "error": "wp_post_id가 없어 수정할 수 없습니다."}
+
+    # None은 미전송(수정 안 함), ""는 전송(비움) — 구분해서 payload 구성
+    payload = {}
+    if title is not None:
+        payload["title"] = title
+    if content is not None:
+        payload["content"] = content
+    if excerpt is not None:
+        payload["excerpt"] = excerpt
+    if not payload:
+        return {"success": False, "error": "수정할 필드가 없습니다(title/content/excerpt 모두 None)."}
+
+    url = cfg.get("WORDPRESS_URL", "").rstrip("/") + f"/wp-json/wp/v2/posts/{wp_post_id}"
+    try:
+        resp = requests.post(
+            url, json=payload,
+            auth=(cfg["WORDPRESS_USERNAME"], _app_password(cfg)),
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return {
+            "success": True,
+            "wp_post_id": data.get("id", wp_post_id),
+            "link": data.get("link", ""),
+            "modified": data.get("modified", ""),
+            "status": data.get("status", ""),
+        }
+    except Exception as e:
+        LOG.warning("WordPress 글 수정 실패(post_id=%s): %s", wp_post_id, e)
+        return {"success": False, "error": str(e)}
+
+
 def _wordpress_api(seo, html, imgs, cfg) -> dict:
     url = cfg.get("WORDPRESS_URL", "").rstrip("/") + "/wp-json/wp/v2/posts"
     imgs = imgs or {}

@@ -475,14 +475,52 @@ elif tab == "📊 현황":
 
 elif tab == "📋 발행 목록":
     st.title("📋 최근 발행 목록")
+    # WordPress REST API 직접 호출 금지 — 수정은 publisher.update_post()만 사용(계층 분리).
+    from modules import publisher as PUB
+    from repositories.article_repository import ArticleRepository
+    from adapters.db.factory import get_db_adapter
+    # TODO(본문 편집 UI): 현재 WP 본문을 불러와 미리보기→수정→저장하는 흐름 +
+    # 긴 본문 가독성 개선(리치 에디터/높이 조절). 이번 범위 제외.
     try:
         posts = cached_posts()
-        published = [p for p in posts if p.get("상태값") in ("발행완료", "검수대기")]
+        published = [p for p in posts if p.get("상태값") in ("발행완료", "검수대기", "수정됨")]
         published.sort(key=lambda x: x.get("발행일시", ""), reverse=True)
         for p in published[:20]:
+            pid = p.get("ID", "")
+            wp_id = str(p.get("wp_post_id", "") or "").strip()
             with st.expander(f"✅ {p.get('최종추천제목','(제목없음)')} — {p.get('발행일시','')}"):
                 st.write(f"**URL:** {p.get('발행 URL', '')}")
                 st.write(f"**상태:** {p.get('상태값')}")
+                if not wp_id:
+                    st.caption("✏️ 수정 기능 미지원 (wp_post_id 없음 — 1차 이전 발행 글)")
+                else:
+                    with st.expander("✏️ 수정"):
+                        e_title = st.text_input("제목", value=p.get("최종추천제목", ""), key=f"ed_t_{pid}")
+                        e_excerpt = st.text_input("요약(excerpt)", value=p.get("메타설명", ""), key=f"ed_e_{pid}")
+                        e_content = st.text_area(
+                            "본문 교체", value="", key=f"ed_c_{pid}",
+                            help="입력하면 WordPress 본문 전체를 이 내용으로 교체. 비워두면 본문은 수정하지 않음(전송 안 함).")
+                        if st.button("💾 저장 (WordPress 반영)", key=f"ed_save_{pid}"):
+                            # content: 비워두면 None(미전송=본문 유지). excerpt/title은 현재값 그대로 전송.
+                            content_arg = e_content if e_content.strip() else None
+                            res = PUB.update_post(cfg, wp_id, title=e_title,
+                                                  content=content_arg, excerpt=e_excerpt)
+                            if res.get("success"):
+                                # WordPress 성공 후에만 로컬 DB/history 갱신
+                                art_repo = ArticleRepository(get_db_adapter(cfg))
+                                try:
+                                    art_repo.update_status(pid, "수정됨")
+                                    art_repo.append_history(pid, "update", {
+                                        "wp_post_id": res.get("wp_post_id", ""),
+                                        "modified": res.get("modified", ""),
+                                        "operator": "dashboard"})
+                                except Exception as _e:
+                                    st.warning(f"WordPress 수정은 성공했으나 로컬 기록 일부 실패: {_e}")
+                                st.success(f"수정 완료 — modified={res.get('modified','')}")
+                                st.rerun()
+                            else:
+                                # 실패 시 로컬 DB/history 절대 미변경
+                                st.error(f"수정 실패 (로컬 미변경): {res.get('error','')}")
     except Exception as e:
         st.error(f"데이터 로드 오류: {e}")
 
