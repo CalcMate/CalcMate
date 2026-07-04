@@ -1382,7 +1382,7 @@ elif tab == "🧮 계산기 관리":
                     if c.get("generated_at"):
                         st.caption(f"생성 시각: {c.get('generated_at')}")
 
-            files = AG.generate_calculator(c)
+            files = AG.generate_calculator(c, cfg)
             if not files["_formula_valid"]:
                 st.warning(f"수식 경고: {files['_formula_msg']}")
             with st.expander("🔎 앱 미리보기"):
