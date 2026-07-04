@@ -172,6 +172,49 @@ def delete_post(cfg, wp_post_id, force=False) -> dict:
         return {"success": False, "error": str(e)}
 
 
+def restore_post(cfg, wp_post_id) -> dict:
+    """휴지통(trash) 글을 발행(publish)으로 복원. POST /posts/{id} {"status":"publish"}.
+
+    복원 전 get_post 재조회 필수(삭제와 동일 원칙):
+      - 재조회 실패(not_found/auth/permission) → 그 에러를 그대로 전달.
+      - 이미 publish → {success:True, already_restored:True} (POST 미전송, 멱등).
+      - trash가 아닌 상태(draft 등) → cannot_restore_from_status 실패.
+    성공 판정은 응답 JSON status=="publish" 확인 후에만(3차 원칙 — HTTP 200만으로 판정 금지).
+    반환에는 대시보드 history 기록용 title/link 포함.
+
+    성공: {"success": True, "wp_post_id", "wp_status": "publish", "already_restored": bool,
+           "title", "link"}
+    실패: {"success": False, "error", "wp_post_id"}
+    """
+    check = get_post(cfg, wp_post_id)
+    if not check.get("success"):
+        return check  # not_found/auth/permission 등 그대로 전달
+    if check.get("status") == "publish":
+        return {"success": True, "wp_post_id": wp_post_id, "wp_status": "publish",
+                "already_restored": True, "title": check.get("title", ""), "link": check.get("link", "")}
+    if check.get("status") != "trash":
+        return {"success": False, "error": f"cannot_restore_from_status:{check.get('status')}",
+                "wp_post_id": wp_post_id}
+
+    url = cfg.get("WORDPRESS_URL", "").rstrip("/") + f"/wp-json/wp/v2/posts/{wp_post_id}"
+    try:
+        resp = requests.post(url, json={"status": "publish"}, auth=_wp_auth(cfg), timeout=30)
+        if resp.status_code != 200:
+            return {"success": False, "error": _wp_error(resp), "wp_post_id": wp_post_id}
+        data = resp.json()
+        actual = data.get("status", "")
+        if actual == "publish":
+            return {"success": True, "wp_post_id": wp_post_id, "wp_status": "publish",
+                    "already_restored": False,
+                    "title": check.get("title", ""),
+                    "link": data.get("link", "") or check.get("link", "")}
+        return {"success": False, "error": f"unexpected_status: expected=publish actual={actual!r}",
+                "wp_post_id": wp_post_id}
+    except Exception as e:
+        LOG.warning("WordPress 글 복원 실패(post_id=%s): %s", wp_post_id, e)
+        return {"success": False, "error": str(e), "wp_post_id": wp_post_id}
+
+
 def _wordpress_api(seo, html, imgs, cfg) -> dict:
     url = cfg.get("WORDPRESS_URL", "").rstrip("/") + "/wp-json/wp/v2/posts"
     imgs = imgs or {}

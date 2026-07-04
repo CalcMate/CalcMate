@@ -126,7 +126,7 @@ st.sidebar.markdown(f"**일 예산:** `${cfg.get('DAILY_AI_BUDGET',5)}`")
 # v12 Lite: 8개 그룹으로 통합(기존 페이지 유지, 그룹→하위 2단 네비). 계산기 생성은 App Factory 단일화.
 NAV_GROUPS = {
     "🏠 Dashboard":    ["🏠 운영센터", "📊 현황"],
-    "📝 Content":      ["📋 발행 목록", "📋 작업 보드", "💬 AI Workspace", "🧠 전략회의실"],
+    "📝 Content":      ["📋 발행 목록", "🗑️ 휴지통", "📋 작업 보드", "💬 AI Workspace", "🧠 전략회의실"],
     "🧮 Calculator":   ["🏭 App Factory", "🧮 계산기 관리"],
     "📅 Scheduler":    ["📅 오늘 발행 일정", "📊 AI Pipeline", "🌐 사이트 관리"],
     "💰 Revenue":      ["💰 비용 모니터"],
@@ -574,6 +574,62 @@ elif tab == "📋 발행 목록":
                             st.session_state.pop(f"del_confirm_{pid}", None)
                             st.session_state.pop(f"del_check_{pid}", None)
                             st.rerun()
+    except Exception as e:
+        st.error(f"데이터 로드 오류: {e}")
+
+elif tab == "🗑️ 휴지통":
+    st.title("🗑️ 휴지통")
+    st.caption("WordPress 휴지통(trash)으로 이동된 글. ♻️ 복원하면 발행(publish)으로 되돌립니다.")
+    # WP REST 직접호출 금지 — 복원은 publisher.restore_post()만 사용(계층 분리).
+    from modules import publisher as PUB
+    from repositories.article_repository import ArticleRepository
+    from adapters.db.factory import get_db_adapter
+    try:
+        posts = cached_posts()
+        trashed = [p for p in posts if p.get("상태값") == "휴지통"]
+        trashed.sort(key=lambda x: x.get("발행일시", ""), reverse=True)
+        if not trashed:
+            st.info("휴지통이 비어 있습니다.")
+        for p in trashed[:30]:
+            pid = p.get("ID", "")
+            wp_id = str(p.get("wp_post_id", "") or "").strip()
+            with st.expander(f"🗑️ {p.get('최종추천제목','(제목없음)')} — {p.get('발행일시','')}"):
+                st.write(f"**URL:** {p.get('발행 URL', '')}")
+                st.write(f"**로컬 상태:** {p.get('상태값')}")
+                if not wp_id:
+                    st.caption("♻️ 복원 미지원 (wp_post_id 없음)")
+                elif st.button("♻️ 복원", key=f"restore_btn_{pid}"):
+                    result = PUB.restore_post(cfg, wp_id)   # 내부 get_post 재조회 포함
+                    if result.get("success"):
+                        # already_restored여도 로컬이 발행완료가 아니면 동기화(WP-로컬 불일치 해소)
+                        if result.get("already_restored") and p.get("상태값") == "발행완료":
+                            st.info("이미 복원되어 있습니다.")
+                        else:
+                            art_repo = ArticleRepository(get_db_adapter(cfg))
+                            try:
+                                art_repo.update_status(pid, "발행완료")
+                                art_repo.append_history(pid, "restore", {
+                                    "wp_post_id": wp_id,
+                                    "title": result.get("title", ""),
+                                    "operator": "dashboard",
+                                    "wp_status": result.get("wp_status", ""),
+                                    "restored_from": "휴지통",
+                                    "already_restored": bool(result.get("already_restored")),
+                                })
+                            except Exception as _e:
+                                st.warning(f"WordPress 복원은 성공했으나 로컬 기록 일부 실패: {_e}")
+                            st.success("♻️ 복원되었습니다" +
+                                       (" (WP는 이미 발행 상태였음 — 로컬 동기화)" if result.get("already_restored") else ""))
+                        st.rerun()
+                    else:
+                        # 실패 시 로컬 미변경
+                        error_map = {
+                            "not_found": "WP에서 글을 찾을 수 없습니다.",
+                            "authentication_failed": "WordPress 인증 실패입니다.",
+                            "permission_denied": "WordPress 권한이 부족합니다.",
+                        }
+                        err = result.get("error", "")
+                        st.error(error_map.get(err, f"복원 실패 (로컬 미변경): {err}"))
     except Exception as e:
         st.error(f"데이터 로드 오류: {e}")
 

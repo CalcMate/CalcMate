@@ -47,7 +47,7 @@
 - **위젯 엔진 통일**: WP 삽입 위젯을 v2(`generate_html`)로 — 구 naive 합산 제거. `render_inline_calculator()`를 대시보드 미리보기와 WP가 공유
 - **파이프라인 콘텐츠 버그 4건**: CTA중복 · 숨김섹션 소스잔존(→`render_*`+`show_*` 서버단 생략) · 죽은링크(→`is_active`) · 계산기당 중복발행(→`count_active_articles`)
 - **WordPress 발행 메타데이터**: post_id/permalink/status/published_at/history/calculator_id 저장
-- **WordPress 글 수정(Update)**: `publisher.update_post` + 대시보드 ✏️수정 UI (성공 시에만 로컬 갱신)
+- **WordPress 글 CRUD 전체**(로컬 실환경 검증): 발행(publish) · 수정(`update_post`, 2차) · 삭제(`delete_post` 휴지통, 3차, 2단계 확인) · 복원(`restore_post` 휴지통→발행, 4차, 🗑️휴지통 서브탭). 상태흐름 발행완료→수정됨→휴지통→발행완료. history publish/update/trash/restore 이벤트. WP REST는 `publisher.py`에만, `get_post` 재조회로 안전 판정
 - 아키텍처 원칙 확립: 상태판단=Repository 계층 / WP REST=`publisher.py`만 / 섹션노출=`render_*`+`show_*`
 
 ### 문서/안정화
@@ -59,7 +59,7 @@
 
 ## 🟡 In Progress / 부분 구현
 
-- **WordPress**: 로컬(Laragon `salarymate.test`) 발행·수정 실환경 검증 완료(post_id/history 저장). **실서버(공개 도메인) 배포는 미완**. 글 삭제/복원은 3·4차 예정
+- **WordPress**: 로컬(Laragon `salarymate.test`)에서 **발행·수정·삭제·복원 CRUD 전체 실환경 검증 완료**(post_id/history 저장, 아래 Completed 참조). **실서버(공개 도메인) 배포는 미완**
 - **Site Settings Override 런타임 소비**: 저장은 되나 파이프라인이 site 값을 아직 읽지 않음(AI 프로필 일부 제외) — 배선 필요
 - **Site Manager 고도화**: 안전삭제/복제/Export·Import UI 완료, 자동 만료삭제·일괄작업은 미구현
 - **Dashboard 운영센터**: 카드/시각화 완료, 실시간성·일부 KPI(Revenue=AdSense 미연동)는 보강 여지
@@ -71,8 +71,6 @@
 ## 🔭 Planned
 
 ### WordPress 글 관리 (계산기 파이프라인 후속)
-- **3차: WordPress 글 삭제**(휴지통 이동, 영구삭제 아님) — `publisher.delete_post` + 대시보드 삭제버튼 + article "삭제됨" 전환(실제 WP 반영)
-- **4차: 휴지통 복원**
 - **계산기 글 품질 시스템**: 품질 기준서 → writer 프롬프트 개선(§7 관련계산기 중복 등) → 자동 검수
 - 정책 RSS 소스 갱신(`korea.kr` 404 → 유효 피드로 교체 또는 복수화)
 
