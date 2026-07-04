@@ -132,6 +132,28 @@ def generate_app(cfg: dict, name: str, category: str = "", desc: str = "") -> di
     }
 
 
+def suggest_idea(cfg: dict) -> dict:
+    """기존 계산기 목록을 참고해 AI가 새 계산기 아이디어(이름/카테고리/설명)를 제안."""
+    try:
+        existing = CalculatorRepository(get_db_adapter(cfg)).get_all()
+    except Exception:
+        existing = []
+    existing_summary = "\n".join(
+        f"- {c.get('name','')} ({c.get('category','')})" for c in existing
+    ) or "(없음)"
+    sys0 = (
+        "너는 대한민국 노무/급여/세금/정부혜택 분야 웹 계산기 기획자다. "
+        "아래는 이미 존재하는 계산기 목록이다:\n" + existing_summary + "\n"
+        "이 목록과 겹치지 않는 새로운 실용적인 계산기 아이디어 1개를 제안하라. "
+        "직장인이 실제로 검색할 만한 주제로 한정한다. "
+        "순수 JSON만 반환: {\"name\":\"\",\"category\":\"\",\"desc\":\"\"}"
+    )
+    # 기존 sys1과 동일 provider/모델(orchestrator) 재사용
+    text, _m, _k = _chat(cfg, "orchestrator", sys0, "새 계산기 아이디어 1개를 제안하라.", 400)
+    d = parse_json_lenient(text)
+    return {"name": d.get("name", ""), "category": d.get("category", ""), "desc": d.get("desc", "")}
+
+
 def save_app(cfg: dict, app: dict, site_id: str = "") -> tuple:
     """생성 결과를 calculators + app_templates 시트에 저장(Repository 경유)."""
     db = get_db_adapter(cfg)

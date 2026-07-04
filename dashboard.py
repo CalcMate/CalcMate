@@ -1423,6 +1423,19 @@ elif tab == "🏭 App Factory":
     st.title("🏭 App Factory")
     st.caption("자동 생성 흐름: GPT 스펙 → Claude 코드(HTML) → GPT SEO/FAQ/초안 → Gemini 이미지 프롬프트 → 저장")
     from modules import app_factory as AF
+
+    # 💡 AI 아이디어 제안(수동 버튼) — 클릭 시에만 입력칸 자동채움. 위젯 키를 직접 세팅해야
+    # 재클릭 시에도 갱신됨(text_input의 value= 방식은 위젯 생성 후 무시되는 Streamlit 제약 회피).
+    if st.button("💡 AI 아이디어 제안", key="af_suggest"):
+        with st.spinner("AI가 새 계산기 아이디어를 찾는 중..."):
+            try:
+                idea = AF.suggest_idea(cfg)
+                st.session_state["af_name"] = idea.get("name", "")
+                st.session_state["af_cat"] = idea.get("category", "")
+                st.session_state["af_desc"] = idea.get("desc", "")
+            except Exception as e:
+                st.warning(f"AI 제안 실패(직접 입력해주세요): {e}")
+
     c1, c2 = st.columns(2)
     af_name = c1.text_input("계산기명 *", placeholder="퇴직금 계산기", key="af_name")
     af_cat = c2.text_input("카테고리", placeholder="노무/급여", key="af_cat")
