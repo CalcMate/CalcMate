@@ -521,6 +521,59 @@ elif tab == "📋 발행 목록":
                             else:
                                 # 실패 시 로컬 DB/history 절대 미변경
                                 st.error(f"수정 실패 (로컬 미변경): {res.get('error','')}")
+
+                    # 🗑️ 삭제(휴지통 이동) — 2단계 확인. publisher만 호출, WP REST 직접호출 없음.
+                    st.markdown("---")
+                    if not st.session_state.get(f"del_confirm_{pid}"):
+                        if st.button("🗑️ 삭제 (휴지통 이동)", key=f"del_btn_{pid}"):
+                            # 확인 단계 진입 전 get_post 재조회(이미 삭제/권한/제목 확인)
+                            check = PUB.get_post(cfg, wp_id)
+                            if check.get("success"):
+                                st.session_state[f"del_confirm_{pid}"] = True
+                                st.session_state[f"del_check_{pid}"] = check
+                                st.rerun()
+                            else:
+                                err = check.get("error", "")
+                                msg = {
+                                    "not_found": "이미 삭제되었거나 존재하지 않는 글입니다.",
+                                    "authentication_failed": "WordPress 인증 실패 — 자격증명을 확인하세요.",
+                                    "permission_denied": "WordPress 권한 부족 — 삭제 권한이 없습니다.",
+                                }.get(err, f"조회 실패: {err}")
+                                st.error(msg)  # 확인 단계 취소, 로컬 미변경
+                    else:
+                        check = st.session_state.get(f"del_check_{pid}", {})
+                        st.warning("⚠️ 이 글을 WordPress 휴지통으로 이동합니다.")
+                        st.write(f"- **제목:** {check.get('title','')}")
+                        st.write(f"- **URL:** {check.get('link','')}")
+                        st.write(f"- **WP 상태:** {check.get('status','')}")
+                        conf = st.text_input('삭제하려면 "DELETE" 를 입력하세요', key=f"del_txt_{pid}")
+                        dc = st.columns(2)
+                        if dc[0].button("실행", key=f"del_exec_{pid}", type="primary",
+                                        disabled=(conf != "DELETE")):
+                            res = PUB.delete_post(cfg, wp_id)  # force=False → 휴지통
+                            if res.get("success"):
+                                art_repo = ArticleRepository(get_db_adapter(cfg))
+                                try:
+                                    art_repo.update_status(pid, "휴지통")
+                                    art_repo.append_history(pid, "trash", {
+                                        "wp_post_id": wp_id,
+                                        "title": check.get("title", ""),
+                                        "operator": "dashboard",
+                                        "wp_status": res.get("wp_status", ""),
+                                        "force": False})
+                                except Exception as _e:
+                                    st.warning(f"WordPress 삭제는 성공했으나 로컬 기록 일부 실패: {_e}")
+                                st.session_state.pop(f"del_confirm_{pid}", None)
+                                st.session_state.pop(f"del_check_{pid}", None)
+                                st.success("🗑️ 휴지통으로 이동 완료")
+                                st.rerun()
+                            else:
+                                # 실패 시 로컬 DB/history 절대 미변경
+                                st.error(f"삭제 실패 (로컬 미변경): {res.get('error','')}")
+                        if dc[1].button("취소", key=f"del_cancel_{pid}"):
+                            st.session_state.pop(f"del_confirm_{pid}", None)
+                            st.session_state.pop(f"del_check_{pid}", None)
+                            st.rerun()
     except Exception as e:
         st.error(f"데이터 로드 오류: {e}")
 
