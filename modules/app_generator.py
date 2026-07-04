@@ -314,7 +314,7 @@ def generate_html(calc: dict, cfg: dict = None) -> str:
         "CATEGORY": f"{emoji} {_html.escape(category)}", "NAME": _html.escape(name),
         "HERO_SUB": _html.escape(desc), "FORM_FIELDS": _form_fields_v2(ins, labels),
         "CALC_BTN": _html.escape(f"{short} 계산하기"),
-        "RESULT_LABEL": _html.escape(f"예상 {plabel}"),
+        "RESULT_LABEL": _html.escape(plabel if plabel.startswith("예상") else f"예상 {plabel}"),
         "PRIMARY_OUT": _html.escape(primary), "RESULT_UNIT": _html.escape(punit or "원"),
         "NOTICE": "본 계산 결과는 참고용이며, 실제 지급액은 근로계약·관련 법령에 따라 달라질 수 있습니다.",
         "ARTICLE_HTML": article,
