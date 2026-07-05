@@ -1,0 +1,8 @@
+# registry_auto.yaml — App Factory 자동생성 계산기 registry (작업지시서 E §1)
+#
+# ⚠️ 이 파일은 App Factory(modules/app_factory.save_app)가 자동으로 씁니다.
+#    사람이 직접 편집하지 마세요.
+#
+# 자동생성 엔트리는 legal(law/article/authority 등)이 전부 null이며 needs_human_legal: true 입니다.
+# 정식 legal 검증이 끝나면 해당 slug를 docs/legal_basis.draft.yaml 로 "승격"해서 옮겨 적으세요.
+# (동일 slug는 legal_basis.draft.yaml 이 우선하므로, 승격 후 이 파일의 항목은 자동으로 무시됩니다.)

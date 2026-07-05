@@ -82,17 +82,10 @@ _registry_cache = None
 
 
 def _registry() -> dict:
-    """slug → registry entry dict. 로드 실패 시 {}(폴백은 각 호출부에서 처리)."""
-    global _registry_cache
-    if _registry_cache is None:
-        try:
-            import yaml
-            data = yaml.safe_load(_REGISTRY_PATH.read_text(encoding="utf-8")) or {}
-            data.pop("schema_version", None)
-            _registry_cache = data if isinstance(data, dict) else {}
-        except Exception:
-            _registry_cache = {}
-    return _registry_cache
+    """slug → registry entry dict. registry_loader에 위임(legal_basis.draft.yaml + registry_auto.yaml
+    merge, 큐레이션 우선). 로드 실패 시 {}(폴백은 각 호출부에서 처리)."""
+    from .registry_loader import load_registry
+    return load_registry()
 
 
 def _compute_type(calc) -> str:

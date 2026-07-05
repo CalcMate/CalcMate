@@ -249,17 +249,10 @@ _legal_basis_cache = None
 
 
 def _load_legal_basis() -> dict:
-    global _legal_basis_cache
-    if _legal_basis_cache is None:
-        try:
-            import yaml
-            data = yaml.safe_load(_LEGAL_BASIS_PATH.read_text(encoding="utf-8")) or {}
-            data.pop("schema_version", None)
-            _legal_basis_cache = data
-        except Exception as e:
-            LOG.warning("[품질] legal_basis 로드 실패 → G8 미적용: %s", e)
-            _legal_basis_cache = {}
-    return _legal_basis_cache
+    """G8용 legal_basis. registry_loader에 위임(legal_basis.draft.yaml + registry_auto.yaml merge).
+    자동엔트리는 legal 전부 null → G8 required 검사 스킵(하위호환 그대로)."""
+    from .registry_loader import load_registry
+    return load_registry()
 
 
 def _norm(s) -> str:

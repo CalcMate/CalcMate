@@ -87,18 +87,10 @@ _legal_basis_cache = None
 
 
 def _load_legal_basis() -> dict:
-    """계산기 slug→법적근거 데이터(검증된 legal_basis). 1회 로드 캐시."""
-    global _legal_basis_cache
-    if _legal_basis_cache is None:
-        try:
-            import yaml
-            data = yaml.safe_load(_LEGAL_BASIS_PATH.read_text(encoding="utf-8")) or {}
-            data.pop("schema_version", None)
-            _legal_basis_cache = data
-        except Exception as e:
-            LOG.warning("legal_basis 로드 실패(무시): %s", e)
-            _legal_basis_cache = {}
-    return _legal_basis_cache
+    """계산기 slug→registry 엔트리(legal_basis.draft.yaml + registry_auto.yaml merge, 큐레이션 우선).
+    registry_loader에 위임(단일 소스). §1: App Factory 자동엔트리도 여기서 함께 보임."""
+    from .registry_loader import load_registry
+    return load_registry()
 
 
 def _legal_unverified(lb) -> bool:
