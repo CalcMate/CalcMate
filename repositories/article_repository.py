@@ -43,27 +43,35 @@ class ArticleRepository:
         published.sort(key=lambda r: r.get("발행일시") or "", reverse=True)
         return [r.get("최종추천제목", "") for r in published[:n]]
 
-    def count_active_articles(self, calculator_id) -> int:
+    def count_active_articles(self, calculator_id, rows=None) -> int:
         """해당 계산기로 발행된 글 중 비활성('삭제됨' 등)을 제외한 유효 발행 건수.
         상태값 문자열 판단은 이 Repository 내부(INACTIVE_ARTICLE_STATUSES)에만 둔다 —
-        파이프라인은 이 개수를 MAX_ARTICLES_PER_CALCULATOR와 비교만 한다."""
+        파이프라인은 이 개수를 MAX_ARTICLES_PER_CALCULATOR와 비교만 한다.
+        rows 전달 시 그 스냅샷을 필터(sheet read 절감). None이면 기존대로 get_where."""
         cid = str(calculator_id or "").strip()
         if not cid:
             return 0
-        rows = self._db.get_where(self.TABLE, {"calculator_id": cid})
-        return sum(1 for r in rows
+        if rows is None:
+            src = self._db.get_where(self.TABLE, {"calculator_id": cid})
+        else:
+            src = [r for r in rows if str(r.get("calculator_id", "")).strip() == cid]
+        return sum(1 for r in src
                    if str(r.get("상태값", "")).strip() not in INACTIVE_ARTICLE_STATUSES)
 
-    def has_quality_hold(self, calculator_id, prompt_version=None) -> bool:
+    def has_quality_hold(self, calculator_id, prompt_version=None, rows=None) -> bool:
         """해당 계산기에 자동 품질검수 HOLD("품질보류") 이력이 있는지.
         상태값 문자열 판단은 이 Repository 내부에만 둔다(파이프라인은 True/False만 사용).
         prompt_version 지정 시: 그 버전으로 HOLD된 건이 하나라도 있으면 True
-        (프롬프트가 그대로면 재도전 불필요). None이면 HOLD 이력 존재 여부만."""
+        (프롬프트가 그대로면 재도전 불필요). None이면 HOLD 이력 존재 여부만.
+        rows 전달 시 그 스냅샷을 필터(sheet read 절감). None이면 기존대로 get_where."""
         cid = str(calculator_id or "").strip()
         if not cid:
             return False
-        rows = self._db.get_where(self.TABLE, {"calculator_id": cid})
-        holds = [r for r in rows if str(r.get("상태값", "")).strip() == "품질보류"]
+        if rows is None:
+            src = self._db.get_where(self.TABLE, {"calculator_id": cid})
+        else:
+            src = [r for r in rows if str(r.get("calculator_id", "")).strip() == cid]
+        holds = [r for r in src if str(r.get("상태값", "")).strip() == "품질보류"]
         if prompt_version is None:
             return bool(holds)
         return any(str(r.get("quality_prompt_version", "")).strip() == str(prompt_version) for r in holds)

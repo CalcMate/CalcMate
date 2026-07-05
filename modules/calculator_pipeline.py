@@ -130,10 +130,13 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
     # 중복 방지용 기존 제목
     repo = CalculatorRepository(get_db_adapter(cfg))
     art_repo = ArticleRepository(get_db_adapter(cfg))
+    # 기사 스냅샷 1회 로드(sheet read 절감) — 후보당 count/has_quality_hold를 이 스냅샷으로 판정.
+    # 실행 중 새로 저장한 행은 아래에서 snapshot에 append(같은 run 내 중복/재평가 정확도 유지).
     try:
-        existing = set(art_repo.get_recent_published_titles(50))
+        snapshot = list(art_repo.get_all())
     except Exception:
-        existing = set()
+        snapshot = []
+    existing = set(r.get("최종추천제목", "") for r in snapshot if r.get("상태값") == "발행완료")
 
     stats = {"produced": 0, "processed": 0, "failed": 0, "no_wp": 0, "dup": 0,
              "quality_hold": 0, "hold_skip": 0}
@@ -156,7 +159,7 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
             # 파이프라인은 개수만 비교하고 상태값 문자열을 직접 다루지 않는다.
             cid = it.get("calculator_id", "")
             max_per = int(cfg.get("MAX_ARTICLES_PER_CALCULATOR", 1) or 1)
-            if cid and art_repo.count_active_articles(cid) >= max_per:
+            if cid and art_repo.count_active_articles(cid, rows=snapshot) >= max_per:
                 stats["dup"] += 1
                 continue
             # HOLD 재평가 게이트: 품질보류 이력은 count_active_articles에서 제외되므로
@@ -165,12 +168,12 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
                 if reeval:
                     # 현재 프롬프트 버전으로 이미 HOLD된 계산기 → 재시도 무의미(스킵).
                     # 프롬프트가 바뀌었으면(옛 버전 HOLD) 통과 → 재도전.
-                    if art_repo.has_quality_hold(cid, prompt_version=prompt_ver):
+                    if art_repo.has_quality_hold(cid, prompt_version=prompt_ver, rows=snapshot):
                         stats["hold_skip"] += 1
                         continue
                 else:
                     # 재평가 off → HOLD 이력 있으면 영구 제외.
-                    if art_repo.has_quality_hold(cid):
+                    if art_repo.has_quality_hold(cid, rows=snapshot):
                         stats["hold_skip"] += 1
                         continue
             seo = generate_seo(cfg, calc.get("name", keyword), keyword)
@@ -270,9 +273,13 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
                                              "prompt_version": prompt_ver})
                 except Exception as _e:
                     LOG.warning("history(quality_hold) 기록 실패(무시): %s", _e)
-                # Critical 반복실패 HOLD → 운영 알림(작업지시서 C 커밋2에서 배선)
+                # Critical 반복실패 HOLD → 운영 알림
                 _notify_critical_hold(cfg, calc, crit_gates, critical_exhausted)
                 existing.add(seo.get("seo_title"))
+                # 같은 run 내 후속 후보 판정을 위해 스냅샷에 반영(품질보류 + 프롬프트버전)
+                snapshot.append({"calculator_id": cid, "상태값": "품질보류",
+                                 "quality_prompt_version": prompt_ver,
+                                 "최종추천제목": seo.get("seo_title", "")})
                 stats["quality_hold"] += 1
                 continue
 
@@ -306,6 +313,11 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
             except Exception as _e:
                 LOG.warning("history(publish) 기록 실패(무시): %s", _e)
             existing.add(seo.get("seo_title"))
+            # 같은 run 내 후속 후보의 count_active_articles 판정을 위해 스냅샷에 반영
+            snapshot.append({"calculator_id": cid,
+                             "상태값": "발행완료" if pub_status == "published" else "검수대기",
+                             "최종추천제목": seo.get("seo_title", ""),
+                             "quality_prompt_version": prompt_ver})
             stats["produced"] += 1
             if pub_status != "published":
                 stats["no_wp"] += 1
