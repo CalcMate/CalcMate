@@ -101,20 +101,51 @@ def _load_legal_basis() -> dict:
     return _legal_basis_cache
 
 
+def _legal_unverified(lb) -> bool:
+    """needs_human_legal 선언 + 실제 legal(law/article/authority)이 전부 비어있음 = 진짜 미검증.
+    플래그 단독이 아니라 '실제 데이터 존재'를 게이트로 삼아 견고(사람이 플래그 갱신을 깜빡해도,
+    검증된 데이터가 있으면 정상 취급 / 데이터가 없으면 플래그와 무관하게 미검증으로 차단).
+    → 기존 7종은 legal이 채워져 있어 False(회귀 없음), App Factory 자동엔트리(legal 전부 null)는 True."""
+    if not isinstance(lb, dict):
+        return False
+    return bool(lb.get("needs_human_legal")) and not (lb.get("law") or lb.get("article") or lb.get("authority"))
+
+
+def _legal_undetermined_block() -> str:
+    """legal 미확정 계산기용 writer 지침(작업지시서 E §4). 특정 조항 인용을 원천 금지해
+    환각(검증 안 된 조항 인용) 벡터를 차단 + 강한 면책 문구 강제."""
+    return (
+        "\n[법적 근거 미확정 — 아래를 반드시 지킨다]\n"
+        "이 계산기의 법적 근거는 아직 확정되지 않았습니다. 다음을 반드시 지킵니다:\n"
+        "1. 특정 법령명이나 조항 번호를 절대 언급하지 않습니다(확인되지 않은 조항을 "
+        "인용하면 심각한 오류가 됩니다).\n"
+        "2. 대신 일반적인 정보와 계산 방식의 취지만 서술합니다.\n"
+        "3. 다음 면책 문구를 주의사항에 반드시 포함합니다: \"본 계산기의 법적 근거는 아직 "
+        "확정되지 않았습니다. 일반 참고용으로만 활용하시고, 정확한 기준은 관할기관에 "
+        "문의하시기 바랍니다.\""
+    )
+
+
 def _legal_basis_block(calc: dict) -> str:
     """계산기 slug의 검증된 법적 근거를 'AI가 지어내지 말고 그대로 인용'하도록 주입.
-    AI_STYLE_BLOCKLIST(문체 금지, _style_block)와는 별개 목록(조항 금지=lb['blocklist'])."""
+    AI_STYLE_BLOCKLIST(문체 금지, _style_block)와는 별개 목록(조항 금지=lb['forbidden_articles']).
+    null-safe: 값이 없는 필드는 줄 자체를 생략(빈칸/None 누출 방지). 미검증 계산기는 §4 블록으로 대체."""
     lb = _load_legal_basis().get(str(calc.get("slug", "")).strip())
     if not lb:
         return ""
+    # legal 미확정(needs_human_legal + 실제 legal 공백) → 환각방지 지침 블록으로 대체
+    if _legal_unverified(lb):
+        return _legal_undetermined_block()
     parts = ["\n[법적 근거 — 아래 검증된 값을 그대로 정확히 인용한다. 스스로 다른 조항 번호를 "
-             "만들어내지 않으며, 확실하지 않으면 법령명과 취지만 쓴다]",
-             f"- 법령: {lb.get('law', '')}"]
+             "만들어내지 않으며, 확실하지 않으면 법령명과 취지만 쓴다]"]
+    if lb.get("law"):
+        parts.append(f"- 법령: {lb['law']}")
     if lb.get("article"):
         parts.append(f"- 조항: {lb['article']}")
     if lb.get("related_articles"):
         parts.append(f"- 관련조항: {', '.join(str(x) for x in lb['related_articles'])}")
-    parts.append(f"- 소관기관: {lb.get('authority', '')}")
+    if lb.get("authority"):
+        parts.append(f"- 소관기관: {lb['authority']}")
     if lb.get("writer_note"):
         parts.append(f"- 작성 지침: {str(lb['writer_note']).strip()}")
     bl = lb.get("forbidden_articles") or []
@@ -124,8 +155,8 @@ def _legal_basis_block(calc: dict) -> str:
     if fp:
         parts.append(f"- 다음 확정형 표현은 쓰지 않는다(수급/지급 요건이 복합적이므로 "
                      f"'가능성이 있습니다'/'심사 결과에 따라 달라질 수 있습니다'로 표현): {', '.join(fp)}")
-    # §3 표준 면책 문구(소관기관 자동 삽입) — 주의사항 섹션에 포함하도록 지시.
-    authority = lb.get("authority", "관할기관")
+    # §3 표준 면책 문구(소관기관 자동 삽입) — authority 없으면 '관할기관'으로 폴백(None 누출 방지).
+    authority = lb.get("authority") or "관할기관"
     parts.append(f"- 주의사항 섹션에 다음 취지의 면책 문구를 반드시 포함한다: "
                  f"\"정확한 세부 기준은 {authority} 등 관할기관에 확인하시기 바랍니다.\" "
                  f"(소관기관명이 복합 표기이면 자연스럽게 요약해서 문장에 녹인다.)")
