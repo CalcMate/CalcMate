@@ -120,6 +120,11 @@ def _legal_basis_block(calc: dict) -> str:
     bl = lb.get("blocklist") or []
     if bl:
         parts.append(f"- 다음 조항/표현은 절대 인용하지 않는다: {', '.join(str(x) for x in bl)}")
+    # §3 표준 면책 문구(소관기관 자동 삽입) — 주의사항 섹션에 포함하도록 지시.
+    authority = lb.get("authority", "관할기관")
+    parts.append(f"- 주의사항 섹션에 다음 취지의 면책 문구를 반드시 포함한다: "
+                 f"\"정확한 세부 기준은 {authority} 등 관할기관에 확인하시기 바랍니다.\" "
+                 f"(소관기관명이 복합 표기이면 자연스럽게 요약해서 문장에 녹인다.)")
     return "\n".join(parts)
 
 
