@@ -34,6 +34,7 @@ weekly-holiday-allowance:
   slug: weekly-holiday-allowance
   category: 노무/급여
   emoji: "💰"
+  card_label: 주휴수당 계산기        # 관련카드 UI 표시명(짧은 문구). 기본=name, 다르면 override
   compute_type: single
   date_fields: []
   validation_mode: formula
@@ -70,6 +71,7 @@ severance-pay:
   slug: severance-pay
   category: 노무/급여
   emoji: "💼"
+  card_label: 퇴직금 계산기
   compute_type: date_based
   date_fields: [start_date, end_date]
   validation_mode: skip
@@ -107,6 +109,7 @@ annual-leave-allowance:
   slug: annual-leave-allowance
   category: 노무/급여
   emoji: "📅"
+  card_label: 연차수당 계산기
   compute_type: single
   date_fields: []
   validation_mode: formula
@@ -149,6 +152,7 @@ unemployment-benefit:
   slug: unemployment-benefit
   category: 고용/보험
   emoji: "📋"
+  card_label: 실업급여 계산기
   compute_type: single
   date_fields: []
   validation_mode: formula
@@ -194,6 +198,7 @@ four-insurances:
   slug: four-insurances
   category: 고용/보험
   emoji: "🏢"
+  card_label: 4대보험 계산기
   compute_type: dict
   date_fields: []
   validation_mode: formula
@@ -235,6 +240,7 @@ four-insurances:
   slug: 연말정산_환급액_계산기
   category: 세금/정부혜택
   emoji: "🧾"
+  card_label: 연말정산 계산기        # ⚠️override: name("연말정산 환급액 계산기")과 다름 — 카드는 짧은 표시명 유지
   compute_type: single
   date_fields: []
   validation_mode: formula
@@ -275,6 +281,7 @@ four-insurances:
   slug: 육아휴직_급여_계산기
   category: 노무/급여/보험
   emoji: "👶"
+  card_label: 육아휴직 급여 계산기
   compute_type: single
   date_fields: []
   validation_mode: formula

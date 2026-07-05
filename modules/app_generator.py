@@ -153,6 +153,26 @@ def _faq_items_v2(calc) -> str:
     return "\n".join(items)
 
 
+def _related_triples(cur: str):
+    """관련 계산기 (slug, emoji, 표시명) 리스트(cur 제외, 순서 유지).
+    registry(related_slugs+emoji+card_label) 우선 → 미등록/로드실패 시 기존 _RELATED 폴백.
+    ※ card_label 기본값은 name(정식명칭)이라, 짧은 카드명이 필요한 계산기는 registry에서 override."""
+    reg = _registry()
+    entry = reg.get(cur) or {}
+    slugs = entry.get("related_slugs")
+    if reg and slugs:   # registry 우선
+        out = []
+        for s in slugs:
+            if s == cur:
+                continue
+            e = reg.get(s) or {}
+            label = e.get("card_label") or e.get("name") or s
+            out.append((s, str(e.get("emoji") or ""), str(label)))
+        return out
+    # 폴백: 기존 _RELATED 하드코딩(현행 동작 보장)
+    return [(s, em, nm) for s, em, nm in _RELATED if s != cur]
+
+
 def _related_items_v2(calc) -> str:
     cur = str(calc.get("slug", ""))
     # href: 형제 계산기 폴더 상대경로(../{slug}/). target=_self: 미리보기 iframe 자체가 이동
@@ -160,7 +180,7 @@ def _related_items_v2(calc) -> str:
     items = [f'<a class="sm-related-item" href="../{slug}/" target="_self">'
              f'<span class="sm-related-emoji">{emoji}</span>'
              f'<span class="sm-related-name">{_html.escape(nm)}</span></a>'
-             for slug, emoji, nm in _RELATED if slug != cur]
+             for slug, emoji, nm in _related_triples(cur)]
     return "\n".join(items[:4])
 
 
