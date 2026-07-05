@@ -49,3 +49,24 @@ def invalidate():
     """캐시 무효화(App Factory가 registry_auto.yaml에 쓴 직후 등)."""
     global _cache
     _cache = None
+
+
+_AUTO_HEADER = (
+    "# registry_auto.yaml — App Factory 자동생성 계산기 registry (작업지시서 E §1)\n"
+    "#\n"
+    "# ⚠️ 이 파일은 App Factory(modules/app_factory.save_app)가 자동으로 씁니다. 사람이 직접 편집하지 마세요.\n"
+    "# 자동생성 엔트리는 legal(law/article/authority 등) 전부 null + needs_human_legal: true 입니다.\n"
+    "# 정식 legal 검증이 끝나면 해당 slug를 docs/legal_basis.draft.yaml 로 '승격'해서 옮겨 적으세요\n"
+    "# (동일 slug는 legal_basis.draft.yaml 이 우선하므로, 승격 후 이 파일의 항목은 자동으로 무시됩니다).\n"
+)
+
+
+def add_auto_entry(slug: str, entry: dict) -> None:
+    """registry_auto.yaml에 엔트리 추가/갱신(PyYAML safe_dump — 자동생성 전용이라 포맷 보존 불필요).
+    헤더 주석 재삽입, 캐시 무효화. slug가 이미 있으면 덮어씀(재생성 대응)."""
+    import yaml
+    data = _read_yaml(_AUTO_PATH)   # 기존 엔트리(없으면 {})
+    data[str(slug)] = entry
+    body = yaml.safe_dump(data, allow_unicode=True, sort_keys=False, default_flow_style=False)
+    _AUTO_PATH.write_text(_AUTO_HEADER + "\n" + body, encoding="utf-8")
+    invalidate()

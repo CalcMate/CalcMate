@@ -193,6 +193,63 @@ def suggest_idea(cfg: dict, keyword: str = "") -> dict:
     return {"name": d.get("name", ""), "category": d.get("category", ""), "desc": d.get("desc", "")}
 
 
+def _infer_registry_meta(input_schema: dict, output_schema: dict, formula) -> tuple:
+    """registry 자동추론(작업지시서 E §3): (date_fields, compute_type, validation_mode, difficulty).
+    - date_fields: input_schema 값에 'date' 포함하는 키(app_generator의 date 판정과 동일 기준)
+    - compute_type: date 필드 있으면 date_based / formula가 dict거나 출력 2+면 dict / 그 외 single
+    - validation_mode: date_based면 skip(날짜 코드계산, formula 미사용), 아니면 formula
+    - difficulty: date_based→date_based / dict→multi_output / 그 외 simple
+    ※ compute_type의 single/dict는 현재 코드가 소비 안 함(date_based만 소비) — 추론 오차 리스크 낮음."""
+    ins = input_schema or {}
+    outs = output_schema or {}
+    date_fields = [k for k, v in ins.items() if "date" in str(v).lower()]
+    if date_fields:
+        compute_type = "date_based"
+    elif isinstance(formula, dict) or len(outs) >= 2:
+        compute_type = "dict"
+    else:
+        compute_type = "single"
+    validation_mode = "skip" if compute_type == "date_based" else "formula"
+    difficulty = {"date_based": "date_based", "dict": "multi_output"}.get(compute_type, "simple")
+    return date_fields, compute_type, validation_mode, difficulty
+
+
+def _build_registry_entry(app: dict, slug: str) -> dict:
+    """save_app이 registry_auto.yaml에 쓸 자동 엔트리(작업지시서 E §3).
+    identity/compute/labels/meta는 자동, legal 전체는 null(사람이 나중에 채움), needs_human_legal=true."""
+    ins = app.get("input_schema", {}) or {}
+    outs = app.get("output_schema", {}) or {}
+    date_fields, compute_type, validation_mode, difficulty = _infer_registry_meta(
+        ins, outs, app.get("formula", ""))
+    name = app.get("name", "")
+    return {
+        "slug": slug,
+        "name": name,
+        "category": app.get("category", ""),
+        "emoji": "🧮",
+        "card_label": name,
+        "compute_type": compute_type,
+        "date_fields": date_fields,
+        "validation_mode": validation_mode,
+        "field_labels": app.get("labels", {}) or {},
+        "difficulty": difficulty,
+        "difficulty_status": "provisional",
+        "needs_human_legal": True,
+        # legal — 전부 null/빈값(사람이 legal_basis.draft.yaml로 승격하며 채움)
+        "law": None, "article": None, "authority": None,
+        "related_articles": [],
+        "writer_note": None,
+        "reviewer_expectation": [],
+        "forbidden_articles": [],
+        "forbidden_phrases": [],
+        "confidence": None,
+        "last_verified": None,
+        "verification_source": [],
+        "content": {"evergreen": None, "update_cycle": None},
+        "related_slugs": [],
+    }
+
+
 def save_app(cfg: dict, app: dict, site_id: str = "") -> tuple:
     """생성 결과를 calculators + app_templates 시트에 저장(Repository 경유)."""
     db = get_db_adapter(cfg)
@@ -237,5 +294,13 @@ def save_app(cfg: dict, app: dict, site_id: str = "") -> tuple:
         })
     except Exception as e:
         return False, f"저장 실패(시트 권한 확인): {e}"
+    # registry_auto.yaml에 자동 엔트리 기록(§3) — 실패해도 계산기 저장 자체는 유효(경고만).
+    try:
+        from .registry_loader import add_auto_entry
+        _rslug = _slug(name)
+        add_auto_entry(_rslug, _build_registry_entry(app, _rslug))
+        LOG.info("registry_auto 엔트리 기록: %s", _rslug)
+    except Exception as _re:
+        LOG.warning("registry_auto 기록 실패(무시, 계산기 저장은 완료됨): %s", _re)
     LOG.info("App Factory 저장 완료: %s (tpl=%s)", name, tpl_id)
     return True, f"✅ '{name}' 계산기 + 템플릿 저장 완료 (template_id={tpl_id})"
