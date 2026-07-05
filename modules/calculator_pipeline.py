@@ -92,7 +92,7 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
     except Exception:
         existing = set()
 
-    stats = {"produced": 0, "processed": 0, "failed": 0, "no_wp": 0, "dup": 0}
+    stats = {"produced": 0, "processed": 0, "failed": 0, "no_wp": 0, "dup": 0, "quality_hold": 0}
     for it in ranked:
         if stats["produced"] >= target:
             break
@@ -121,27 +121,86 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
             if not faq:
                 faq = generate_faq(cfg, calc.get("name", keyword))
 
-            body_html, _ = _write_article(cfg, calc, keyword, seo, faq)
-            # 계산기 위젯: app_generator(v2)로 실제 formula/퇴직금 날짜로직 반영(구 naive 합산 제거).
+            # 계산기 위젯(결정론) — 재시도와 무관하므로 1회만 계산.
             # 블로그 본문과 중복되는 섹션(본문/FAQ/관련계산기/광고/PWA)은 위젯에서 숨김.
             from .app_generator import generate_calculator, render_inline_calculator
             widget_cfg = dict(cfg)
             widget_cfg.update({"SHOW_ARTICLE": False, "SHOW_FAQ": False, "SHOW_RELATED": False,
                                "SHOW_ADSENSE": False, "SHOW_CPA": False, "SHOW_PWA": False})
             widget = render_inline_calculator(generate_calculator(calc, widget_cfg))
-            final_html = (f"{body_html}\n<hr/>\n<h2>계산기 사용하기</h2>\n"
-                          f"<p>{CTA_TEXT}</p>\n{widget}")
-            # 내부링크: 관련 계산기/관련 글 자동 연결 (신규)
+            # 관련링크 후보(결정론) — 1회만 조회
             try:
                 from .internal_link_engine import (generate_related_calculators,
                                                    generate_related_articles, inject_internal_links)
-                rel_calc = generate_related_calculators(cfg, it.get("calculator_id", ""), 3)
+                rel_calc = generate_related_calculators(cfg, cid, 3)
                 rel_art = generate_related_articles(cfg, keyword, 3)
-                final_html = inject_internal_links(final_html, rel_calc, rel_art)
             except Exception as _e:
-                LOG.warning("내부링크 생성 실패(무시): %s", _e)
+                LOG.warning("내부링크 후보 조회 실패(무시): %s", _e)
+                rel_calc, rel_art = [], []
+                inject_internal_links = lambda h, *a: h
 
-            # 발행
+            def _assemble(_body):
+                fh = f"{_body}\n<hr/>\n<h2>계산기 사용하기</h2>\n<p>{CTA_TEXT}</p>\n{widget}"
+                try:
+                    return inject_internal_links(fh, rel_calc, rel_art)
+                except Exception as _e2:
+                    LOG.warning("내부링크 주입 실패(무시): %s", _e2)
+                    return fh
+
+            # 본문 생성 → 조립 → 품질검수(Gate→Score). REWRITE면 writer 전체재생성 재시도.
+            from .publish_quality import check_publish_quality
+            body_html, _ = _write_article(cfg, calc, keyword, seo, faq)
+            final_html = _assemble(body_html)
+            qc = check_publish_quality(cfg, body_html, final_html, calc)
+            rcfg = cfg.get("QUALITY_RETRY", {}) or {}
+            max_total = int(rcfg.get("MAX_TOTAL_RETRY", 2) or 2)     # 총 재시도 하드상한(무한루프 방지)
+            crit_limit = int(rcfg.get("CRITICAL_RETRY_LIMIT", 2) or 2)  # Critical 연속실패 알림 임계(C)
+            q_retries, consec_critical = 0, 0
+            while qc.get("result") == "REWRITE" and q_retries < max_total:
+                q_retries += 1
+                consec_critical = (consec_critical + 1) if qc.get("severity") == "critical" else 0
+                if consec_critical >= crit_limit:
+                    # 작업지시서 C: Critical 반복 실패 시 Telegram 알림. 이번엔 로그 구분표시만.
+                    LOG.warning("[품질] Critical 연속 %d회(임계 %d) 반복 실패 — 알림 대상(C): %s",
+                                consec_critical, crit_limit, keyword)
+                LOG.info("[품질] REWRITE 전체재생성 %d/%d: %s (severity=%s)",
+                         q_retries, max_total, keyword, qc.get("severity"))
+                body_html, _ = _write_article(cfg, calc, keyword, seo, faq)
+                final_html = _assemble(body_html)
+                qc = check_publish_quality(cfg, body_html, final_html, calc)
+
+            final_html = qc.get("html") or final_html   # G6 CTA중복 코드수정 반영본
+            q_fields = {
+                "quality_score": ("" if qc.get("score") is None else qc.get("score")),
+                "quality_status": qc.get("result", ""),
+                "quality_failed_rules": json.dumps(qc.get("failed_rules") or [], ensure_ascii=False),
+                "quality_review_model": qc.get("quality_review_model") or "",
+                "quality_reviewed_at": datetime.now().isoformat(),
+            }
+
+            # 한도 초과에도 REWRITE → 발행하지 않고 사람개입 대기(검수대기)
+            if qc.get("result") == "REWRITE":
+                LOG.warning("[품질] 재시도 한도(%d) 초과에도 REWRITE — 미발행/검수대기: %s", max_total, keyword)
+                article_id = art_repo.save({
+                    "정책명": keyword, "최종추천제목": seo.get("seo_title"),
+                    "메타설명": seo.get("seo_description"),
+                    "태그": ", ".join(seo.get("seo_keywords", []) or []),
+                    "발행일시": datetime.now().isoformat(),
+                    "원본출처": calc.get("published_url", ""),
+                    "상태값": "검수대기", "site_id": it.get("site_id", ""), "calculator_id": cid,
+                    **q_fields,
+                })
+                try:
+                    art_repo.append_history(article_id, "quality_hold",
+                                            {"quality_status": "REWRITE", "retries": q_retries,
+                                             "severity": qc.get("severity", "")})
+                except Exception as _e:
+                    LOG.warning("history(quality_hold) 기록 실패(무시): %s", _e)
+                existing.add(seo.get("seo_title"))
+                stats["quality_hold"] += 1
+                continue
+
+            # PASS/WARN → 발행
             pub = publisher.publish(datetime.now().strftime("%Y%m%d%H%M%S"),
                                     {"seo_title": seo.get("seo_title"),
                                      "meta_description": seo.get("seo_description"),
@@ -163,6 +222,7 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
                 "상태값": "발행완료" if pub_status == "published" else "검수대기",
                 "site_id": it.get("site_id", ""),
                 "calculator_id": cid,
+                **q_fields,
             })
             # history "publish" 이벤트 기록(발행 흐름 무영향 — 실패해도 무시)
             try:
@@ -180,7 +240,7 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
             tg.send(cfg, f"❌ 계산기 글 오류: {e}")
 
     elapsed = round(time.time() - start, 1)
-    LOG.info("✅ 계산기 파이프라인 종료: 목표 %d / 생산 %d (발행 %d, WP대기 %d) / 처리 %d / 중복 %d / 실패 %d / %s초",
+    LOG.info("✅ 계산기 파이프라인 종료: 목표 %d / 생산 %d (발행 %d, WP대기 %d) / 처리 %d / 중복 %d / 품질보류 %d / 실패 %d / %s초",
              target, stats["produced"], stats["produced"] - stats["no_wp"], stats["no_wp"],
-             stats["processed"], stats["dup"], stats["failed"], elapsed)
+             stats["processed"], stats["dup"], stats["quality_hold"], stats["failed"], elapsed)
     return stats
