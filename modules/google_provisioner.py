@@ -34,7 +34,7 @@ SHEET_TABS = {
         "wp_post_id", "wp_permalink", "wp_status", "published_at", "history",
         "calculator_id",
         "quality_score", "quality_status", "quality_failed_rules",
-        "quality_review_model", "quality_reviewed_at",
+        "quality_review_model", "quality_reviewed_at", "quality_prompt_version",
     ],
     "운영로그": [
         "로그ID", "실행일시", "마스터ID", "대상정책명", "가동결과",

@@ -10,12 +10,13 @@ from adapters.db.base import AbstractDBAdapter
 VALID_STATUSES = {
     "대기", "진행중", "작성중", "이미지오류", "작성오류",
     "발행완료", "발행실패", "복구대기", "보류", "만료", "재처리대기",
-    "수정됨", "휴지통",
+    "수정됨", "휴지통", "품질보류",
 }
 
-# 유효 발행 카운트에서 제외할 비활성 상태(삭제/휴지통 등). 상태 종류가 늘어나면
+# 유효 발행 카운트에서 제외할 비활성 상태(삭제/휴지통/품질보류 등). 상태 종류가 늘어나면
 # 이 집합만 수정하면 되도록 Repository 계층에 둔다(파이프라인/엔진은 개수만 사용).
-INACTIVE_ARTICLE_STATUSES = {"삭제됨", "휴지통", "발행취소"}
+# "품질보류": 자동 품질검수 HOLD(발행 안 됨) — 발행됨으로 카운트하지 않아 재도전 여지를 둔다.
+INACTIVE_ARTICLE_STATUSES = {"삭제됨", "휴지통", "발행취소", "품질보류"}
 
 
 class ArticleRepository:
@@ -52,6 +53,20 @@ class ArticleRepository:
         rows = self._db.get_where(self.TABLE, {"calculator_id": cid})
         return sum(1 for r in rows
                    if str(r.get("상태값", "")).strip() not in INACTIVE_ARTICLE_STATUSES)
+
+    def has_quality_hold(self, calculator_id, prompt_version=None) -> bool:
+        """해당 계산기에 자동 품질검수 HOLD("품질보류") 이력이 있는지.
+        상태값 문자열 판단은 이 Repository 내부에만 둔다(파이프라인은 True/False만 사용).
+        prompt_version 지정 시: 그 버전으로 HOLD된 건이 하나라도 있으면 True
+        (프롬프트가 그대로면 재도전 불필요). None이면 HOLD 이력 존재 여부만."""
+        cid = str(calculator_id or "").strip()
+        if not cid:
+            return False
+        rows = self._db.get_where(self.TABLE, {"calculator_id": cid})
+        holds = [r for r in rows if str(r.get("상태값", "")).strip() == "품질보류"]
+        if prompt_version is None:
+            return bool(holds)
+        return any(str(r.get("quality_prompt_version", "")).strip() == str(prompt_version) for r in holds)
 
     def get_by_id(self, article_id: str) -> dict | None:
         rows = self._db.get_where(self.TABLE, {"ID": article_id})
