@@ -16,6 +16,7 @@ WordPress/AI 호출 규칙: 이 모듈은 WP REST를 호출하지 않는다. GPT
 import re
 import html as _html
 from datetime import datetime
+from pathlib import Path
 
 from .ai_provider import build_provider
 from .utils.parser import parse_json_lenient
@@ -241,6 +242,85 @@ def _score_with_gpt(cfg: dict, body_html: str, calc: dict) -> dict:
             "reason": str(d.get("reason", ""))[:200], "failed": failed, "model": model}
 
 
+# ── G8: 결정론적 법적 근거 검증(GPT 미신뢰 — 코드가 직접 문자열 매칭) ──
+# calculator_pipeline 순환 import 회피 위해 독립 로더를 둔다.
+_LEGAL_BASIS_PATH = Path(__file__).resolve().parent.parent / "docs" / "legal_basis.draft.yaml"
+_legal_basis_cache = None
+
+
+def _load_legal_basis() -> dict:
+    global _legal_basis_cache
+    if _legal_basis_cache is None:
+        try:
+            import yaml
+            data = yaml.safe_load(_LEGAL_BASIS_PATH.read_text(encoding="utf-8")) or {}
+            data.pop("schema_version", None)
+            _legal_basis_cache = data
+        except Exception as e:
+            LOG.warning("[품질] legal_basis 로드 실패 → G8 미적용: %s", e)
+            _legal_basis_cache = {}
+    return _legal_basis_cache
+
+
+def _norm(s) -> str:
+    return re.sub(r"\s+", "", str(s or ""))
+
+
+def _law_mentioned(law, ntext: str) -> bool:
+    """정답 판정은 관대: 복합(·,/)이면 구성요소 중 하나라도, 단일이면 (괄호 제거) 법명 포함 시 통과."""
+    for comp in re.split(r"[·/]", str(law or "")):
+        comp = _norm(re.sub(r"\(.*?\)", "", comp)).replace("(복합)", "")
+        if comp and comp in ntext:
+            return True
+    return False
+
+
+def _authority_mentioned(authority, ntext: str) -> bool:
+    """기관명 토큰(부/청/처/원/위원회) 중 하나라도 등장하면 통과(복합 표기 대응)."""
+    orgs = re.findall(r"[가-힣]+(?:부|청|처|원|위원회)", str(authority or ""))
+    return any(_norm(o) in ntext for o in orgs) if orgs else True
+
+
+def _check_g8(body_html: str, calc: dict) -> list:
+    """G8: legal_basis 대조. 반환=실패 rule 리스트(빈 리스트=통과, GPT 호출 전 결정론 판정).
+    required(law/article/authority) 누락 또는 forbidden_articles/phrases 등장 → Critical.
+    검사 범위: body_html(writer FAQ 포함). legal_basis 미등록 계산기는 미적용(하위호환)."""
+    slug = str((calc or {}).get("slug", "")).strip()
+    entry = _load_legal_basis().get(slug)
+    if not entry:
+        return []
+    text = _plain_text(body_html)
+    ntext = _norm(text)
+    correct = f"{entry.get('law', '')} {entry.get('article', '')}".strip()
+    fails = []
+
+    # 1) required — 값이 채워진 필드만(article=null이면 제외). robust 매칭(오탐 방지).
+    if entry.get("law") and not _law_mentioned(entry["law"], ntext):
+        fails.append({"gate": "G8", "grade": "critical", "critical": True,
+                      "detail": f"법령명 미언급: {entry['law']}"})
+    if entry.get("article") and _norm(entry["article"]) not in ntext:
+        fails.append({"gate": "G8", "grade": "critical", "critical": True,
+                      "detail": f"정확한 조항 미언급: '{correct}'를 명시할 것"})
+    if entry.get("authority") and not _authority_mentioned(entry["authority"], ntext):
+        fails.append({"gate": "G8", "grade": "critical", "critical": True,
+                      "detail": f"소관기관 미언급: {entry['authority']}"})
+
+    # 2) forbidden_articles — 정확일치(정규화). 등장 시 정답 조항까지 detail에 담아 재생성 강조.
+    for fa in entry.get("forbidden_articles") or []:
+        if _norm(fa) in ntext:
+            fails.append({"gate": "G8", "grade": "critical", "critical": True,
+                          "detail": f"금지된 조항 등장: {fa}. 이 계산기의 올바른 법적 근거는 "
+                                    f"'{correct}'이며, 반드시 이 값만 사용하고 다른 조항 번호는 언급하지 말 것."})
+
+    # 3) forbidden_phrases — 계산기별 확정형 표현(법적 정확성 이슈이므로 Critical).
+    for fp in entry.get("forbidden_phrases") or []:
+        if fp in text:
+            fails.append({"gate": "G8", "grade": "critical", "critical": True,
+                          "detail": f"확정형 표현 '{fp}' 등장 — 수급/지급 요건이 복합적이므로 "
+                                    f"'가능성이 있습니다'/'심사 결과에 따라 달라질 수 있습니다'처럼 표현할 것."})
+    return fails
+
+
 # ── 공개 API: Gate → Score → Rewrite Contract ─────────────────────
 def check_publish_quality(cfg: dict, body_html: str, final_html: str, calc: dict = None) -> dict:
     """발행 글 품질 검수. Gate(코드) 실패면 GPT 미호출 REWRITE, 통과면 Score(GPT).
@@ -255,6 +335,11 @@ def check_publish_quality(cfg: dict, body_html: str, final_html: str, calc: dict
         LOG.info("[품질] CTA 중복 %d개 코드수정 제거", removed)
 
     passed, failed = check_gates(body_html, fixed_html, cfg)
+    # G8(결정론적 법적근거 검증) — check_gates 시그니처 무변경, 결과만 병합(GPT 호출 전).
+    g8 = _check_g8(body_html, calc)
+    if g8:
+        failed = failed + g8
+        passed = False
     if not passed:
         rules = _prioritize(failed)
         return {"result": "REWRITE", "score": None, "severity": _overall_severity(rules),
