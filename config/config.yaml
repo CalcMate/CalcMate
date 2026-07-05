@@ -79,6 +79,7 @@ TELEGRAM_EVENTS:
   budget: true
   daily_summary: true
   publish_request: true
+  quality_critical_hold: true
 QUALITY_GATE:
   MIN_LENGTH: 1800
   MAX_LENGTH: 2500

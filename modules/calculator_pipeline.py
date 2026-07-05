@@ -49,11 +49,17 @@ def _prompt_version() -> str:
 
 def _notify_critical_hold(cfg: dict, calc: dict, critical_gates: list, exhausted: bool) -> None:
     """Critical 반복실패로 HOLD된 경우 운영 알림. exhausted(Critical 연속 임계 초과)일 때만.
-    (커밋 1: 로그만. 커밋 2에서 telegram_ops 배선.)"""
+    telegram_ops 표준 헬퍼만 사용(raw send 직접호출 금지). 실패해도 발행 흐름 무영향."""
     if not exhausted:
         return
     LOG.warning("[품질] Critical HOLD 알림 대상: %s (slug=%s, critical=%s)",
                 calc.get("name", ""), calc.get("slug", ""), critical_gates or "-")
+    try:
+        from . import telegram_ops as TOPS
+        TOPS.notify_quality_hold(cfg, calc.get("name", ""), calc.get("slug", ""),
+                                 critical_gates, datetime.now().isoformat(timespec="minutes"))
+    except Exception as _e:
+        LOG.warning("품질 HOLD Telegram 알림 실패(무시): %s", _e)
 
 
 def _style_block(cfg: dict) -> str:

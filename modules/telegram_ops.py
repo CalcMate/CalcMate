@@ -15,7 +15,7 @@ LOG = get_logger()
 
 # 이벤트별 ON/OFF 게이팅. config.yaml의 TELEGRAM_EVENTS(dict)로 제어.
 # 미설정 시 기본 True(하위호환 — 기존 동작 유지).
-EVENT_KEYS = ("error", "budget", "daily_summary", "publish_request")
+EVENT_KEYS = ("error", "budget", "daily_summary", "publish_request", "quality_critical_hold")
 
 
 def _enabled(cfg: dict, event: str) -> bool:
@@ -55,6 +55,21 @@ def notify_publish_request(cfg: dict, title: str, url: str = "") -> None:
     if not _enabled(cfg, "publish_request"):
         return
     TN.send(cfg, f"📝 [발행 승인 요청] {title}\n{url}".strip())
+
+
+def notify_quality_hold(cfg: dict, name: str, slug: str = "",
+                        critical_gates=None, last_at: str = "") -> None:
+    """Critical 반복실패로 품질 HOLD된 계산기 알림(작업지시서 C)."""
+    if not _enabled(cfg, "quality_critical_hold"):
+        return
+    gates = ", ".join(critical_gates or []) or "-"
+    TN.send(cfg, (
+        f"🚫 [품질 HOLD] Critical 반복실패로 발행 보류\n"
+        f"계산기: {name} ({slug})\n"
+        f"미해결 Critical Gate: {gates}\n"
+        f"마지막 시도: {last_at}\n"
+        f"상태: 품질보류 (자동 재도전 대상 — 프롬프트 개선 시 재평가)"
+    ))
 
 
 def notify(cfg: dict, message: str) -> None:
