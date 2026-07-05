@@ -117,9 +117,13 @@ def _legal_basis_block(calc: dict) -> str:
     parts.append(f"- 소관기관: {lb.get('authority', '')}")
     if lb.get("writer_note"):
         parts.append(f"- 작성 지침: {str(lb['writer_note']).strip()}")
-    bl = lb.get("blocklist") or []
+    bl = lb.get("forbidden_articles") or []
     if bl:
-        parts.append(f"- 다음 조항/표현은 절대 인용하지 않는다: {', '.join(str(x) for x in bl)}")
+        parts.append(f"- 다음 조항은 절대 인용하지 않는다: {', '.join(str(x) for x in bl)}")
+    fp = lb.get("forbidden_phrases") or []
+    if fp:
+        parts.append(f"- 다음 확정형 표현은 쓰지 않는다(수급/지급 요건이 복합적이므로 "
+                     f"'가능성이 있습니다'/'심사 결과에 따라 달라질 수 있습니다'로 표현): {', '.join(fp)}")
     # §3 표준 면책 문구(소관기관 자동 삽입) — 주의사항 섹션에 포함하도록 지시.
     authority = lb.get("authority", "관할기관")
     parts.append(f"- 주의사항 섹션에 다음 취지의 면책 문구를 반드시 포함한다: "

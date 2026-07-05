@@ -27,7 +27,8 @@ weekly-holiday-allowance:
   reviewer_expectation:
     - 법령명(근로기준법) 및 조항(제55조) 언급
     - 15시간 미만 예외 언급
-  blocklist: []
+  forbidden_articles: []
+  forbidden_phrases: []
   # 코드정합: input(hourly_wage, weekly_hours) / formula hourly_wage*(weekly_hours/40*8).
 
 severance-pay:
@@ -46,7 +47,8 @@ severance-pay:
   reviewer_expectation:
     - 법령명(근로자퇴직급여 보장법) 및 조항(제8조) 언급
     - 근로기준법 제34조 언급 없음
-  blocklist: [근로기준법 제34조]
+  forbidden_articles: [근로기준법 제34조]
+  forbidden_phrases: []
   # 코드정합: input(avg_monthly_wage, start_date, end_date) / formula avg_monthly_wage*(total_days/365).
 
 annual-leave-allowance:
@@ -66,7 +68,8 @@ annual-leave-allowance:
   reviewer_expectation:
     - 법령명(근로기준법) 및 조항(제60조) 언급
     - 연차 사용 촉진제도(제61조) 예외 언급
-  blocklist: []
+  forbidden_articles: []
+  forbidden_phrases: []
   # 코드정합: input(daily_wage, unused_days) / formula daily_wage*unused_days.
 
 unemployment-benefit:
@@ -89,7 +92,10 @@ unemployment-benefit:
     - 소관기관(고용노동부) 언급
     - 요건이 단일하지 않고 복합적임을 명시
     - 수급 여부를 확정적으로 표현하지 않음(가능성/심사결과 표현 사용)
-  blocklist: []
+  forbidden_articles: []
+  forbidden_phrases:
+    - 받을 수 있습니다
+    - 지급됩니다
   # 코드정합: input(avg_daily_wage, age, employment_months) / daily_benefit=avg_daily_wage*0.6.
   # 요건(180일·수급자격)은 계산기가 산출하지 않고 급여액만 계산 — writer_note는 글 맥락용.
 
@@ -117,7 +123,8 @@ four-insurances:
   reviewer_expectation:
     - 4개 법령명 모두 언급 또는 요약 언급
     - 산재보험이 근로자 공제 대상이 아님을 구분
-  blocklist: []
+  forbidden_articles: []
+  forbidden_phrases: []
   # 결정: "관련 법령에 따라"식 단순화는 기각 — legal_basis 도입 취지와 배치, writer_note에 압축 지시 있음.
   # 코드정합: output은 국민연금/건강/고용 3종+total(산재 없음, 설계상 맞음).
 
@@ -141,7 +148,8 @@ four-insurances:
   reviewer_expectation:
     - 법령명(소득세법) 및 조항(제137조) 언급
     - 참고용 예상치이며 홈택스/회사 정산결과와 다를 수 있음(면책 문구) 포함
-  blocklist: []
+  forbidden_articles: [소득세법 제55조, 소득세법 제63조]   # 세율·기부금세액공제 조항과 혼동(B-2 관찰)
+  forbidden_phrases: []
   # 코드정합: input(total_income, deductions) / formula total_income-deductions — 누진세율·항목별
   #          세액공제 없는 단순 근사 → 강한 면책 유지(0-3 조사 확인).
 
@@ -164,5 +172,6 @@ four-insurances:
     - 법령명(고용보험법) 및 조항(제70조) 언급
     - 구체적 상한·하한 금액이 본문에 등장하지 않음
     - 연도별 변경 가능 안내 포함
-  blocklist: []
+  forbidden_articles: [고용보험법 제40조, 근로기준법 제74조]   # 실업급여·출산휴가 조항과 혼동(B-2 관찰)
+  forbidden_phrases: []
   # 코드정합: input(avg_monthly_wage, leave_months, government_support_%, company_%) — %기반, 특정연도 금액 미하드코딩.
