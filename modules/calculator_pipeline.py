@@ -41,9 +41,31 @@ def _load_prompt() -> str:
                 "[BODY_HTML_START]...[BODY_HTML_END]로 감싸라.")
 
 
-def _write_article(cfg: dict, calc: dict, keyword: str, seo: dict, faq: list) -> tuple:
+def _style_block(cfg: dict) -> str:
+    """config AI_STYLE_BLOCKLIST를 프롬프트에 주입(하드코딩 대신 설정 단일소스)."""
+    patterns = cfg.get("AI_STYLE_BLOCKLIST") or []
+    if not patterns:
+        return ""
+    items = "\n".join(f"- {p}" for p in patterns)
+    return ("\n[금지 문체 — 아래 표현/패턴은 절대 사용하지 말 것]\n" + items)
+
+
+def _rewrite_block(failed_rules) -> str:
+    """재생성 시 failed_rules(priority 정렬)를 '우선순위 순 보완 지시'로 주입."""
+    if not failed_rules:
+        return ""
+    lines = []
+    for r in failed_rules:
+        lines.append(f"{r.get('priority','?')}. [{r.get('gate','')}] {r.get('detail','')}")
+    return ("\n[재생성 지시] 이전 생성본이 아래 기준을 충족하지 못했다. "
+            "우선순위 순서대로 반드시 보완하라:\n" + "\n".join(lines))
+
+
+def _write_article(cfg: dict, calc: dict, keyword: str, seo: dict, faq: list,
+                   failed_rules=None) -> tuple:
     provider, model = make_provider(cfg, "writer")
-    system = _load_prompt()
+    # 정적 기본 프롬프트 + (config 금지문체) + (재생성 시 failed_rules 보완지시)
+    system = _load_prompt() + _style_block(cfg) + _rewrite_block(failed_rules)
     user = (
         f"계산기명: {calc.get('name')}\n"
         f"타겟 키워드(글 주제): {keyword}\n"
@@ -165,7 +187,9 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
                                 consec_critical, crit_limit, keyword)
                 LOG.info("[품질] REWRITE 전체재생성 %d/%d: %s (severity=%s)",
                          q_retries, max_total, keyword, qc.get("severity"))
-                body_html, _ = _write_article(cfg, calc, keyword, seo, faq)
+                # Rewrite Contract 주입: 직전 검수의 failed_rules를 우선순위 순으로 writer에 전달
+                body_html, _ = _write_article(cfg, calc, keyword, seo, faq,
+                                              failed_rules=qc.get("failed_rules"))
                 final_html = _assemble(body_html)
                 qc = check_publish_quality(cfg, body_html, final_html, calc)
 
