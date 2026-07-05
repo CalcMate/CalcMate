@@ -89,6 +89,8 @@ QUALITY_GATE:
   MIN_EXAMPLES: 2
   CTA_COUNT: 1
   MIN_INTERNAL_LINKS: 2
+  BLOCK_UNVERIFIED_LEGAL: true   # needs_human_legal + 실제 legal 공백 계산기는 GPT 호출 전 품질보류(발행차단).
+                                  # false로 두면 "legal 미확정 모드"(특정 조항 금지+강한 면책)로 발행 허용.
 QUALITY_SCORE:
   PASS_THRESHOLD: 90
   WARN_THRESHOLD: 80

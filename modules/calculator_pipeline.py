@@ -84,6 +84,8 @@ def _rewrite_block(failed_rules) -> str:
 
 _LEGAL_BASIS_PATH = Path(__file__).resolve().parent.parent / "docs" / "legal_basis.draft.yaml"
 _legal_basis_cache = None
+# legal 미검증 HOLD 전용 sentinel(프롬프트 버전과 구분) — legal이 채워지면 이 HOLD는 무시되어 자동 해제.
+_LEGAL_HOLD_VERSION = "legal_unverified"
 
 
 def _load_legal_basis() -> dict:
@@ -214,6 +216,10 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
     stats = {"produced": 0, "processed": 0, "failed": 0, "no_wp": 0, "dup": 0,
              "quality_hold": 0, "hold_skip": 0}
     rcfg = cfg.get("QUALITY_RETRY", {}) or {}
+    # §5 legal 미검증 차단 스위치(기본 true). needs_human_legal + 실제 legal 공백 계산기를
+    # GPT 호출 전 품질보류. legal-HOLD는 아래 sentinel 버전으로 기록해, 프롬프트 버전 기반
+    # 재평가 게이트(has_quality_hold(prompt_ver))와 충돌하지 않도록 분리 → legal이 채워지면 자동 해제.
+    block_unverified = bool((cfg.get("QUALITY_GATE") or {}).get("BLOCK_UNVERIFIED_LEGAL", True))
     max_candidates = int(rcfg.get("MAX_CANDIDATES_PER_RUN", 5) or 5)
     reeval = bool((cfg.get("QUALITY_HOLD") or {}).get("REEVALUATE_ON_PROMPT_VERSION_CHANGE", True))
     prompt_ver = _prompt_version()
@@ -249,6 +255,36 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
                     if art_repo.has_quality_hold(cid, rows=snapshot):
                         stats["hold_skip"] += 1
                         continue
+            # §5 legal 미검증 차단 게이트 — GPT(generate_seo) 호출 이전에 즉시 품질보류.
+            #   trigger: BLOCK_UNVERIFIED_LEGAL=true AND needs_human_legal+실제 legal 공백.
+            #   idempotent: 이미 legal-HOLD 이력(sentinel) 있으면 재기록 없이 스킵.
+            #   해제: 사람이 legal_basis.draft.yaml에 legal 채우면 _legal_unverified=False → 이 게이트 통과.
+            if block_unverified and cid:
+                _lb = _load_legal_basis().get(str(calc.get("slug", "")).strip())
+                if _lb and _legal_unverified(_lb):
+                    if art_repo.has_quality_hold(cid, prompt_version=_LEGAL_HOLD_VERSION, rows=snapshot):
+                        stats["hold_skip"] += 1
+                        continue
+                    LOG.warning("[품질] legal 미검증(needs_human_legal, legal 공백) — GPT 호출 전 품질보류: %s",
+                                calc.get("slug", cid))
+                    _aid = art_repo.save({
+                        "정책명": keyword, "최종추천제목": calc.get("name", keyword),
+                        "발행일시": datetime.now().isoformat(),
+                        "상태값": "품질보류", "site_id": it.get("site_id", ""), "calculator_id": cid,
+                        "quality_status": "LEGAL_UNVERIFIED",
+                        "quality_prompt_version": _LEGAL_HOLD_VERSION,
+                        "quality_reviewed_at": datetime.now().isoformat(),
+                    })
+                    try:
+                        art_repo.append_history(_aid, "quality_hold",
+                                                {"reason": "legal_unverified", "needs_human_legal": True,
+                                                 "prompt_version": _LEGAL_HOLD_VERSION})
+                    except Exception as _e:
+                        LOG.warning("history(legal_unverified) 기록 실패(무시): %s", _e)
+                    snapshot.append({"calculator_id": cid, "상태값": "품질보류",
+                                     "quality_prompt_version": _LEGAL_HOLD_VERSION})
+                    stats["quality_hold"] += 1
+                    continue
             seo = generate_seo(cfg, calc.get("name", keyword), keyword)
             if seo.get("seo_title") in existing:
                 stats["dup"] += 1
