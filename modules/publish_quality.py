@@ -267,10 +267,16 @@ def _norm(s) -> str:
 
 
 def _law_mentioned(law, ntext: str) -> bool:
-    """정답 판정은 관대: 복합(·,/)이면 구성요소 중 하나라도, 단일이면 (괄호 제거) 법명 포함 시 통과."""
+    """정답 판정은 관대: 복합(·,/)이면 구성요소 중 하나라도 등장하면 통과.
+    정식명(국민연금법)뿐 아니라 약칭(국민연금 — '법' 접미사 제거형)도 허용(4대보험 등 약칭 사용 대응)."""
     for comp in re.split(r"[·/]", str(law or "")):
         comp = _norm(re.sub(r"\(.*?\)", "", comp)).replace("(복합)", "")
-        if comp and comp in ntext:
+        if not comp:
+            continue
+        if comp in ntext:
+            return True
+        core = comp[:-1] if comp.endswith("법") else comp   # 국민연금법 → 국민연금
+        if len(core) >= 3 and core in ntext:
             return True
     return False
 
