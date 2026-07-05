@@ -74,6 +74,45 @@ _RELATED = [("weekly-holiday-allowance", "💰", "주휴수당 계산기"),
             ("육아휴직_급여_계산기", "👶", "육아휴직 급여 계산기")]
 
 
+# ── calculator_registry (legal_basis.draft.yaml, schema_version 2) ────
+# Phase B: 기존 하드코딩(_RELATED / 슬러그 분기)을 registry 조회로 이관하되,
+# registry 미등록/로드실패 시 기존 하드코딩값으로 폴백(현행 동작 보장).
+_REGISTRY_PATH = _BASE_DIR / "docs" / "legal_basis.draft.yaml"
+_registry_cache = None
+
+
+def _registry() -> dict:
+    """slug → registry entry dict. 로드 실패 시 {}(폴백은 각 호출부에서 처리)."""
+    global _registry_cache
+    if _registry_cache is None:
+        try:
+            import yaml
+            data = yaml.safe_load(_REGISTRY_PATH.read_text(encoding="utf-8")) or {}
+            data.pop("schema_version", None)
+            _registry_cache = data if isinstance(data, dict) else {}
+        except Exception:
+            _registry_cache = {}
+    return _registry_cache
+
+
+def _compute_type(calc) -> str:
+    """registry compute_type 우선. 없으면 기존 하드코딩과 동일한 폴백."""
+    slug = str(calc.get("slug", ""))
+    ct = (_registry().get(slug) or {}).get("compute_type")
+    if ct:
+        return str(ct)
+    return "date_based" if slug == "severance-pay" else "single"
+
+
+def _validation_mode(calc) -> str:
+    """registry validation_mode 우선. 없으면 기존 하드코딩과 동일한 폴백."""
+    slug = str(calc.get("slug", ""))
+    vm = (_registry().get(slug) or {}).get("validation_mode")
+    if vm:
+        return str(vm)
+    return "skip" if slug == "severance-pay" else "formula"
+
+
 def _split_label(k, labels=None):
     """_LABELS의 '시급(원)' → ('시급','원'). 괄호 없으면 (label,''). labels(계산기별) 우선."""
     lab = _label(k, labels)
@@ -197,8 +236,7 @@ def _read_assets_js() -> str:
 
 def _compute_js(calc) -> str:
     """계산기별 computeResult(inputs) 생성. 기존 formula/퇴직금 date분기 로직 유지."""
-    slug = str(calc.get("slug", ""))
-    if slug == "severance-pay":   # 날짜 기반(입사일/퇴사일 → total_days) — 로직 무변경
+    if _compute_type(calc) == "date_based":   # 날짜 기반(입사일/퇴사일 → total_days) — 로직 무변경, 분기조건만 registry화
         return (
             'window.computeResult = function(inputs){\n'
             '  var s = new Date(inputs["start_date"]); var e = new Date(inputs["end_date"]);\n'
@@ -416,9 +454,10 @@ def generate_calculator(calc: dict, cfg: dict = None) -> dict:
     """index.html / style.css / script.js 3파일 dict 반환(+수식 검증). cfg 선택(Form Engine용)."""
     ins = _pj(calc.get("input_schema"), {})
     formula = _pj(calc.get("formula"), calc.get("formula", ""))
-    if str(calc.get("slug", "")) == "severance-pay":
+    if _validation_mode(calc) == "skip":
         # 날짜기반: _compute_js가 start_date/end_date로 계산(formula 필드 미사용) →
         # 옛 formula의 total_days 등 미존재 변수 참조로 뜨는 불필요 경고 제외(DB formula는 무변경)
+        # 분기조건만 registry(validation_mode)화 — 폴백은 기존 slug=="severance-pay"와 동일
         ok, msg = True, "날짜기반 계산(코드 내장) — 수식 검증 제외"
     else:
         ok, msg = validate_formula(formula, ins) if formula else (True, "수식 없음")
