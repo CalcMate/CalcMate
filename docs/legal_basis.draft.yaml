@@ -8,7 +8,8 @@
 # writer(_write_article)가 calc.slug로 조회해 "그대로 인용" 지시로 주입한다(B-2).
 # blocklist(조항 금지)는 AI_STYLE_BLOCKLIST(문체 금지)와 별개 목록이다.
 
-schema_version: 1
+schema_version: 2   # v1=legal_basis 전용 → v2=calculator_registry(Phase A). 기존 legal 필드 무변경,
+                    # identity/compute/labels/meta/content/relations 추가(compute/relations는 읽기전용 미러).
 
 weekly-holiday-allowance:
   name: 주휴수당 계산기
@@ -29,6 +30,22 @@ weekly-holiday-allowance:
     - 15시간 미만 예외 언급
   forbidden_articles: []
   forbidden_phrases: []
+  # --- registry v2 (Phase A: 읽기전용 미러, 아직 참조 코드 없음) ---
+  slug: weekly-holiday-allowance
+  category: 노무/급여
+  emoji: "💰"
+  compute_type: single
+  date_fields: []
+  validation_mode: formula
+  field_labels: {}
+  difficulty: simple
+  difficulty_status: provisional
+  needs_human_legal: true
+  content:
+    evergreen: true
+    update_cycle: null
+    content_caveat: null
+  related_slugs: [severance-pay, annual-leave-allowance, unemployment-benefit, four-insurances, 연말정산_환급액_계산기, 육아휴직_급여_계산기]
   # 코드정합: input(hourly_wage, weekly_hours) / formula hourly_wage*(weekly_hours/40*8).
 
 severance-pay:
@@ -49,6 +66,22 @@ severance-pay:
     - 근로기준법 제34조 언급 없음
   forbidden_articles: [근로기준법 제34조]
   forbidden_phrases: []
+  # --- registry v2 (Phase A: 읽기전용 미러) ---
+  slug: severance-pay
+  category: 노무/급여
+  emoji: "💼"
+  compute_type: date_based
+  date_fields: [start_date, end_date]
+  validation_mode: skip
+  field_labels: {}
+  difficulty: date_based
+  difficulty_status: provisional
+  needs_human_legal: true
+  content:
+    evergreen: true
+    update_cycle: null
+    content_caveat: null
+  related_slugs: [weekly-holiday-allowance, annual-leave-allowance, unemployment-benefit, four-insurances, 연말정산_환급액_계산기, 육아휴직_급여_계산기]
   # 코드정합: input(avg_monthly_wage, start_date, end_date) / formula avg_monthly_wage*(total_days/365).
 
 annual-leave-allowance:
@@ -70,6 +103,22 @@ annual-leave-allowance:
     - 연차 사용 촉진제도(제61조) 예외 언급
   forbidden_articles: []
   forbidden_phrases: []
+  # --- registry v2 (Phase A: 읽기전용 미러) ---
+  slug: annual-leave-allowance
+  category: 노무/급여
+  emoji: "📅"
+  compute_type: single
+  date_fields: []
+  validation_mode: formula
+  field_labels: {}
+  difficulty: simple
+  difficulty_status: provisional
+  needs_human_legal: true
+  content:
+    evergreen: true
+    update_cycle: null
+    content_caveat: null
+  related_slugs: [weekly-holiday-allowance, severance-pay, unemployment-benefit, four-insurances, 연말정산_환급액_계산기, 육아휴직_급여_계산기]
   # 코드정합: input(daily_wage, unused_days) / formula daily_wage*unused_days.
 
 unemployment-benefit:
@@ -96,6 +145,22 @@ unemployment-benefit:
   forbidden_phrases:
     - 받을 수 있습니다
     - 지급됩니다
+  # --- registry v2 (Phase A: 읽기전용 미러) ---
+  slug: unemployment-benefit
+  category: 고용/보험
+  emoji: "📋"
+  compute_type: single
+  date_fields: []
+  validation_mode: formula
+  field_labels: {}
+  difficulty: complex
+  difficulty_status: provisional
+  needs_human_legal: true
+  content:
+    evergreen: true
+    update_cycle: null
+    content_caveat: null
+  related_slugs: [weekly-holiday-allowance, severance-pay, annual-leave-allowance, four-insurances, 연말정산_환급액_계산기, 육아휴직_급여_계산기]
   # 코드정합: input(avg_daily_wage, age, employment_months) / daily_benefit=avg_daily_wage*0.6.
   # 요건(180일·수급자격)은 계산기가 산출하지 않고 급여액만 계산 — writer_note는 글 맥락용.
 
@@ -125,6 +190,22 @@ four-insurances:
     - 산재보험이 근로자 공제 대상이 아님을 구분
   forbidden_articles: []
   forbidden_phrases: []
+  # --- registry v2 (Phase A: 읽기전용 미러) ---
+  slug: four-insurances
+  category: 고용/보험
+  emoji: "🏢"
+  compute_type: dict
+  date_fields: []
+  validation_mode: formula
+  field_labels: {}
+  difficulty: multi_output
+  difficulty_status: provisional
+  needs_human_legal: true
+  content:
+    evergreen: false          # 요율(국민연금 4.5%/건강 3.545%/고용 0.9%)이 formula에 하드코딩 → 연 1회 갱신 필요
+    update_cycle: yearly
+    content_caveat: null
+  related_slugs: [weekly-holiday-allowance, severance-pay, annual-leave-allowance, unemployment-benefit, 연말정산_환급액_계산기, 육아휴직_급여_계산기]
   # 결정: "관련 법령에 따라"식 단순화는 기각 — legal_basis 도입 취지와 배치, writer_note에 압축 지시 있음.
   # 코드정합: output은 국민연금/건강/고용 3종+total(산재 없음, 설계상 맞음).
 
@@ -150,6 +231,22 @@ four-insurances:
     - 참고용 예상치이며 홈택스/회사 정산결과와 다를 수 있음(면책 문구) 포함
   forbidden_articles: [소득세법 제55조, 소득세법 제63조]   # 세율·기부금세액공제 조항과 혼동(B-2 관찰)
   forbidden_phrases: []
+  # --- registry v2 (Phase A: 읽기전용 미러) ---
+  slug: 연말정산_환급액_계산기
+  category: 세금/정부혜택
+  emoji: "🧾"
+  compute_type: single
+  date_fields: []
+  validation_mode: formula
+  field_labels: {}
+  difficulty: simple
+  difficulty_status: provisional
+  needs_human_legal: true
+  content:
+    evergreen: true           # 잠정 — 조사 시 WP 타임아웃으로 본문 미확인, content 재검증 필요
+    update_cycle: null
+    content_caveat: crude_estimate   # 누진세율·세액공제 미반영 단순 근사 → 강한 면책 유지
+  related_slugs: [weekly-holiday-allowance, severance-pay, annual-leave-allowance, unemployment-benefit, four-insurances, 육아휴직_급여_계산기]
   # 코드정합: input(total_income, deductions) / formula total_income-deductions — 누진세율·항목별
   #          세액공제 없는 단순 근사 → 강한 면책 유지(0-3 조사 확인).
 
@@ -174,4 +271,20 @@ four-insurances:
     - 연도별 변경 가능 안내 포함
   forbidden_articles: [고용보험법 제40조, 근로기준법 제74조]   # 실업급여·출산휴가 조항과 혼동(B-2 관찰)
   forbidden_phrases: []
+  # --- registry v2 (Phase A: 읽기전용 미러) ---
+  slug: 육아휴직_급여_계산기
+  category: 노무/급여/보험
+  emoji: "👶"
+  compute_type: single
+  date_fields: []
+  validation_mode: formula
+  field_labels: {}
+  difficulty: simple
+  difficulty_status: provisional
+  needs_human_legal: true
+  content:
+    evergreen: true           # %기반이라 특정연도 금액 미하드코딩 — 상한·하한만 시행령 연동(본문에서 금액 미언급)
+    update_cycle: null
+    content_caveat: null
+  related_slugs: [weekly-holiday-allowance, severance-pay, annual-leave-allowance, unemployment-benefit, four-insurances, 연말정산_환급액_계산기]
   # 코드정합: input(avg_monthly_wage, leave_months, government_support_%, company_%) — %기반, 특정연도 금액 미하드코딩.
