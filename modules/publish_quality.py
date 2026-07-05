@@ -204,6 +204,16 @@ def _score_with_gpt(cfg: dict, body_html: str, calc: dict) -> dict:
     """S1~S6 GPT 채점. 반환 {scores:{s1..s6}, reason, failed:[{gate,detail,grade}]}."""
     calc = calc or {}
     year = datetime.now().year
+    # S3는 '연도별로 바뀌는 수치'가 있는 계산기에만 적용연도 명시를 요구. evergreen(연도 무관)이면 면제.
+    # (registry content.evergreen 기준 — G8/S2와 같은 철학: 해당 없는 걸 존재/형식으로 감점하지 않음)
+    _entry = _load_legal_basis().get(str(calc.get("slug", "")).strip()) or {}
+    _evergreen = bool((_entry.get("content") or {}).get("evergreen"))
+    s3_line = (
+        "S3 최신 기준 반영: 이 계산기는 연도별로 바뀌는 금액·요율이 없는 evergreen 계산기이므로 "
+        "적용 연도 명시를 요구하지 않는다 — 이 항목으로 감점하지 말고 100점을 준다.\n"
+        if _evergreen else
+        f"S3 최신 기준 반영: 금액·요율 등 연도별로 바뀌는 수치를 언급할 때 적용 연도({year})가 명시됐는가.\n"
+    )
     system = (
         "너는 계산기 소개글 품질 심사위원이다. 후하게 주지 말고 엄격히 평가한다.\n"
         f"올해는 {year}년이다. 아래 6개 항목을 각 0~100으로 채점하라.\n"
@@ -212,7 +222,7 @@ def _score_with_gpt(cfg: dict, body_html: str, calc: dict) -> dict:
         "확정하므로 여기서 판정하지 않는다. 오직 '인용된 법적 근거가 이 계산기에 왜 적용되는지 "
         "설명이 자연스럽고 맥락에 맞는가'만 평가한다. 법령이 인용되어 있으면 '표기 여부'로는 절대 "
         "감점하지 말 것(그건 G8 소관). 인용 자체가 없더라도 그 사유로 여기서 감점하지 말고 100점을 준다.\n"
-        f"S3 최신 기준 반영: 금액·기간 기준에 적용 연도({year})가 명시됐는가.\n"
+        + s3_line +
         "S4 문체 자연스러움: AI 티/부자연스러운 반복이 없는가.\n"
         "S5 중복 콘텐츠: 일반론 나열이 아니라 이 계산기 고유 정보를 담았는가.\n"
         "S6 검색 의도 충족: '바로 계산→예시→주의사항→FAQ' 흐름 대비 법 설명 비중이 과하지 않은가.\n"
