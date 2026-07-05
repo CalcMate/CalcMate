@@ -69,7 +69,9 @@ _RELATED = [("weekly-holiday-allowance", "💰", "주휴수당 계산기"),
             ("severance-pay", "💼", "퇴직금 계산기"),
             ("annual-leave-allowance", "📅", "연차수당 계산기"),
             ("unemployment-benefit", "📋", "실업급여 계산기"),
-            ("four-insurances", "🏢", "4대보험 계산기")]
+            ("four-insurances", "🏢", "4대보험 계산기"),
+            ("연말정산_환급액_계산기", "🧾", "연말정산 계산기"),
+            ("육아휴직_급여_계산기", "👶", "육아휴직 급여 계산기")]
 
 
 def _split_label(k, labels=None):
