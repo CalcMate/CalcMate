@@ -82,11 +82,52 @@ def _rewrite_block(failed_rules) -> str:
             "우선순위 순서대로 반드시 보완하라:\n" + "\n".join(lines))
 
 
+_LEGAL_BASIS_PATH = Path(__file__).resolve().parent.parent / "docs" / "legal_basis.draft.yaml"
+_legal_basis_cache = None
+
+
+def _load_legal_basis() -> dict:
+    """계산기 slug→법적근거 데이터(검증된 legal_basis). 1회 로드 캐시."""
+    global _legal_basis_cache
+    if _legal_basis_cache is None:
+        try:
+            import yaml
+            data = yaml.safe_load(_LEGAL_BASIS_PATH.read_text(encoding="utf-8")) or {}
+            data.pop("schema_version", None)
+            _legal_basis_cache = data
+        except Exception as e:
+            LOG.warning("legal_basis 로드 실패(무시): %s", e)
+            _legal_basis_cache = {}
+    return _legal_basis_cache
+
+
+def _legal_basis_block(calc: dict) -> str:
+    """계산기 slug의 검증된 법적 근거를 'AI가 지어내지 말고 그대로 인용'하도록 주입.
+    AI_STYLE_BLOCKLIST(문체 금지, _style_block)와는 별개 목록(조항 금지=lb['blocklist'])."""
+    lb = _load_legal_basis().get(str(calc.get("slug", "")).strip())
+    if not lb:
+        return ""
+    parts = ["\n[법적 근거 — 아래 검증된 값을 그대로 정확히 인용한다. 스스로 다른 조항 번호를 "
+             "만들어내지 않으며, 확실하지 않으면 법령명과 취지만 쓴다]",
+             f"- 법령: {lb.get('law', '')}"]
+    if lb.get("article"):
+        parts.append(f"- 조항: {lb['article']}")
+    if lb.get("related_articles"):
+        parts.append(f"- 관련조항: {', '.join(str(x) for x in lb['related_articles'])}")
+    parts.append(f"- 소관기관: {lb.get('authority', '')}")
+    if lb.get("writer_note"):
+        parts.append(f"- 작성 지침: {str(lb['writer_note']).strip()}")
+    bl = lb.get("blocklist") or []
+    if bl:
+        parts.append(f"- 다음 조항/표현은 절대 인용하지 않는다: {', '.join(str(x) for x in bl)}")
+    return "\n".join(parts)
+
+
 def _write_article(cfg: dict, calc: dict, keyword: str, seo: dict, faq: list,
                    failed_rules=None) -> tuple:
     provider, model = make_provider(cfg, "writer")
-    # 정적 기본 프롬프트 + (config 금지문체) + (재생성 시 failed_rules 보완지시)
-    system = _load_prompt() + _style_block(cfg) + _rewrite_block(failed_rules)
+    # 정적 기본 프롬프트 + (config 금지문체) + (계산기별 검증 법적근거) + (재생성 시 보완지시)
+    system = _load_prompt() + _style_block(cfg) + _legal_basis_block(calc) + _rewrite_block(failed_rules)
     user = (
         f"계산기명: {calc.get('name')}\n"
         f"타겟 키워드(글 주제): {keyword}\n"
