@@ -11,6 +11,7 @@ gspread/Drive 직접 호출 없음.
 import json
 import re
 from datetime import datetime
+from pathlib import Path
 
 from adapters.db.factory import get_db_adapter
 from repositories.calculator_repository import CalculatorRepository
@@ -250,21 +251,40 @@ def _build_registry_entry(app: dict, slug: str) -> dict:
     }
 
 
-def save_app(cfg: dict, app: dict, site_id: str = "") -> tuple:
-    """생성 결과를 calculators + app_templates 시트에 저장(Repository 경유)."""
+_CALC_INDEX_PATH = Path(__file__).resolve().parent.parent / "docs" / "calculator_index.json"
+
+
+def _write_calculator_index(cfg: dict) -> None:
+    """slug ↔ 한글 name 매핑을 docs/calculator_index.json에 전량 재생성(개발 편의용 인덱스).
+    ※ 순수 참조 문서 — 기존 로직(registry/파이프라인/UI)은 이 파일을 읽지 않는다.
+       slug=내부식별자(폴더/URL), name=화면표시(한글)의 대응을 한눈에 보기 위한 것."""
+    repo = CalculatorRepository(get_db_adapter(cfg))
+    idx = {}
+    for c in repo.get_all():
+        s = str(c.get("slug", "")).strip()
+        if s:
+            idx[s] = {"name": c.get("name", ""), "category": c.get("category", "")}
+    _CALC_INDEX_PATH.write_text(
+        json.dumps(idx, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def save_app(cfg: dict, app: dict, site_id: str = "", slug: str = None) -> tuple:
+    """생성 결과를 calculators + app_templates 시트에 저장(Repository 경유).
+    slug: 신규 계산기의 영문 식별자(폴더/URL/내부참조). 미지정 시 _slug(name)로 폴백(하위호환).
+    ※ 기존 계산기 slug는 절대 변경하지 않음 — 이 함수는 '신규 저장' 경로에만 관여."""
     db = get_db_adapter(cfg)
     calc_repo = CalculatorRepository(db)
     tpl_repo = TemplateRepository(db)
     name = app.get("name", "")
+    new_slug = (slug or "").strip().lower() or _slug(name)   # 명시 영문 slug 우선, 없으면 기존 방식
     try:
         _all = calc_repo.get_all()
         # 중복 체크(이름)
         if any(str(c.get("name", "")).strip().lower() == name.lower() for c in _all):
             return False, f"중복 계산기명: '{name}' 이미 등록됨"
-        # 중복 체크(slug) — 이름은 달라도 slug가 겹치면 차단(배포 폴더/링크 충돌 방지)
-        new_slug = _slug(name)
-        if any(_slug(str(c.get("name", ""))) == new_slug for c in _all):
-            return False, f"중복 슬러그: '{new_slug}' 이미 등록됨 (이름은 다르지만 slug 충돌)"
+        # 중복 체크(slug) — 기존 '저장된 slug'와 비교(배포 폴더/링크 충돌 방지)
+        if any(str(c.get("slug", "")).strip().lower() == new_slug for c in _all):
+            return False, f"중복 슬러그: '{new_slug}' 이미 등록됨"
     except Exception as e:
         return False, f"기존 계산기 조회 실패(시트 권한 확인): {e}"
 
@@ -281,7 +301,7 @@ def save_app(cfg: dict, app: dict, site_id: str = "") -> tuple:
             "status": "active",
         })
         calc_repo.save({
-            "name": name, "slug": _slug(name), "category": app.get("category", ""),
+            "name": name, "slug": new_slug, "category": app.get("category", ""),
             "calculator_type": app.get("calculator_type", "general"),
             "template_id": tpl_id, "site_id": site_id,
             "formula": app.get("formula", ""),
@@ -297,10 +317,14 @@ def save_app(cfg: dict, app: dict, site_id: str = "") -> tuple:
     # registry_auto.yaml에 자동 엔트리 기록(§3) — 실패해도 계산기 저장 자체는 유효(경고만).
     try:
         from .registry_loader import add_auto_entry
-        _rslug = _slug(name)
-        add_auto_entry(_rslug, _build_registry_entry(app, _rslug))
-        LOG.info("registry_auto 엔트리 기록: %s", _rslug)
+        add_auto_entry(new_slug, _build_registry_entry(app, new_slug))
+        LOG.info("registry_auto 엔트리 기록: %s", new_slug)
     except Exception as _re:
         LOG.warning("registry_auto 기록 실패(무시, 계산기 저장은 완료됨): %s", _re)
+    # calculator_index.json 갱신(slug↔한글 name 매핑, 개발 편의용 — 기존 로직은 이 파일을 읽지 않음).
+    try:
+        _write_calculator_index(cfg)
+    except Exception as _ie:
+        LOG.warning("calculator_index 갱신 실패(무시): %s", _ie)
     LOG.info("App Factory 저장 완료: %s (tpl=%s)", name, tpl_id)
     return True, f"✅ '{name}' 계산기 + 템플릿 저장 완료 (template_id={tpl_id})"

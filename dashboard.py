@@ -1639,17 +1639,27 @@ elif tab == "🏭 App Factory":
             with st.expander("🔎 실제 렌더 미리보기"):
                 import streamlit.components.v1 as components
                 components.html(app["html"], height=420, scrolling=True)
+        af_slug = st.text_input(
+            "영문 slug * (폴더·URL·내부 식별자 — 저장 후 변경 불가)",
+            placeholder="annual-tax-settlement", key="af_slug",
+            help="영문 소문자·숫자·하이픈만. 한글/공백 불가. 대시보드 표시는 계속 한글 이름(name)을 사용합니다.")
         if st.button("💾 calculators + app_templates 저장", type="primary", key="af_save"):
-            ok, msg = AF.save_app(cfg, app)
-            if ok:
-                st.session_state["af_result"] = None
-                st.session_state["af_just_saved_name"] = app.get("name", "")
-                st.session_state["nav_group"] = "🧮 Calculator"
-                st.session_state["sub_🧮 Calculator"] = "🧮 계산기 관리"
-                st.success(f"{msg} — 계산기 관리로 이동합니다.")
-                st.rerun()
+            import re as _re_slug
+            slug_in = (af_slug or "").strip().lower()
+            if not _re_slug.match(r"^[a-z0-9][a-z0-9-]*$", slug_in):
+                st.error("영문 slug를 입력하세요 — 소문자·숫자·하이픈만 (예: annual-tax-settlement). "
+                         "한글/공백/대문자 불가.")
             else:
-                st.error(msg)
+                ok, msg = AF.save_app(cfg, app, slug=slug_in)
+                if ok:
+                    st.session_state["af_result"] = None
+                    st.session_state["af_just_saved_name"] = app.get("name", "")
+                    st.session_state["nav_group"] = "🧮 Calculator"
+                    st.session_state["sub_🧮 Calculator"] = "🧮 계산기 관리"
+                    st.success(f"{msg} — 계산기 관리로 이동합니다.")
+                    st.rerun()
+                else:
+                    st.error(msg)
 
 # ══════════════════════════════════════════════════════════════
 # 탭: 💬 AI Workspace (대시보드 내 AI 대화 + 파일/데이터 도구)
