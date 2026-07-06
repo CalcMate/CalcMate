@@ -1,7 +1,27 @@
 # 블로그자동화 v12 Lite / SalaryMate 플랫폼
 
 > 정부정책(RSS) 블로그 자동화 + 계산기 콘텐츠 플랫폼 + AI 운영센터(Streamlit).
-> 본 문서는 **실제 소스 코드 기준**(2026-06-30, Sprint 2A/2B + Calculator Reviewer 개선 반영). Python 85개 파일.
+> 본 문서는 **실제 소스 코드 기준**. Python 85개 파일.
+
+---
+
+## 📚 문서 지도 (여기부터)
+프로젝트를 처음 본다면 이 순서로 읽으세요.
+
+```
+README (이 문서, 5분 개요)
+  └▶ MASTER_ROADMAP.md ── 프로젝트 목표·완료·로드맵 한눈에 (기준 문서)
+        ├▶ docs/ARCHITECTURE.md ── 계산기 파이프라인 전체 흐름 (Gate/Score)
+        │     └▶ docs/REGISTRY.md ── Registry 2.0 (단일 소스, legal, HOLD)
+        │     └▶ docs/APP_FACTORY.md ── 신규 계산기 생성 (slug/name)
+        ├▶ docs/OPERATIONS.md ── 운영자 절차 (추가→legal→발행→관찰→수정)
+        ├▶ docs/DEVELOPER_GUIDE.md ── 개발자 (구조·규칙·스냅샷 테스트)
+        ├▶ BACKLOG.md ── 미완 작업 (HIGH/MED/LOW)
+        ├▶ KNOWN_ISSUES.md ── 알려진 문제 (원인·영향·우회·개선)
+        └▶ CHANGELOG.md ── 버전 이력 (git 기준)
+```
+> 루트의 구버전 문서(`ARCHITECTURE.md`/`FILE_STRUCTURE.md`/`ROADMAP.md`)는 정책 12단계 중심의 이전 버전입니다.
+> 계산기 서브시스템 최신 문서는 위 `docs/` 및 `MASTER_ROADMAP.md`를 기준으로 삼으세요.
 
 ---
 
@@ -145,9 +165,9 @@ repositories/ · adapters/(db,storage) · scripts/ · templates/ · prompts/ · 
 ---
 
 ## 더 읽기
-**계산기 서브시스템(최신, docs/)**: [`ARCHITECTURE`](docs/ARCHITECTURE.md) · [`REGISTRY`](docs/REGISTRY.md) · [`APP_FACTORY`](docs/APP_FACTORY.md) · [`OPERATIONS`](docs/OPERATIONS.md) · [`DEVELOPER_GUIDE`](docs/DEVELOPER_GUIDE.md)
-**기타**: `FILE_STRUCTURE.md`(파일 구조) · `ROADMAP.md` · `SPRINT_2A_REPORT.md`·`SPRINT_2B_REPORT.md` · `docs/QUALITY_STANDARD_V1.2.md`
-> 루트 `ARCHITECTURE.md`는 구버전(정책 12단계 중심). 계산기 파이프라인 최신 문서는 위 `docs/` 참조.
+**기준 문서**: [`MASTER_ROADMAP`](MASTER_ROADMAP.md) · [`BACKLOG`](BACKLOG.md) · [`KNOWN_ISSUES`](KNOWN_ISSUES.md) · [`CHANGELOG`](CHANGELOG.md)
+**계산기 서브시스템(docs/)**: [`ARCHITECTURE`](docs/ARCHITECTURE.md) · [`REGISTRY`](docs/REGISTRY.md) · [`APP_FACTORY`](docs/APP_FACTORY.md) · [`OPERATIONS`](docs/OPERATIONS.md) · [`DEVELOPER_GUIDE`](docs/DEVELOPER_GUIDE.md)
+**기타(구버전/보조)**: `FILE_STRUCTURE.md` · `ROADMAP.md` · `CHANGELOG_AI.md` · `SPRINT_2A_REPORT.md`·`SPRINT_2B_REPORT.md` · `docs/QUALITY_STANDARD_V1.2.md`
 
 ---
 
