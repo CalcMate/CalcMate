@@ -79,21 +79,17 @@ def _registry() -> dict:
 
 
 def _compute_type(calc) -> str:
-    """registry compute_type 우선. 없으면 기존 하드코딩과 동일한 폴백."""
-    slug = str(calc.get("slug", ""))
-    ct = (_registry().get(slug) or {}).get("compute_type")
-    if ct:
-        return str(ct)
-    return "date_based" if slug == "severance-pay" else "single"
+    """registry compute_type 유일 소스(Phase D: slug=="severance-pay" 하드코딩 폴백 제거).
+    미등록 계산기는 일반 기본값 single(특수취급 없음 — date_based는 registry에만 존재)."""
+    ct = (_registry().get(str(calc.get("slug", ""))) or {}).get("compute_type")
+    return str(ct) if ct else "single"
 
 
 def _validation_mode(calc) -> str:
-    """registry validation_mode 우선. 없으면 기존 하드코딩과 동일한 폴백."""
-    slug = str(calc.get("slug", ""))
-    vm = (_registry().get(slug) or {}).get("validation_mode")
-    if vm:
-        return str(vm)
-    return "skip" if slug == "severance-pay" else "formula"
+    """registry validation_mode 유일 소스(Phase D: slug 하드코딩 폴백 제거).
+    미등록 계산기는 일반 기본값 formula(skip은 registry에만 존재)."""
+    vm = (_registry().get(str(calc.get("slug", ""))) or {}).get("validation_mode")
+    return str(vm) if vm else "formula"
 
 
 def _split_label(k, labels=None):
@@ -456,7 +452,7 @@ def generate_calculator(calc: dict, cfg: dict = None) -> dict:
     if _validation_mode(calc) == "skip":
         # 날짜기반: _compute_js가 start_date/end_date로 계산(formula 필드 미사용) →
         # 옛 formula의 total_days 등 미존재 변수 참조로 뜨는 불필요 경고 제외(DB formula는 무변경)
-        # 분기조건만 registry(validation_mode)화 — 폴백은 기존 slug=="severance-pay"와 동일
+        # 분기조건은 registry(validation_mode) 유일 소스(Phase D: 슬러그 하드코딩 폴백 제거됨)
         ok, msg = True, "날짜기반 계산(코드 내장) — 수식 검증 제외"
     else:
         ok, msg = validate_formula(formula, ins) if formula else (True, "수식 없음")
