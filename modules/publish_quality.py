@@ -16,7 +16,6 @@ WordPress/AI 호출 규칙: 이 모듈은 WP REST를 호출하지 않는다. GPT
 import re
 import html as _html
 from datetime import datetime
-from pathlib import Path
 
 from .ai_provider import build_provider
 from .utils.parser import parse_json_lenient
@@ -260,11 +259,6 @@ def _score_with_gpt(cfg: dict, body_html: str, calc: dict) -> dict:
 
 
 # ── G8: 결정론적 법적 근거 검증(GPT 미신뢰 — 코드가 직접 문자열 매칭) ──
-# calculator_pipeline 순환 import 회피 위해 독립 로더를 둔다.
-_LEGAL_BASIS_PATH = Path(__file__).resolve().parent.parent / "docs" / "legal_basis.draft.yaml"
-_legal_basis_cache = None
-
-
 def _load_legal_basis() -> dict:
     """G8용 legal_basis. registry_loader에 위임(legal_basis.draft.yaml + registry_auto.yaml merge).
     자동엔트리는 legal 전부 null → G8 required 검사 스킵(하위호환 그대로)."""

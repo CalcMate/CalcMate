@@ -67,13 +67,9 @@ _JS_ORDER = ["number_input.js", "result_save.js", "share.js", "pwa.js",
              "faq.js", "related.js", "components.js"]
 # ── calculator_registry (legal_basis.draft.yaml + registry_auto.yaml, schema_version 2) ────
 # Phase D: registry가 유일 소스(관련계산기/compute 분기의 하드코딩 폴백은 제거됨).
-_REGISTRY_PATH = _BASE_DIR / "docs" / "legal_basis.draft.yaml"
-_registry_cache = None
-
-
 def _registry() -> dict:
-    """slug → registry entry dict. registry_loader에 위임(legal_basis.draft.yaml + registry_auto.yaml
-    merge, 큐레이션 우선). 로드 실패 시 {}(폴백은 각 호출부에서 처리)."""
+    """slug → registry entry dict. 실제 로드/merge/캐시는 registry_loader가 단일 담당
+    (legal_basis.draft.yaml=큐레이션 우선 + registry_auto.yaml=자동생성). 로드 실패 시 {}."""
     from .registry_loader import load_registry
     return load_registry()
 

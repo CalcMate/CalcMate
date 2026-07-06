@@ -44,6 +44,15 @@ Streamlit **8그룹 2단 네비게이션**(그룹 → 하위 페이지). `dashbo
 - **Calculator**: 계산기 생성 / SEO 글 / FAQ / AI Reviewer / HTML 생성 → 계산기 파이프라인.
 - **공통**: Scheduler / Telegram / AI Assistant / Analytics / Cost Manager / Retry Queue.
 
+## 계산기 품질 파이프라인 & Registry 2.0
+계산기 콘텐츠는 **Registry(단일 소스) → Generator → Writer → Gate(G1~G8) → Score(S1~S6) → Retry/HOLD → WordPress** 흐름을 탄다.
+- **Registry 2.0**: 계산기 메타데이터(slug/계산방식/legal/관련계산기)를 `docs/legal_basis.draft.yaml`(사람 큐레이션) + `docs/registry_auto.yaml`(App Factory 자동)로 관리하고 `registry_loader`가 merge(큐레이션 우선). 하드코딩 폴백은 제거되어 registry가 유일 소스.
+- **식별자 분리**: `slug`(영문, 폴더/URL/내부) vs `name`(한글, 화면). 신규 계산기는 App Factory에서 영문 slug 직접 입력.
+- **Gate(결정론) vs Score(GPT) 책임 분리**: "존재/형식/개수"는 Gate, "품질/맥락"만 Score. **G8**은 legal_basis 검증값을 문자열 매칭으로 확인(환각 방지).
+- **legal 미검증 차단**: 신규 계산기는 legal이 채워질 때까지 발행 HOLD(`BLOCK_UNVERIFIED_LEGAL`). 사람이 legal 입력 시 자동 해제.
+
+상세: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · [`docs/REGISTRY.md`](docs/REGISTRY.md) · [`docs/APP_FACTORY.md`](docs/APP_FACTORY.md) · [`docs/OPERATIONS.md`](docs/OPERATIONS.md) · [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md)
+
 ## 5. AI Provider 구조
 모든 AI 호출은 `modules/ai_provider.py`로 단일화(OpenAI/Anthropic/Google GenAI). 키는 `secrets.yaml`에서 병합 주입.
 
@@ -136,7 +145,9 @@ repositories/ · adapters/(db,storage) · scripts/ · templates/ · prompts/ · 
 ---
 
 ## 더 읽기
-`ARCHITECTURE.md`(계층/흐름) · `FILE_STRUCTURE.md`(파일 구조) · `ROADMAP.md`(Completed/In Progress/Planned) · `SPRINT_2A_REPORT.md`·`SPRINT_2B_REPORT.md` · `docs/CALCULATOR_REVIEWER_FIX_RESULT.md`
+**계산기 서브시스템(최신, docs/)**: [`ARCHITECTURE`](docs/ARCHITECTURE.md) · [`REGISTRY`](docs/REGISTRY.md) · [`APP_FACTORY`](docs/APP_FACTORY.md) · [`OPERATIONS`](docs/OPERATIONS.md) · [`DEVELOPER_GUIDE`](docs/DEVELOPER_GUIDE.md)
+**기타**: `FILE_STRUCTURE.md`(파일 구조) · `ROADMAP.md` · `SPRINT_2A_REPORT.md`·`SPRINT_2B_REPORT.md` · `docs/QUALITY_STANDARD_V1.2.md`
+> 루트 `ARCHITECTURE.md`는 구버전(정책 12단계 중심). 계산기 파이프라인 최신 문서는 위 `docs/` 참조.
 
 ---
 

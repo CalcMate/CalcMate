@@ -82,8 +82,6 @@ def _rewrite_block(failed_rules) -> str:
             "우선순위 순서대로 반드시 보완하라:\n" + "\n".join(lines))
 
 
-_LEGAL_BASIS_PATH = Path(__file__).resolve().parent.parent / "docs" / "legal_basis.draft.yaml"
-_legal_basis_cache = None
 # legal 미검증 HOLD 전용 sentinel(프롬프트 버전과 구분) — legal이 채워지면 이 HOLD는 무시되어 자동 해제.
 _LEGAL_HOLD_VERSION = "legal_unverified"
 
