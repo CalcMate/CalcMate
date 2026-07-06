@@ -65,18 +65,8 @@ _ASSETS = _BASE_DIR / "templates" / "calculators" / "assets"
 # components.js는 init을 실행하므로 마지막(다른 모듈 정의 후)
 _JS_ORDER = ["number_input.js", "result_save.js", "share.js", "pwa.js",
              "faq.js", "related.js", "components.js"]
-_RELATED = [("weekly-holiday-allowance", "💰", "주휴수당 계산기"),
-            ("severance-pay", "💼", "퇴직금 계산기"),
-            ("annual-leave-allowance", "📅", "연차수당 계산기"),
-            ("unemployment-benefit", "📋", "실업급여 계산기"),
-            ("four-insurances", "🏢", "4대보험 계산기"),
-            ("연말정산_환급액_계산기", "🧾", "연말정산 계산기"),
-            ("육아휴직_급여_계산기", "👶", "육아휴직 급여 계산기")]
-
-
-# ── calculator_registry (legal_basis.draft.yaml, schema_version 2) ────
-# Phase B: 기존 하드코딩(_RELATED / 슬러그 분기)을 registry 조회로 이관하되,
-# registry 미등록/로드실패 시 기존 하드코딩값으로 폴백(현행 동작 보장).
+# ── calculator_registry (legal_basis.draft.yaml + registry_auto.yaml, schema_version 2) ────
+# Phase D: registry가 유일 소스(관련계산기/compute 분기의 하드코딩 폴백은 제거됨).
 _REGISTRY_PATH = _BASE_DIR / "docs" / "legal_basis.draft.yaml"
 _registry_cache = None
 
@@ -148,22 +138,18 @@ def _faq_items_v2(calc) -> str:
 
 def _related_triples(cur: str):
     """관련 계산기 (slug, emoji, 표시명) 리스트(cur 제외, 순서 유지).
-    registry(related_slugs+emoji+card_label) 우선 → 미등록/로드실패 시 기존 _RELATED 폴백.
+    registry(related_slugs+emoji+card_label)가 유일 소스(Phase D: _RELATED 폴백 제거). 미등록이면 빈 리스트.
     ※ card_label 기본값은 name(정식명칭)이라, 짧은 카드명이 필요한 계산기는 registry에서 override."""
     reg = _registry()
-    entry = reg.get(cur) or {}
-    slugs = entry.get("related_slugs")
-    if reg and slugs:   # registry 우선
-        out = []
-        for s in slugs:
-            if s == cur:
-                continue
-            e = reg.get(s) or {}
-            label = e.get("card_label") or e.get("name") or s
-            out.append((s, str(e.get("emoji") or ""), str(label)))
-        return out
-    # 폴백: 기존 _RELATED 하드코딩(현행 동작 보장)
-    return [(s, em, nm) for s, em, nm in _RELATED if s != cur]
+    slugs = (reg.get(cur) or {}).get("related_slugs") or []
+    out = []
+    for s in slugs:
+        if s == cur:
+            continue
+        e = reg.get(s) or {}
+        label = e.get("card_label") or e.get("name") or s
+        out.append((s, str(e.get("emoji") or ""), str(label)))
+    return out
 
 
 def _related_items_v2(calc) -> str:
