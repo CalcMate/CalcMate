@@ -46,6 +46,21 @@ def parse_args():
     return p.parse_args()
 
 # ─────────────────────────────────────────────────────────────
+def resolve_publish_fn(cfg: dict):
+    """PUBLISH_MODE(calculator|rss)에 따라 스케줄러가 호출할 실행 함수 선택.
+    두 함수 모두 (cfg, max_count=1) 시그니처로 스케줄러와 호환된다.
+      - calculator(기본): run_calculator_once (계산기 SEO 파이프라인)
+      - rss: run_once (기존 RSS 파이프라인 — 정책 라인 붙일 때 재사용)
+    """
+    mode = str(cfg.get("PUBLISH_MODE", "calculator")).strip().lower()
+    if mode == "rss":
+        return run_once
+    if mode != "calculator":
+        LOG.warning("알 수 없는 PUBLISH_MODE=%r → calculator로 처리", mode)
+    from modules.calculator_pipeline import run_calculator_once
+    return run_calculator_once
+
+# ─────────────────────────────────────────────────────────────
 def run_once(cfg: dict, dry_run: bool = False, max_count: int = None) -> dict:
     """수집 후 DAILY_POST_COUNT(또는 max_count)만큼 글을 '생산'한다.
 
@@ -387,8 +402,9 @@ def main():
 
     # 운영 방식: 슬롯 기반 예약 발행(스케줄러) 단일화. (Legacy 반복 실행 모드는 v12 Lite에서 제거)
     from modules.scheduler import run_scheduler_loop
-    LOG.info("운영 방식: 예약 발행(스케줄러)")
-    run_scheduler_loop(cfg, run_once)
+    publish_fn = resolve_publish_fn(cfg)
+    LOG.info("운영 방식: 예약 발행(스케줄러) — PUBLISH_MODE=%s", cfg.get("PUBLISH_MODE", "calculator"))
+    run_scheduler_loop(cfg, publish_fn)
     return
 
 if __name__ == "__main__":

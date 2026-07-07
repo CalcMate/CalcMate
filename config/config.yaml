@@ -1,7 +1,7 @@
 ADSENSE_MODE: pre
 AUTO_TOPIC_EXPANSION: true
 DAILY_AI_BUDGET: 5
-DAILY_POST_COUNT: 2
+DAILY_POST_COUNT: 3
 DB_ADAPTER: sheets
 DLQ_THRESHOLD: 3
 DUPLICATE_THRESHOLD: 0.85
@@ -61,19 +61,33 @@ AI_ROLES:
     provider: gemini
     model: gemini-2.5-flash
 OPERATION_MODE: scheduled
+PUBLISH_MODE: calculator
 PUBLISH_SCHEDULE:
   enabled: true
   failure_mode: retry_in_slot
   weekday:
-  - start: 09:00
-    end: '10:00'
-  - start: '13:00'
-    end: '14:00'
+  - start: 06:00
+    end: 06:30
+  - start: '11:30'
+    end: '12:00'
+  - start: '18:30'
+    end: '19:00'
   weekend:
   - start: 09:00
     end: '10:00'
   - start: '13:00'
     end: '14:00'
+  - start: '19:00'
+    end: '20:00'
+# Content Sync Engine (WordPress 기준 → Google Sheets 동기화, Publish Scheduler와 별개 서비스)
+#   run_sync.py 로 독립 기동. 매일 run_at(새벽, Publish 슬롯과 안 겹치는 시간)에 1회 실행.
+#   full_scan_weekday(0=월) 요일에는 전체 스캔(full), 그 외 요일은 recent(최근 recent_days일).
+CONTENT_SYNC:
+  enabled: true
+  run_at: '03:00'
+  full_scan_weekday: 0
+  recent_days: 30
+  poll_seconds: 60
 TELEGRAM_EVENTS:
   error: true
   budget: true
@@ -89,8 +103,7 @@ QUALITY_GATE:
   MIN_EXAMPLES: 2
   CTA_COUNT: 1
   MIN_INTERNAL_LINKS: 2
-  BLOCK_UNVERIFIED_LEGAL: true   # needs_human_legal + 실제 legal 공백 계산기는 GPT 호출 전 품질보류(발행차단).
-                                  # false로 두면 "legal 미확정 모드"(특정 조항 금지+강한 면책)로 발행 허용.
+  BLOCK_UNVERIFIED_LEGAL: true
 QUALITY_SCORE:
   PASS_THRESHOLD: 90
   WARN_THRESHOLD: 80
@@ -107,3 +120,17 @@ AI_STYLE_BLOCKLIST:
 - 완벽하게 이해
 - 이해하셨을 것입니다
 - 다양한 조건에 따라 달라질 수 있습니다
+SITE_MODE: pre_adsense
+SHOW_ADSENSE: false
+SHOW_CPA: false
+SHOW_SHARE: true
+SHOW_PWA: true
+SHOW_RESULT_SAVE: true
+SHOW_FAQ: true
+SHOW_NOTICE: true
+SHOW_RELATED: true
+SHOW_DETAIL: true
+RESULT_EXPORT_TYPE: png
+KAKAO_JS_KEY: ''
+CALCULATOR_VERSION: 2.0.0
+LAW_VERSION: 2026-07

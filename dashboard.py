@@ -61,6 +61,58 @@ def load_cfg():
 
 cfg = load_cfg()
 
+# ── 예약 발행 스케줄러 백그라운드 자동 실행 ────────────────────────
+# 대시보드만 띄우고 별도 run_scheduler.bat를 안 돌리면 슬롯 예약(예: 19:35)이
+# 실행되지 않던 문제 수정. @st.cache_resource 로 프로세스당 1회만 스레드 기동
+# (Streamlit rerun/멀티세션에도 중복 실행 안 됨). scheduler 내부 파일 락이
+# run_scheduler.bat 를 병행 실행해도 동시 발행을 막아줌.
+@st.cache_resource
+def _start_scheduler_thread():
+    import threading
+    from modules.scheduler import run_scheduler_loop
+    import main as _PIPE
+
+    def _loop():
+        try:
+            run_scheduler_loop(cfg, _PIPE.resolve_publish_fn(cfg))
+        except Exception as e:  # 스레드가 죽어도 대시보드는 유지
+            import logging
+            logging.getLogger("dashboard").error("스케줄러 스레드 종료: %s", e, exc_info=True)
+
+    t = threading.Thread(target=_loop, name="scheduler-loop", daemon=True)
+    t.start()
+    return t
+
+# PUBLISH_SCHEDULE.enabled 가 true 이고 운영 모드가 scheduled 일 때만 기동
+if cfg.get("OPERATION_MODE", "scheduled") == "scheduled" \
+        and (cfg.get("PUBLISH_SCHEDULE") or {}).get("enabled", True):
+    _start_scheduler_thread()
+
+# ── Content Sync(WP→Sheets 동기화) 백그라운드 자동 실행 ────────────
+# Publish Scheduler와 완전히 분리된 독립 서비스. 대시보드가 떠 있으면 매일
+# CONTENT_SYNC.run_at(기본 03:00)에 1회 동기화가 자동 실행된다(별도 스레드/락/이력).
+# run_sync.py 를 Windows 작업 스케줄러로 병행 등록해도 content_sync.lock +
+# 하루 1회 실행 가드가 중복 실행을 막아준다.
+@st.cache_resource
+def _start_content_sync_thread():
+    import threading
+    from modules.content_sync import run_sync_loop
+
+    def _loop():
+        try:
+            run_sync_loop(cfg)
+        except Exception as e:  # 스레드가 죽어도 대시보드는 유지
+            import logging
+            logging.getLogger("dashboard").error("content_sync 스레드 종료: %s", e, exc_info=True)
+
+    t = threading.Thread(target=_loop, name="content-sync-loop", daemon=True)
+    t.start()
+    return t
+
+# CONTENT_SYNC.enabled 가 true 일 때만 기동(기본 True)
+if (cfg.get("CONTENT_SYNC") or {}).get("enabled", True):
+    _start_content_sync_thread()
+
 # ── 빠른 읽기 헬퍼 (운영센터 5초 로딩 목표 — 모두 로컬 파일) ──────
 def _read_health_cache() -> dict:
     p = BASE / "data" / "logs" / "health_last.json"
