@@ -12,7 +12,7 @@ sys.path.insert(0, str(BASE))
 
 from modules.config_loader import load_config, ConfigError
 from modules.logger import get_logger, BudgetTracker
-from modules.telegram_notifier import send as tg_send
+from modules import telegram_ops
 import modules.rss_collector as rss_collector       # 하위 호환 유지
 from modules.collector.factory import get_collector
 from modules.site_manager import SiteManager
@@ -80,11 +80,11 @@ def run_once(cfg: dict, dry_run: bool = False, max_count: int = None) -> dict:
     bs = budget.check_budget()
     if bs["daily_exceeded"]:
         LOG.warning("일 예산 초과 — 오늘 파이프라인 중단")
-        tg_send(cfg, f"⛔ BUDGET_LIMIT_DAILY: 일 예산 ${bs['daily_limit']} 초과")
+        telegram_ops.notify(cfg, f"⛔ BUDGET_LIMIT_DAILY: 일 예산 ${bs['daily_limit']} 초과")
         return {"produced": 0, "reason": "budget_daily"}
     if bs["monthly_exceeded"]:
         LOG.warning("월 예산 초과 — 이번 달 파이프라인 중단")
-        tg_send(cfg, f"⛔ BUDGET_LIMIT_MONTHLY: 월 예산 ${bs['monthly_limit']} 초과")
+        telegram_ops.notify(cfg, f"⛔ BUDGET_LIMIT_MONTHLY: 월 예산 ${bs['monthly_limit']} 초과")
         return {"produced": 0, "reason": "budget_monthly"}
 
     # ── STEP 1: 수집 ──────────────────────────────────────────
@@ -124,7 +124,7 @@ def run_once(cfg: dict, dry_run: bool = False, max_count: int = None) -> dict:
         if bs["daily_exceeded"] or bs["monthly_exceeded"]:
             LOG.warning("처리 중 예산 초과 감지 — 남은 항목 중단 (생산 %d/%d)",
                         stats["produced"], target)
-            tg_send(cfg, "⛔ BUDGET_LIMIT: 처리 중 예산 초과 — 중단")
+            telegram_ops.notify(cfg, "⛔ BUDGET_LIMIT: 처리 중 예산 초과 — 중단")
             stats["reason"] = "budget_midrun"
             break
         stats["processed"] += 1
@@ -307,7 +307,7 @@ def _process_one(item: dict, cfg: dict, budget, site_mgr,
             sheet_sync.append_log(cfg, log_entry)
         except Exception as log_err:
             LOG.warning("운영로그 기록 실패(원 오류 처리 중): %s", log_err)
-        tg_send(cfg, f"❌ 항목 처리 오류: {e}")
+        telegram_ops.notify(cfg, f"❌ 항목 처리 오류: {e}")
         LOG.error("항목 처리 오류: %s", e, exc_info=True)
         _check_dlq(post_id, cfg)
         return "failed"
@@ -336,7 +336,7 @@ def _check_dlq(post_id: str, cfg: dict):
         json.dump(failures, f)
     threshold = cfg.get("DLQ_THRESHOLD", 3)
     if len(failures) >= threshold:
-        tg_send(cfg, f"⚠️ DLQ_MOVED: ID={post_id} 발행실패 {len(failures)}회 → 재처리대기")
+        telegram_ops.notify(cfg, f"⚠️ DLQ_MOVED: ID={post_id} 발행실패 {len(failures)}회 → 재처리대기")
         LOG.warning(f"DLQ: {post_id} 재처리대기 이동")
 
 # ─────────────────────────────────────────────────────────────
@@ -368,7 +368,7 @@ def main():
     if not health_check.critical_passed(hc):
         failed = [k for k, v in hc.items() if isinstance(v, dict) and v.get("status") == "FAIL" and v.get("level") == "CRITICAL"]
         LOG.error(f"헬스체크 CRITICAL 실패: {failed} → 중단")
-        tg_send(cfg, f"⛔ HEALTH_CHECK_FAILED: {failed}")
+        telegram_ops.notify(cfg, f"⛔ HEALTH_CHECK_FAILED: {failed}")
         sys.exit(1)
     LOG.info("헬스체크 통과")
 

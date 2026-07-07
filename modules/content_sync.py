@@ -112,6 +112,22 @@ def _append_history(cfg: dict, record: dict):
         LOG.warning("sync 이력 기록 실패: %s", e)
 
 
+# 루프 예외 알림 스팸 방지용 스로틀(scheduler._alert_throttled와 동일 패턴).
+_last_alert_ts: dict = {}
+
+def _alert_throttled(cfg: dict, tag: str, level: str, title: str, detail="",
+                     event: str = "error", min_interval: int = 1800) -> None:
+    """telegram_ops.notify_level을 스로틀링해서 호출(알림 폭주 방지). 실패해도 무시."""
+    now = time.time()
+    if now - _last_alert_ts.get(tag, 0) < min_interval:
+        return
+    _last_alert_ts[tag] = now
+    try:
+        telegram_ops.notify_level(cfg, level, title, detail, event=event)
+    except Exception:
+        pass
+
+
 # ── Output Adapter 구조 ───────────────────────────────────────────
 # 지금은 WordPress만 대상이지만, 나중에 PDF/스토어/토스미니앱 등 다른 채널을
 # 같은 sync 로직으로 관리할 수 있도록 채널 호출부를 이 어댑터 인터페이스로 격리한다.
@@ -500,6 +516,7 @@ def run_sync_loop(cfg: dict, poll_seconds: int | None = None):
         catch_up_if_needed(cfg)
     except Exception as e:
         LOG.error("[sync] catch-up 오류: %s", e, exc_info=True)
+        _alert_throttled(cfg, "sync_catchup", "ERROR", "Content Sync catch-up 예외", e)
     # 재시작 후 같은 날 중복 실행 방지: 마지막 sync 날짜를 영속 마커에서 복원
     last_run_date = _last_sync_run_date(cfg)
     while True:
@@ -517,4 +534,6 @@ def run_sync_loop(cfg: dict, poll_seconds: int | None = None):
                     LOG.info("[sync] 다른 동기화 진행 중(lock) — 이번 주기 건너뜀")
         except Exception as e:
             LOG.error("[sync] 루프 오류: %s", e, exc_info=True)
+            # 루프 예외 — 운영자 즉시 인지(Sprint 1 §1-4). 스팸 방지 스로틀.
+            _alert_throttled(cfg, "sync_loop", "ERROR", "Content Sync 루프 예외", e)
         time.sleep(poll)

@@ -25,7 +25,7 @@ from .strategist_calculator import score_keywords
 from . import cleaner
 from . import publisher
 from .logger import get_logger, BudgetTracker
-from . import telegram_notifier as tg
+from . import telegram_ops as tops
 
 LOG = get_logger()
 _PROMPT = Path(__file__).resolve().parent.parent / "prompts" / "calculator_writer_prompt.txt"
@@ -186,6 +186,13 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
     bs = budget.check_budget()
     if bs["daily_exceeded"] or bs["monthly_exceeded"]:
         LOG.warning("예산 초과 — 계산기 파이프라인 중단")
+        # 발행 0건 조기종료 — 운영자 인지(Sprint 1 §2). 실패해도 흐름 무영향.
+        try:
+            tops.notify_level(cfg, "WARNING", "예산 초과 — 계산기 파이프라인 중단",
+                              f"일예산 초과={bs['daily_exceeded']} / 월예산 초과={bs['monthly_exceeded']}",
+                              event="budget")
+        except Exception as _e:
+            LOG.warning("예산초과 알림 실패(무시): %s", _e)
         return {"produced": 0, "reason": "budget"}
 
     # 1) 키워드 수집 (Calculator Collector)
@@ -265,6 +272,15 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
                         continue
                     LOG.warning("[품질] legal 미검증(needs_human_legal, legal 공백) — GPT 호출 전 품질보류: %s",
                                 calc.get("slug", cid))
+                    # 발행 0건(legal 미검증 차단) — 운영자 인지(Sprint 1 §2)
+                    try:
+                        tops.notify_level(cfg, "WARNING",
+                            f"legal 미검증 발행 보류: {calc.get('name', keyword)}",
+                            f"slug={calc.get('slug', cid)} · needs_human_legal이나 법령/조항/기관 값이 비어 "
+                            f"발행 차단(품질보류). legal_basis.draft.yaml 입력 시 자동 해제.",
+                            event="quality_critical_hold")
+                    except Exception as _e:
+                        LOG.warning("legal HOLD 알림 실패(무시): %s", _e)
                     _aid = art_repo.save({
                         "정책명": keyword, "최종추천제목": calc.get("name", keyword),
                         "발행일시": datetime.now().isoformat(),
@@ -380,8 +396,19 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
                                              "prompt_version": prompt_ver})
                 except Exception as _e:
                     LOG.warning("history(quality_hold) 기록 실패(무시): %s", _e)
-                # Critical 반복실패 HOLD → 운영 알림
+                # Critical 반복실패 HOLD → 운영 알림(기존: critical_exhausted일 때만 발송)
                 _notify_critical_hold(cfg, calc, crit_gates, critical_exhausted)
+                # 비-Critical(Major/Score 미달) 재시도 한도 초과 HOLD도 조용히 넘기지 않는다(Sprint 1 §2).
+                # critical_exhausted면 위에서 이미 발송했으므로 중복 방지 위해 else로만.
+                if not critical_exhausted:
+                    try:
+                        tops.notify_level(cfg, "WARNING",
+                            f"품질 미달 발행 보류(재시도 한도 초과): {calc.get('name', keyword)}",
+                            f"severity={qc.get('severity','')} · retries={q_retries}/{max_total} · "
+                            f"failed_gates={[r.get('gate','') for r in (qc.get('failed_rules') or [])] or '-'}",
+                            event="quality_critical_hold")
+                    except Exception as _e:
+                        LOG.warning("품질 HOLD(WARNING) 알림 실패(무시): %s", _e)
                 existing.add(seo.get("seo_title"))
                 # 같은 run 내 후속 후보 판정을 위해 스냅샷에 반영(품질보류 + 프롬프트버전)
                 snapshot.append({"calculator_id": cid, "상태값": "품질보류",
@@ -432,7 +459,7 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
         except Exception as e:
             stats["failed"] += 1
             LOG.error("계산기 글 생성 오류(%s): %s", keyword, e, exc_info=True)
-            tg.send(cfg, f"❌ 계산기 글 오류: {e}")
+            tops.notify(cfg, f"❌ 계산기 글 오류: {e}")
 
     # 실행 종료 사유 3구분(§5): 아무것도 발행 안 된 이유를 사람이 바로 알 수 있게.
     if stats["produced"] > 0:

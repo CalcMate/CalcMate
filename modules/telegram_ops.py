@@ -74,3 +74,26 @@ def notify_quality_hold(cfg: dict, name: str, slug: str = "",
 
 def notify(cfg: dict, message: str) -> None:
     TN.send(cfg, message)
+
+
+# 알림 레벨 표준(Sprint 1 §4). INFO/WARNING/ERROR/CRITICAL.
+_LEVEL_ICON = {"INFO": "ℹ️", "WARNING": "⚠️", "ERROR": "❌", "CRITICAL": "🚨"}
+
+
+def notify_level(cfg: dict, level: str, title: str, detail="", event: str = "error") -> None:
+    """레벨(INFO/WARNING/ERROR/CRITICAL) + 이벤트키 게이팅 표준 알림.
+
+    Sprint 1에서 추가되는 모든 운영 알림의 단일 진입점(raw send 직접호출 금지).
+      - event: TELEGRAM_EVENTS 게이팅 키(미설정 시 ON=기본). 신규 알림은 기존 키에 매핑:
+          · 자동화 정지/루프 예외/스레드 종료 → "error"
+          · 품질 HOLD(legal 미검증 / 재시도 한도 초과) → "quality_critical_hold"
+          · 예산 초과 → "budget"
+    메시지 형식: "<아이콘> [LEVEL] title\n detail"
+    """
+    if not _enabled(cfg, event):
+        return
+    icon = _LEVEL_ICON.get(str(level).upper(), "")
+    body = f"{icon} [{str(level).upper()}] {title}".strip()
+    if detail:
+        body += f"\n{str(detail)[:400]}"
+    TN.send(cfg, body)

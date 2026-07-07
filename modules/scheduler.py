@@ -33,6 +33,23 @@ LOG = get_logger()
 FAILURE_MODES = ("none", "retry_in_slot", "next_slot")
 STATUSES = ("pending", "running", "completed", "failed", "retry")
 
+# 루프 예외 알림 스팸 방지용 스로틀(태그별 마지막 발송 시각). poll(기본 30s)마다
+# 같은 예외가 반복돼도 min_interval 이내엔 재발송하지 않는다.
+_last_alert_ts: dict = {}
+
+def _alert_throttled(cfg: dict, tag: str, level: str, title: str, detail="",
+                     event: str = "error", min_interval: int = 1800) -> None:
+    """telegram_ops.notify_level을 스로틀링해서 호출(알림 폭주 방지). 실패해도 무시."""
+    now = time.time()
+    if now - _last_alert_ts.get(tag, 0) < min_interval:
+        return
+    _last_alert_ts[tag] = now
+    try:
+        from . import telegram_ops
+        telegram_ops.notify_level(cfg, level, title, detail, event=event)
+    except Exception:
+        pass
+
 
 # ── 경로 ──────────────────────────────────────────────────────────
 def _schedule_dir(cfg: dict) -> Path:
@@ -401,6 +418,8 @@ def run_scheduler_loop(cfg: dict, run_once_fn, poll_seconds: int = 30):
                 LOG.info("오늘 일정 모두 처리됨 — 다음 날 자동 생성 대기")
         except Exception as e:
             LOG.error("스케줄러 루프 오류: %s", e, exc_info=True)
+            # 루프 예외 — 운영자 즉시 인지(Sprint 1 §1-3). 스팸 방지 스로틀.
+            _alert_throttled(cfg, "scheduler_loop", "ERROR", "발행 스케줄러 루프 예외", e)
         time.sleep(poll_seconds)
 
 

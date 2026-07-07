@@ -8,7 +8,7 @@ AI 역할 정의서:
   출력: 수정 완료 HTML [BODY_HTML_START]...[BODY_HTML_END]
 """
 from .ai_provider import build_provider_for_role, retry_call
-from .telegram_notifier import send as tg_send
+from . import telegram_ops
 
 # ── M4 Review AI 시스템 프롬프트 ─────────────────────────────────────────────
 SYSTEM_M4_PRE = """너는 수석 편집자다.
@@ -71,7 +71,7 @@ def edit(draft_html: str, cfg: dict, logger=None,
     except Exception as e:
         if logger:
             logger.warning(f"[M4] 주 모델 실패: {e} → fallback 시도")
-        tg_send(cfg, f"⚠️ M4 Review AI 실패: {e} — fallback 전환")
+        telegram_ops.notify(cfg, f"⚠️ M4 Review AI 실패: {e} — fallback 전환")
 
     # 2차: fallback (EDITOR_FALLBACK_PROVIDER)
     try:

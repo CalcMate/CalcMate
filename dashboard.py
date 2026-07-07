@@ -78,6 +78,13 @@ def _start_scheduler_thread():
         except Exception as e:  # 스레드가 죽어도 대시보드는 유지
             import logging
             logging.getLogger("dashboard").error("스케줄러 스레드 종료: %s", e, exc_info=True)
+            # 자동화 정지 — 운영자 즉시 인지(Sprint 1 §1-1)
+            try:
+                from modules import telegram_ops
+                telegram_ops.notify_level(cfg, "ERROR",
+                    "발행 스케줄러 스레드 종료 — 예약 발행 중단됨", e, event="error")
+            except Exception:
+                pass
 
     t = threading.Thread(target=_loop, name="scheduler-loop", daemon=True)
     t.start()
@@ -104,6 +111,13 @@ def _start_content_sync_thread():
         except Exception as e:  # 스레드가 죽어도 대시보드는 유지
             import logging
             logging.getLogger("dashboard").error("content_sync 스레드 종료: %s", e, exc_info=True)
+            # 자동화 정지 — 운영자 즉시 인지(Sprint 1 §1-2)
+            try:
+                from modules import telegram_ops
+                telegram_ops.notify_level(cfg, "ERROR",
+                    "Content Sync 스레드 종료 — 동기화 중단됨", e, event="error")
+            except Exception:
+                pass
 
     t = threading.Thread(target=_loop, name="content-sync-loop", daemon=True)
     t.start()
