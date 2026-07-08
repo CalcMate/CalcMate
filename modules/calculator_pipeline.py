@@ -254,11 +254,13 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
                     # 프롬프트가 바뀌었으면(옛 버전 HOLD) 통과 → 재도전.
                     if art_repo.has_quality_hold(cid, prompt_version=prompt_ver, rows=snapshot):
                         stats["hold_skip"] += 1
+                        LOG.info("[HOLD스킵] %s (cid=%s)", keyword, cid)
                         continue
                 else:
                     # 재평가 off → HOLD 이력 있으면 영구 제외.
                     if art_repo.has_quality_hold(cid, rows=snapshot):
                         stats["hold_skip"] += 1
+                        LOG.info("[HOLD스킵] %s (cid=%s)", keyword, cid)
                         continue
             # §5 legal 미검증 차단 게이트 — GPT(generate_seo) 호출 이전에 즉시 품질보류.
             #   trigger: BLOCK_UNVERIFIED_LEGAL=true AND needs_human_legal+실제 legal 공백.
@@ -269,6 +271,7 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
                 if _lb and _legal_unverified(_lb):
                     if art_repo.has_quality_hold(cid, prompt_version=_LEGAL_HOLD_VERSION, rows=snapshot):
                         stats["hold_skip"] += 1
+                        LOG.info("[HOLD스킵] %s (cid=%s)", keyword, cid)
                         continue
                     LOG.warning("[품질] legal 미검증(needs_human_legal, legal 공백) — GPT 호출 전 품질보류: %s",
                                 calc.get("slug", cid))
