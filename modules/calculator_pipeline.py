@@ -486,6 +486,18 @@ def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None) 
                 art_repo.append_history(article_id, "publish", {"wp_post_id": pub.get("wp_post_id", "")})
             except Exception as _e:
                 LOG.warning("history(publish) 기록 실패(무시): %s", _e)
+            # 재평가로 되살아나 실제 발행됨 → 같은 계산기의 옛 품질보류 행을 '재처리완료'로 정리
+            # (삭제 안 함, 상태만 변경 + history — 감사 추적). 검수대기(WP 미구성)일 땐 정리 안 함.
+            if pub_status == "published" and cid:
+                try:
+                    _nres = art_repo.resolve_holds_for_calculator(
+                        cid, new_signature=sig, published_post_id=pub.get("wp_post_id", ""),
+                        exclude_id=article_id)
+                    if _nres:
+                        LOG.info("[REEVALUATE] 발행 성공 → 옛 품질보류 %d건 재처리완료(resolved): cid=%s",
+                                 _nres, cid)
+                except Exception as _e:
+                    LOG.warning("품질보류 정리 실패(무시): %s", _e)
             existing.add(seo.get("seo_title"))
             # 같은 run 내 후속 후보의 count_active_articles 판정을 위해 스냅샷에 반영
             snapshot.append({"calculator_id": cid,
@@ -538,7 +550,8 @@ def reevaluate_holds(cfg: dict, apply: bool = False, only_slug: str = None) -> d
     rows = arepo.get_all()
     holds = [r for r in rows if str(r.get("상태값", "")).strip() == "품질보류"]
 
-    released, blocked, legal_pending = [], [], []
+    max_per = int(cfg.get("MAX_ARTICLES_PER_CALCULATOR", 1) or 1)
+    released, blocked, legal_pending, already_published = [], [], [], []
     for r in holds:
         cid = str(r.get("calculator_id", "") or "")
         saved = str(r.get("quality_prompt_version", "") or "")
@@ -552,15 +565,23 @@ def reevaluate_holds(cfg: dict, apply: bool = False, only_slug: str = None) -> d
             continue
         cur = _quality_signature(cfg, calc)
         item = {"cid": cid, "name": calc.get("name", r.get("최종추천제목", "")),
-                "old": saved, "new": cur}
-        (released if saved != cur else blocked).append(item)
+                "old": saved, "new": cur, "hold_id": str(r.get("ID", "") or "")}
+        if saved == cur:
+            blocked.append(item)                                  # 서명 동일 → 유지
+        elif arepo.count_active_articles(cid, rows=rows) >= max_per:
+            already_published.append(item)                        # 이미 발행됨 → 잔존 HOLD(정리 대상)
+        else:
+            released.append(item)                                 # 서명 변경 + 미발행 → 재도전
 
     # [REEVALUATE] 로그(요청 형식)
-    LOG.info("[REEVALUATE] 품질보류 재평가 — 총 %d건 (REWRITE %d / legal미검증 %d)",
-             len(holds), len(released) + len(blocked), len(legal_pending))
+    LOG.info("[REEVALUATE] 품질보류 재평가 — 총 %d건 (재도전 %d / 유지 %d / 이미발행 %d / legal미검증 %d)",
+             len(holds), len(released), len(blocked), len(already_published), len(legal_pending))
     for it in released:
         LOG.info("[REEVALUATE]   released(서명변경→재도전): %s (cid=%s) %s→%s",
                  it["name"], it["cid"], it["old"], it["new"])
+    for it in already_published:
+        LOG.info("[REEVALUATE]   already_published(이미 발행됨→정리 대상): %s (cid=%s)",
+                 it["name"], it["cid"])
     for it in blocked:
         LOG.info("[REEVALUATE]   blocked(서명동일→유지): %s (cid=%s) %s",
                  it["name"], it["cid"], it["old"])
@@ -568,15 +589,27 @@ def reevaluate_holds(cfg: dict, apply: bool = False, only_slug: str = None) -> d
         LOG.info("[REEVALUATE]   legal미검증(legal_basis 입력 필요): %s (slug=%s)",
                  it["name"], it["slug"])
 
-    applied, produced = False, 0
-    if apply and released:
-        # only_slug 지정 시 그 계산기만 재생성(cid 한정). 미지정 시 전체 재도전.
-        target_cid = released[0]["cid"] if only_slug else None
-        LOG.info("[REEVALUATE] --apply: 재도전 대상 %d건 → 즉시 재생성 실행%s",
-                 len(released), f" (cid={target_cid} 한정)" if target_cid else "")
-        stats = run_calculator_once(cfg, only_cid=target_cid) or {}
-        produced = int(stats.get("produced", 0))
+    applied, produced, resolved = False, 0, 0
+    if apply:
+        # 1) 이미 발행된 계산기의 잔존 품질보류 정리(삭제 안 함, 재처리완료 + history)
+        done = set()
+        for it in already_published:
+            if it["cid"] in done:
+                continue
+            resolved += arepo.resolve_holds_for_calculator(
+                it["cid"], new_signature=it["new"], reason="already_published_on_reeval")
+            done.add(it["cid"])
+        if resolved:
+            LOG.info("[REEVALUATE] --apply: 이미 발행된 잔존 품질보류 %d건 → 재처리완료(resolved)", resolved)
+        # 2) 재도전 대상 재생성(only_slug면 그 계산기만)
+        if released:
+            target_cid = released[0]["cid"] if only_slug else None
+            LOG.info("[REEVALUATE] --apply: 재도전 대상 %d건 → 즉시 재생성 실행%s",
+                     len(released), f" (cid={target_cid} 한정)" if target_cid else "")
+            stats = run_calculator_once(cfg, only_cid=target_cid) or {}
+            produced = int(stats.get("produced", 0))
         applied = True
 
     return {"holds": len(holds), "released": released, "blocked": blocked,
-            "legal_pending": legal_pending, "applied": applied, "produced": produced}
+            "already_published": already_published, "legal_pending": legal_pending,
+            "applied": applied, "produced": produced, "resolved": resolved}

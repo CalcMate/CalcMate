@@ -1439,12 +1439,17 @@ elif tab == "🧮 Calculator Builder":
             try:
                 from modules.calculator_pipeline import reevaluate_holds
                 res = reevaluate_holds(cfg, apply=False)
-                st.success(f"품질보류 {res['holds']}건 · 재도전 대상 {len(res['released'])}건 · "
-                           f"유지 {len(res['blocked'])}건 · legal 입력필요 {len(res['legal_pending'])}건")
+                st.success(f"품질보류 {res['holds']}건 · 재도전 {len(res['released'])}건 · "
+                           f"유지 {len(res['blocked'])}건 · 이미발행(정리대상) {len(res.get('already_published',[]))}건 · "
+                           f"legal 입력필요 {len(res['legal_pending'])}건")
                 if res["released"]:
                     st.write("**재도전 대상(released):**")
                     for it in res["released"]:
                         st.write(f"- {it['name']} (`{it['old']}`→`{it['new']}`)")
+                if res.get("already_published"):
+                    st.write("**이미 발행됨(옛 HOLD 정리 대상 — '재도전 즉시 실행' 시 재처리완료):**")
+                    for it in res["already_published"]:
+                        st.write(f"- {it['name']}")
                 if res["legal_pending"]:
                     st.write("**legal_basis 입력 필요:**")
                     for it in res["legal_pending"]:
@@ -1456,8 +1461,8 @@ elif tab == "🧮 Calculator Builder":
                 from modules.calculator_pipeline import reevaluate_holds
                 with st.spinner("재도전 대상 재생성 중(키워드→SEO→본문→품질검수)..."):
                     res = reevaluate_holds(cfg, apply=True)
-                st.success(f"재도전 {len(res['released'])}건 → 재생성 실행: 생산 {res.get('produced',0)}건. "
-                           "상세는 작업보드/오류로그 참고.")
+                st.success(f"재도전 {len(res['released'])}건 → 생산 {res.get('produced',0)}건 · "
+                           f"옛 HOLD 정리(재처리완료) {res.get('resolved',0)}건. 상세는 작업보드/오류로그 참고.")
             except Exception as e:
                 st.error(f"재생성 실패: {e}")
     st.divider()
