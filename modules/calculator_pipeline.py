@@ -43,8 +43,35 @@ def _load_prompt() -> str:
 
 
 def _prompt_version() -> str:
-    """writer 프롬프트 내용 해시(sha1[:8]). 내용이 바뀌면 값이 바뀌어 HOLD 재평가 판단에 사용."""
+    """writer 프롬프트 내용 해시(sha1[:8]). 내용이 바뀌면 값이 바뀌어 HOLD 재평가 판단에 사용.
+    (하위호환 유지 — 현재 REWRITE HOLD 서명은 _quality_signature로 확장됨. legal sentinel과 구분)"""
     return hashlib.sha1(_load_prompt().encode("utf-8")).hexdigest()[:8]
+
+
+# 품질 재평가 서명에 포함하는 legal_basis 필드(G8/writer 판정에 실제 영향 주는 것만).
+# 표시용 필드(name/category/emoji 등)는 제외 → 불필요한 재평가/재생성 방지.
+_LEGAL_SIG_FIELDS = ("law", "article", "related_articles", "authority",
+                     "forbidden_articles", "forbidden_phrases", "needs_human_legal", "writer_note")
+
+
+def _quality_signature(cfg: dict, calc: dict) -> str:
+    """품질 재평가 서명(sha1[:8]). REWRITE HOLD의 quality_prompt_version에 저장된다.
+
+    이 값이 바뀌면 기존 HOLD의 저장 서명과 달라져 has_quality_hold 재평가 게이트가
+    자동으로 '재도전'을 허용한다(운영자 개입 없이 다음 스케줄에서 재생성).
+    포함: writer 프롬프트 + 품질 게이트(QUALITY_GATE)/스코어(QUALITY_SCORE) 규칙
+          + G7 금지문체(AI_STYLE_BLOCKLIST) + 해당 계산기 legal_basis(판정영향 필드).
+    slug 단위 — 수정한 계산기만 서명이 바뀌어 그 계산기만 재도전(불필요한 전체 재생성 방지)."""
+    lb = _load_legal_basis().get(str(calc.get("slug", "")).strip()) or {}
+    payload = {
+        "prompt": _load_prompt(),
+        "gate": cfg.get("QUALITY_GATE", {}) or {},
+        "score": cfg.get("QUALITY_SCORE", {}) or {},
+        "style": cfg.get("AI_STYLE_BLOCKLIST", []) or [],
+        "legal": {k: lb.get(k) for k in _LEGAL_SIG_FIELDS},
+    }
+    blob = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
+    return hashlib.sha1(blob.encode("utf-8")).hexdigest()[:8]
 
 
 def _notify_critical_hold(cfg: dict, calc: dict, critical_gates: list, exhausted: bool) -> None:
@@ -223,11 +250,10 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
     rcfg = cfg.get("QUALITY_RETRY", {}) or {}
     # §5 legal 미검증 차단 스위치(기본 true). needs_human_legal + 실제 legal 공백 계산기를
     # GPT 호출 전 품질보류. legal-HOLD는 아래 sentinel 버전으로 기록해, 프롬프트 버전 기반
-    # 재평가 게이트(has_quality_hold(prompt_ver))와 충돌하지 않도록 분리 → legal이 채워지면 자동 해제.
+    # 재평가 게이트(has_quality_hold(sig))와 충돌하지 않도록 분리 → legal이 채워지면 자동 해제.
     block_unverified = bool((cfg.get("QUALITY_GATE") or {}).get("BLOCK_UNVERIFIED_LEGAL", True))
     max_candidates = int(rcfg.get("MAX_CANDIDATES_PER_RUN", 5) or 5)
     reeval = bool((cfg.get("QUALITY_HOLD") or {}).get("REEVALUATE_ON_PROMPT_VERSION_CHANGE", True))
-    prompt_ver = _prompt_version()
     attempted = 0   # 실제 생성까지 간 후보 수(AI 비용 기준 상한)
     for it in ranked:
         if stats["produced"] >= target:
@@ -242,17 +268,20 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
             # 계산기당 발행 상한(설정값) — 상태 판단은 Repository(count_active_articles)에 위임.
             # 파이프라인은 개수만 비교하고 상태값 문자열을 직접 다루지 않는다.
             cid = it.get("calculator_id", "")
+            # 품질 재평가 서명(계산기별). legal_basis/게이트/프롬프트 변경 시 값이 바뀌어
+            # 옛 HOLD가 자동으로 재도전 대상이 된다.
+            sig = _quality_signature(cfg, calc)
             max_per = int(cfg.get("MAX_ARTICLES_PER_CALCULATOR", 1) or 1)
             if cid and art_repo.count_active_articles(cid, rows=snapshot) >= max_per:
                 stats["dup"] += 1
                 continue
             # HOLD 재평가 게이트: 품질보류 이력은 count_active_articles에서 제외되므로
-            # 여기서 프롬프트 버전으로 재도전 여부를 결정(상태 판단은 Repository 헬퍼에 위임).
+            # 여기서 품질 서명(sig)으로 재도전 여부를 결정(상태 판단은 Repository 헬퍼에 위임).
             if cid:
                 if reeval:
-                    # 현재 프롬프트 버전으로 이미 HOLD된 계산기 → 재시도 무의미(스킵).
-                    # 프롬프트가 바뀌었으면(옛 버전 HOLD) 통과 → 재도전.
-                    if art_repo.has_quality_hold(cid, prompt_version=prompt_ver, rows=snapshot):
+                    # 현재 서명으로 이미 HOLD된 계산기 → 재시도 무의미(스킵).
+                    # 서명이 바뀌었으면(legal/게이트/프롬프트 변경) 통과 → 재도전.
+                    if art_repo.has_quality_hold(cid, prompt_version=sig, rows=snapshot):
                         stats["hold_skip"] += 1
                         LOG.info("[HOLD스킵] %s (cid=%s)", keyword, cid)
                         continue
@@ -373,7 +402,7 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
                 "quality_failed_rules": json.dumps(qc.get("failed_rules") or [], ensure_ascii=False),
                 "quality_review_model": qc.get("quality_review_model") or "",
                 "quality_reviewed_at": datetime.now().isoformat(),
-                "quality_prompt_version": prompt_ver,
+                "quality_prompt_version": sig,
             }
 
             # 한도 초과에도 REWRITE → 발행하지 않고 품질 HOLD("품질보류", 자동 재도전 대상)
@@ -396,7 +425,7 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
                                             {"quality_status": "REWRITE", "retries": q_retries,
                                              "severity": qc.get("severity", ""),
                                              "critical_gates": crit_gates,
-                                             "prompt_version": prompt_ver})
+                                             "prompt_version": sig})
                 except Exception as _e:
                     LOG.warning("history(quality_hold) 기록 실패(무시): %s", _e)
                 # Critical 반복실패 HOLD → 운영 알림(기존: critical_exhausted일 때만 발송)
@@ -415,7 +444,7 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
                 existing.add(seo.get("seo_title"))
                 # 같은 run 내 후속 후보 판정을 위해 스냅샷에 반영(품질보류 + 프롬프트버전)
                 snapshot.append({"calculator_id": cid, "상태값": "품질보류",
-                                 "quality_prompt_version": prompt_ver,
+                                 "quality_prompt_version": sig,
                                  "최종추천제목": seo.get("seo_title", "")})
                 stats["quality_hold"] += 1
                 continue
@@ -454,7 +483,7 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
             snapshot.append({"calculator_id": cid,
                              "상태값": "발행완료" if pub_status == "published" else "검수대기",
                              "최종추천제목": seo.get("seo_title", ""),
-                             "quality_prompt_version": prompt_ver})
+                             "quality_prompt_version": sig})
             stats["produced"] += 1
             if pub_status != "published":
                 stats["no_wp"] += 1
@@ -481,3 +510,59 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
              attempted, stats["processed"], stats["dup"], stats["hold_skip"], stats["quality_hold"],
              stats["failed"], elapsed)
     return stats
+
+
+def reevaluate_holds(cfg: dict, apply: bool = False) -> dict:
+    """품질보류(HOLD) 재평가 — 운영 도구(수동 트리거용).
+
+    현재 품질 서명(_quality_signature)과 각 REWRITE HOLD에 저장된 서명을 비교해
+    '재도전 대상(released)'과 '유지(blocked)'를 집계하고 [REEVALUATE] 로그를 남긴다.
+    실제 해제는 서명 불일치로 자동 처리되므로(다음 파이프라인 실행에서 재도전), 이 함수는
+    기본이 '리포트(dry-run)'다. apply=True면 즉시 run_calculator_once를 1회 실행해 재생성한다.
+    legal 미검증 HOLD(sentinel)는 legal_basis 입력이 필요하므로 별도 legal_pending으로 분리 보고.
+
+    반환: {holds, released:[...], blocked:[...], legal_pending:[...], applied:bool, produced:int}
+    """
+    db = get_db_adapter(cfg)
+    arepo = ArticleRepository(db)
+    crepo = CalculatorRepository(db)
+    rows = arepo.get_all()
+    holds = [r for r in rows if str(r.get("상태값", "")).strip() == "품질보류"]
+
+    released, blocked, legal_pending = [], [], []
+    for r in holds:
+        cid = str(r.get("calculator_id", "") or "")
+        saved = str(r.get("quality_prompt_version", "") or "")
+        calc = crepo.get_by_id(cid) or {}
+        # legal 미검증 sentinel HOLD는 서명 재평가 대상이 아님(legal 입력 시 게이트가 자동 통과)
+        if saved == _LEGAL_HOLD_VERSION or str(r.get("quality_status", "")) == "LEGAL_UNVERIFIED":
+            legal_pending.append({"cid": cid, "slug": calc.get("slug", ""),
+                                  "name": calc.get("name", r.get("최종추천제목", ""))})
+            continue
+        cur = _quality_signature(cfg, calc)
+        item = {"cid": cid, "name": calc.get("name", r.get("최종추천제목", "")),
+                "old": saved, "new": cur}
+        (released if saved != cur else blocked).append(item)
+
+    # [REEVALUATE] 로그(요청 형식)
+    LOG.info("[REEVALUATE] 품질보류 재평가 — 총 %d건 (REWRITE %d / legal미검증 %d)",
+             len(holds), len(released) + len(blocked), len(legal_pending))
+    for it in released:
+        LOG.info("[REEVALUATE]   released(서명변경→재도전): %s (cid=%s) %s→%s",
+                 it["name"], it["cid"], it["old"], it["new"])
+    for it in blocked:
+        LOG.info("[REEVALUATE]   blocked(서명동일→유지): %s (cid=%s) %s",
+                 it["name"], it["cid"], it["old"])
+    for it in legal_pending:
+        LOG.info("[REEVALUATE]   legal미검증(legal_basis 입력 필요): %s (slug=%s)",
+                 it["name"], it["slug"])
+
+    applied, produced = False, 0
+    if apply and released:
+        LOG.info("[REEVALUATE] --apply: 재도전 대상 %d건 → 즉시 재생성 실행", len(released))
+        stats = run_calculator_once(cfg) or {}
+        produced = int(stats.get("produced", 0))
+        applied = True
+
+    return {"holds": len(holds), "released": released, "blocked": blocked,
+            "legal_pending": legal_pending, "applied": applied, "produced": produced}

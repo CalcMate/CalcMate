@@ -1427,6 +1427,39 @@ elif tab == "🧮 Calculator Builder":
             st.success(f"생산 {s.get('produced',0)}건 (발행대기 포함). 상세는 작업보드/오류로그 참고.")
         except Exception as e:
             st.error(f"생성 실패: {e}")
+
+    # ── 품질보류 재평가(HOLD Re-evaluate) ──────────────────────────
+    # 자동 재평가(품질 서명 변경 시 다음 스케줄에서 자동 재도전)와 별개로, 지금 즉시
+    # "무엇이 재도전 대상인지" 확인/실행하는 운영 도구.
+    with st.expander("♻️ 품질보류 재평가 (legal/게이트/프롬프트 변경 반영)"):
+        st.caption("품질 서명이 바뀐 품질보류 글을 재도전 대상으로 집계합니다. "
+                   "'재평가 확인'은 리포트만(비용 0), '재도전 즉시 실행'은 재생성(API 비용)까지 수행.")
+        rc1, rc2 = st.columns(2)
+        if rc1.button("🔍 재평가 확인 (리포트)", key="reeval_report"):
+            try:
+                from modules.calculator_pipeline import reevaluate_holds
+                res = reevaluate_holds(cfg, apply=False)
+                st.success(f"품질보류 {res['holds']}건 · 재도전 대상 {len(res['released'])}건 · "
+                           f"유지 {len(res['blocked'])}건 · legal 입력필요 {len(res['legal_pending'])}건")
+                if res["released"]:
+                    st.write("**재도전 대상(released):**")
+                    for it in res["released"]:
+                        st.write(f"- {it['name']} (`{it['old']}`→`{it['new']}`)")
+                if res["legal_pending"]:
+                    st.write("**legal_basis 입력 필요:**")
+                    for it in res["legal_pending"]:
+                        st.write(f"- {it['name']} (slug=`{it['slug']}`)")
+            except Exception as e:
+                st.error(f"재평가 실패: {e}")
+        if rc2.button("▶ 재도전 즉시 실행 (재생성)", key="reeval_apply"):
+            try:
+                from modules.calculator_pipeline import reevaluate_holds
+                with st.spinner("재도전 대상 재생성 중(키워드→SEO→본문→품질검수)..."):
+                    res = reevaluate_holds(cfg, apply=True)
+                st.success(f"재도전 {len(res['released'])}건 → 재생성 실행: 생산 {res.get('produced',0)}건. "
+                           "상세는 작업보드/오류로그 참고.")
+            except Exception as e:
+                st.error(f"재생성 실패: {e}")
     st.divider()
     try:
         calcs = repo.get_all()

@@ -43,6 +43,10 @@ def parse_args():
     p.add_argument("--strategy-room", action="store_true", help="전략회의실 즉시 실행")
     p.add_argument("--calculator", action="store_true", help="계산기 콘텐츠 파이프라인 1회 실행")
     p.add_argument("--seed-calculators", action="store_true", help="SalaryMate 초기 계산기/템플릿 시드 등록")
+    p.add_argument("--reevaluate-hold", action="store_true",
+                   help="품질보류 재평가 리포트(서명 변경으로 재도전 대상 집계). --apply로 즉시 재생성")
+    p.add_argument("--apply", action="store_true",
+                   help="--reevaluate-hold와 함께: 재도전 대상이 있으면 즉시 재생성 1회 실행")
     return p.parse_args()
 
 # ─────────────────────────────────────────────────────────────
@@ -393,6 +397,13 @@ def main():
         from modules.calculator_pipeline import run_calculator_once
         LOG.info("계산기 콘텐츠 파이프라인 실행")
         print(json.dumps(run_calculator_once(cfg), ensure_ascii=False))
+        return
+
+    if args.reevaluate_hold:
+        from modules.calculator_pipeline import reevaluate_holds
+        LOG.info("품질보류 재평가%s", " + 즉시 재생성(--apply)" if args.apply else "(리포트)")
+        res = reevaluate_holds(cfg, apply=args.apply)
+        print(json.dumps(res, ensure_ascii=False, indent=2))
         return
 
     # 단발 실행 (run_pipeline.bat 등 하위호환)
