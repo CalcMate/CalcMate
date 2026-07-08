@@ -47,6 +47,8 @@ def parse_args():
                    help="품질보류 재평가 리포트(서명 변경으로 재도전 대상 집계). --apply로 즉시 재생성")
     p.add_argument("--apply", action="store_true",
                    help="--reevaluate-hold와 함께: 재도전 대상이 있으면 즉시 재생성 1회 실행")
+    p.add_argument("--only-slug", default=None,
+                   help="--reevaluate-hold와 함께: 특정 계산기(slug)만 재평가/재생성 대상으로 한정")
     return p.parse_args()
 
 # ─────────────────────────────────────────────────────────────
@@ -401,8 +403,9 @@ def main():
 
     if args.reevaluate_hold:
         from modules.calculator_pipeline import reevaluate_holds
-        LOG.info("품질보류 재평가%s", " + 즉시 재생성(--apply)" if args.apply else "(리포트)")
-        res = reevaluate_holds(cfg, apply=args.apply)
+        LOG.info("품질보류 재평가%s%s", " + 즉시 재생성(--apply)" if args.apply else "(리포트)",
+                 f" [slug={args.only_slug}]" if args.only_slug else "")
+        res = reevaluate_holds(cfg, apply=args.apply, only_slug=args.only_slug)
         print(json.dumps(res, ensure_ascii=False, indent=2))
         return
 

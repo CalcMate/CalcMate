@@ -204,8 +204,9 @@ def _write_article(cfg: dict, calc: dict, keyword: str, seo: dict, faq: list,
     return cleaner.parse_html_body(text), tokens
 
 
-def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
-    """활성 계산기 키워드로 SEO 글을 생산/발행. max_count 미지정 시 DAILY_POST_COUNT."""
+def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None) -> dict:
+    """활성 계산기 키워드로 SEO 글을 생산/발행. max_count 미지정 시 DAILY_POST_COUNT.
+    only_cid 지정 시 그 계산기 후보만 대상(재평가 재도전 등 특정 계산기만 재생성용)."""
     start = time.time()
     budget = BudgetTracker(cfg)
     target = int(max_count if max_count is not None else cfg.get("DAILY_POST_COUNT", 1) or 1)
@@ -227,6 +228,13 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
     if not items:
         LOG.info("활성 계산기 없음 — 종료 (Calculator Builder/시드로 등록 필요)")
         return {"produced": 0, "reason": "no_calculators"}
+
+    # 특정 계산기만 대상(only_cid) — 재평가 재도전 등에서 1개 계산기만 재생성할 때.
+    if only_cid:
+        items = [it for it in items if str(it.get("calculator_id", "")) == str(only_cid)]
+        LOG.info("[대상한정] 계산기 cid=%s 키워드 %d개만 처리", only_cid, len(items))
+        if not items:
+            return {"produced": 0, "reason": "only_cid_no_keywords"}
 
     # 2) 점수화/정렬 (기본 휴리스틱 — 비용 0, cfg.CALCULATOR_AI_SCORE=true면 AI)
     use_ai = bool(cfg.get("CALCULATOR_AI_SCORE", False))
@@ -512,13 +520,14 @@ def run_calculator_once(cfg: dict, max_count: int = None) -> dict:
     return stats
 
 
-def reevaluate_holds(cfg: dict, apply: bool = False) -> dict:
+def reevaluate_holds(cfg: dict, apply: bool = False, only_slug: str = None) -> dict:
     """품질보류(HOLD) 재평가 — 운영 도구(수동 트리거용).
 
     현재 품질 서명(_quality_signature)과 각 REWRITE HOLD에 저장된 서명을 비교해
     '재도전 대상(released)'과 '유지(blocked)'를 집계하고 [REEVALUATE] 로그를 남긴다.
     실제 해제는 서명 불일치로 자동 처리되므로(다음 파이프라인 실행에서 재도전), 이 함수는
     기본이 '리포트(dry-run)'다. apply=True면 즉시 run_calculator_once를 1회 실행해 재생성한다.
+    only_slug 지정 시 그 계산기만 리포트/재생성 대상으로 한정(1건만 검증할 때).
     legal 미검증 HOLD(sentinel)는 legal_basis 입력이 필요하므로 별도 legal_pending으로 분리 보고.
 
     반환: {holds, released:[...], blocked:[...], legal_pending:[...], applied:bool, produced:int}
@@ -534,6 +543,8 @@ def reevaluate_holds(cfg: dict, apply: bool = False) -> dict:
         cid = str(r.get("calculator_id", "") or "")
         saved = str(r.get("quality_prompt_version", "") or "")
         calc = crepo.get_by_id(cid) or {}
+        if only_slug and str(calc.get("slug", "")) != str(only_slug):
+            continue   # 대상 계산기 한정
         # legal 미검증 sentinel HOLD는 서명 재평가 대상이 아님(legal 입력 시 게이트가 자동 통과)
         if saved == _LEGAL_HOLD_VERSION or str(r.get("quality_status", "")) == "LEGAL_UNVERIFIED":
             legal_pending.append({"cid": cid, "slug": calc.get("slug", ""),
@@ -559,8 +570,11 @@ def reevaluate_holds(cfg: dict, apply: bool = False) -> dict:
 
     applied, produced = False, 0
     if apply and released:
-        LOG.info("[REEVALUATE] --apply: 재도전 대상 %d건 → 즉시 재생성 실행", len(released))
-        stats = run_calculator_once(cfg) or {}
+        # only_slug 지정 시 그 계산기만 재생성(cid 한정). 미지정 시 전체 재도전.
+        target_cid = released[0]["cid"] if only_slug else None
+        LOG.info("[REEVALUATE] --apply: 재도전 대상 %d건 → 즉시 재생성 실행%s",
+                 len(released), f" (cid={target_cid} 한정)" if target_cid else "")
+        stats = run_calculator_once(cfg, only_cid=target_cid) or {}
         produced = int(stats.get("produced", 0))
         applied = True
 
