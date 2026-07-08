@@ -295,6 +295,9 @@ def run_sync_once(cfg: dict, mode: str = "recent", adapter: OutputAdapter | None
                 "checked": 0, "changed": 0, "anomalies": []}
 
     db = get_db_adapter(cfg)
+    # 동기화는 시트 최신 상태를 기준으로 판단해야 하므로 TTL 캐시가 있어도 강제 새로고침.
+    if hasattr(db, "invalidate_cache"):
+        db.invalidate_cache("articles")
     repo = ArticleRepository(db)
     all_rows = repo.get_all()
 
