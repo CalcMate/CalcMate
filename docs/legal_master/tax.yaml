@@ -1,0 +1,27 @@
+# legal_master/tax.yaml — 법령 조항 엔티티(SSOT). scripts/migrate_legal_master.py 생성.
+income_tax_act_137:
+  law: 소득세법
+  article: 제137조
+  related_articles:
+  - 제134조
+  - 제140조
+  authority: 국세청
+  confidence: medium
+  last_verified: 2026-07-05
+  verification_source:
+  - law.go.kr
+  - nts.go.kr
+  writer_note: '소득세법 제137조(근로소득세액의 연말정산)에 따라 원천징수의무자는 다음 연도 2월분 근로소득(또는 퇴직자의 퇴직월 근로소득)
+    지급 시 1년간의 근로소득에 소득·세액공제를 반영해 최종 소득세를 정산한다. 매월 원천징수(제134조)는 잠정 세액이며, 연말정산으로 과부족을
+    정산한다. ⚠️ 본 계산 결과는 참고용 예상치이며, 실제 연말정산 결과는 국세청 홈택스 및 회사 정산 결과와 다를 수 있다는 문구를 반드시
+    포함한다. "간이 추정"이라는 표현만으로 대체하지 않는다.
+
+    '
+  reviewer_expectation:
+  - 법령명(소득세법) 및 조항(제137조) 언급
+  - 참고용 예상치이며 홈택스/회사 정산결과와 다를 수 있음(면책 문구) 포함
+  forbidden_articles:
+  - 소득세법 제55조
+  - 소득세법 제63조
+  forbidden_phrases: []
+  needs_human_legal: true

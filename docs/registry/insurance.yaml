@@ -1,0 +1,26 @@
+# registry/insurance.yaml — 계산기 정의(legal_refs로 법령 참조). scripts/migrate_legal_master.py 생성.
+four-insurances:
+  name: 4대보험 계산기
+  slug: four-insurances
+  category: 고용/보험
+  emoji: 🏢
+  card_label: 4대보험 계산기
+  compute_type: dict
+  date_fields: []
+  validation_mode: formula
+  field_labels: {}
+  difficulty: multi_output
+  difficulty_status: provisional
+  content:
+    evergreen: false
+    update_cycle: yearly
+    content_caveat: null
+  related_slugs:
+  - weekly-holiday-allowance
+  - severance-pay
+  - annual-leave-allowance
+  - unemployment-benefit
+  - 연말정산_환급액_계산기
+  - 육아휴직_급여_계산기
+  legal_refs:
+  - four_major_insurances

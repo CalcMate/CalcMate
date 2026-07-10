@@ -1,0 +1,28 @@
+# legal_master/insurance.yaml — 법령 조항 엔티티(SSOT). scripts/migrate_legal_master.py 생성.
+four_major_insurances:
+  law: 국민연금법·국민건강보험법·고용보험법·산업재해보상보험법 (복합)
+  article: null
+  related_articles:
+  - 국민연금법 제8조(가입대상)
+  - 국민건강보험법 제6조제2항
+  - 고용보험법 제8조
+  - 산업재해보상보험법 제8조
+  authority: 보건복지부(국민연금·건강보험) / 고용노동부(고용·산재보험)
+  confidence: high
+  last_verified: 2026-07-05
+  verification_source:
+  - law.go.kr
+  - easylaw.go.kr
+  - mohw.go.kr
+  writer_note: '4대보험은 국민연금법 제8조, 국민건강보험법 제6조제2항, 고용보험법 제8조, 산업재해보상보험법 제8조에 따라 근로자를
+    사용하는 모든 사업장이 의무 가입해야 한다. 4개 법령을 개별 인용하기보다 이 문장 하나로 압축해서 기준서 §6 "법적 근거 1회 이상" 요건을
+    충족한다. 단, 산재보험료는 가입 의무와 별개로 원칙적으로 사업주가 전액 부담하므로, "4대보험 모두 근로자 급여에서 공제된다"처럼 일반화하지
+    않는다 — 근로자 실공제 대상은 국민연금· 건강보험·고용보험 3종이다.
+
+    '
+  reviewer_expectation:
+  - 4개 법령명 모두 언급 또는 요약 언급
+  - 산재보험이 근로자 공제 대상이 아님을 구분
+  forbidden_articles: []
+  forbidden_phrases: []
+  needs_human_legal: true

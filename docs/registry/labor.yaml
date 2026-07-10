@@ -1,0 +1,78 @@
+# registry/labor.yaml — 계산기 정의(legal_refs로 법령 참조). scripts/migrate_legal_master.py 생성.
+weekly-holiday-allowance:
+  name: 주휴수당 계산기
+  slug: weekly-holiday-allowance
+  category: 노무/급여
+  emoji: 💰
+  card_label: 주휴수당 계산기
+  compute_type: single
+  date_fields: []
+  validation_mode: formula
+  field_labels: {}
+  difficulty: simple
+  difficulty_status: provisional
+  content:
+    evergreen: true
+    update_cycle: null
+    content_caveat: null
+  related_slugs:
+  - severance-pay
+  - annual-leave-allowance
+  - unemployment-benefit
+  - four-insurances
+  - 연말정산_환급액_계산기
+  - 육아휴직_급여_계산기
+  legal_refs:
+  - labor_standards_act_55
+severance-pay:
+  name: 퇴직금 계산기
+  slug: severance-pay
+  category: 노무/급여
+  emoji: 💼
+  card_label: 퇴직금 계산기
+  compute_type: date_based
+  date_fields:
+  - start_date
+  - end_date
+  validation_mode: skip
+  field_labels: {}
+  difficulty: date_based
+  difficulty_status: provisional
+  content:
+    evergreen: true
+    update_cycle: null
+    content_caveat: null
+  related_slugs:
+  - weekly-holiday-allowance
+  - annual-leave-allowance
+  - unemployment-benefit
+  - four-insurances
+  - 연말정산_환급액_계산기
+  - 육아휴직_급여_계산기
+  legal_refs:
+  - worker_retirement_benefit_act_8
+annual-leave-allowance:
+  name: 연차수당 계산기
+  slug: annual-leave-allowance
+  category: 노무/급여
+  emoji: 📅
+  card_label: 연차수당 계산기
+  compute_type: single
+  date_fields: []
+  validation_mode: formula
+  field_labels: {}
+  difficulty: simple
+  difficulty_status: provisional
+  content:
+    evergreen: true
+    update_cycle: null
+    content_caveat: null
+  related_slugs:
+  - weekly-holiday-allowance
+  - severance-pay
+  - unemployment-benefit
+  - four-insurances
+  - 연말정산_환급액_계산기
+  - 육아휴직_급여_계산기
+  legal_refs:
+  - labor_standards_act_60

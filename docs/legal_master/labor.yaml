@@ -1,0 +1,65 @@
+# legal_master/labor.yaml — 법령 조항 엔티티(SSOT). scripts/migrate_legal_master.py 생성.
+labor_standards_act_55:
+  law: 근로기준법
+  article: 제55조
+  related_articles:
+  - 제18조제3항
+  authority: 고용노동부
+  confidence: high
+  last_verified: 2026-07-05
+  verification_source:
+  - law.go.kr
+  - easylaw.go.kr
+  writer_note: '근로기준법 제55조에 따라 사용자는 근로자에게 1주 평균 1회 이상의 유급휴일을 보장해야 하며, 이 유급휴일에 지급되는
+    임금이 주휴수당이다. 4주 평균 주 15시간 미만 근로자는 제18조제3항에 의해 적용 제외되므로 이 예외를 함께 언급한다.
+
+    '
+  reviewer_expectation:
+  - 법령명(근로기준법) 및 조항(제55조) 언급
+  - 15시간 미만 예외 언급
+  forbidden_articles: []
+  forbidden_phrases: []
+  needs_human_legal: true
+worker_retirement_benefit_act_8:
+  law: 근로자퇴직급여 보장법
+  article: 제8조
+  related_articles: []
+  authority: 고용노동부
+  confidence: high
+  last_verified: 2026-07-05
+  verification_source:
+  - law.go.kr
+  - easylaw.go.kr
+  writer_note: '근로자퇴직급여 보장법 제8조에 따라 사용자는 계속근로기간 1년에 대해 30일분 이상의 평균임금을 퇴직금으로 지급해야 한다.
+    2005년 이 법 제정 이후 근로기준법 제34조는 이관·삭제되었으므로 절대 인용하지 않는다.
+
+    '
+  reviewer_expectation:
+  - 법령명(근로자퇴직급여 보장법) 및 조항(제8조) 언급
+  - 근로기준법 제34조 언급 없음
+  forbidden_articles:
+  - 근로기준법 제34조
+  forbidden_phrases: []
+  needs_human_legal: true
+labor_standards_act_60:
+  law: 근로기준법
+  article: 제60조
+  related_articles:
+  - 제61조
+  authority: 고용노동부
+  confidence: high
+  last_verified: 2026-07-05
+  verification_source:
+  - law.go.kr
+  - easylaw.go.kr
+  writer_note: '근로기준법 제60조에 따라 1년간 80% 이상 출근한 근로자에게 15일의 유급휴가가 발생하며, 미사용 시 연차수당으로
+    정산된다. 단, 제61조에 따른 연차 사용 촉진제도가 적법하게 시행된 경우 수당 지급의무가 면제될 수 있으므로 이 예외를 FAQ 등에 함께
+    언급한다.
+
+    '
+  reviewer_expectation:
+  - 법령명(근로기준법) 및 조항(제60조) 언급
+  - 연차 사용 촉진제도(제61조) 예외 언급
+  forbidden_articles: []
+  forbidden_phrases: []
+  needs_human_legal: true

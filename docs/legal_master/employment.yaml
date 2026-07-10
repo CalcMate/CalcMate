@@ -1,0 +1,55 @@
+# legal_master/employment.yaml — 법령 조항 엔티티(SSOT). scripts/migrate_legal_master.py 생성.
+employment_insurance_act_40:
+  law: 고용보험법
+  article: 제40조
+  related_articles:
+  - 제41조
+  - 제58조
+  authority: 고용노동부
+  confidence: medium
+  last_verified: 2026-07-05
+  verification_source:
+  - law.go.kr
+  - easylaw.go.kr
+  writer_note: '고용보험법 제40조 및 제41조에 따른 구직급여 수급요건에는 피보험단위기간 180일 이상, 이직사유 제한(제58조) 등
+    여러 조건이 복합적으로 포함된다. 단일 조문이나 단일 요건만으로 수급 여부가 결정된다고 단정하지 않는다. "수급 가능합니다"처럼 확정적으로
+    쓰지 말고 "수급 가능성이 있습니다", "최종 수급 여부는 고용센터 심사 결과에 따라 달라질 수 있습니다"처럼 표현한다.
+
+    '
+  reviewer_expectation:
+  - 법령명(고용보험법) 언급
+  - 소관기관(고용노동부) 언급
+  - 요건이 단일하지 않고 복합적임을 명시
+  - 수급 여부를 확정적으로 표현하지 않음(가능성/심사결과 표현 사용)
+  forbidden_articles: []
+  forbidden_phrases:
+  - 받을 수 있습니다
+  - 받게 됩니다
+  - 수급 대상입니다
+  needs_human_legal: true
+employment_insurance_act_70:
+  law: 고용보험법
+  article: 제70조
+  related_articles:
+  - 제41조
+  - 제73조
+  authority: 고용노동부
+  confidence: high
+  last_verified: 2026-07-05
+  verification_source:
+  - law.go.kr
+  - easylaw.go.kr
+  writer_note: '고용보험법 제70조에 따라 30일 이상 육아휴직을 부여받고 피보험단위기간이 180일 이상인 피보험자에게 육아휴직 급여가
+    지급된다. 지급액 상한·하한 등 구체 금액은 절대 언급하지 않는다(고용보험법 시행령에서 정하며 연도별로 바뀌므로 특정 숫자를 쓰면 틀릴 위험이
+    큼). 대신 "금액 기준은 매년 변경될 수 있으므로 고용노동부 최신 안내를 참고하라"는 취지로만 안내한다.
+
+    '
+  reviewer_expectation:
+  - 법령명(고용보험법) 및 조항(제70조) 언급
+  - 구체적 상한·하한 금액이 본문에 등장하지 않음
+  - 연도별 변경 가능 안내 포함
+  forbidden_articles:
+  - 고용보험법 제40조
+  - 근로기준법 제74조
+  forbidden_phrases: []
+  needs_human_legal: true

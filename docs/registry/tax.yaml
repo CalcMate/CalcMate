@@ -1,0 +1,26 @@
+# registry/tax.yaml — 계산기 정의(legal_refs로 법령 참조). scripts/migrate_legal_master.py 생성.
+연말정산_환급액_계산기:
+  name: 연말정산 환급액 계산기
+  slug: 연말정산_환급액_계산기
+  category: 세금/정부혜택
+  emoji: 🧾
+  card_label: 연말정산 계산기
+  compute_type: single
+  date_fields: []
+  validation_mode: formula
+  field_labels: {}
+  difficulty: simple
+  difficulty_status: provisional
+  content:
+    evergreen: true
+    update_cycle: null
+    content_caveat: crude_estimate
+  related_slugs:
+  - weekly-holiday-allowance
+  - severance-pay
+  - annual-leave-allowance
+  - unemployment-benefit
+  - four-insurances
+  - 육아휴직_급여_계산기
+  legal_refs:
+  - income_tax_act_137

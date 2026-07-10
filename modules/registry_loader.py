@@ -47,8 +47,60 @@ def load_registry(force: bool = False) -> dict:
 
 def invalidate():
     """캐시 무효화(App Factory가 registry_auto.yaml에 쓴 직후 등)."""
-    global _cache
+    global _cache, _lm_cache, _reg_cache
     _cache = None
+    _lm_cache = None
+    _reg_cache = None
+
+
+# ── Sprint B-1: legal_master/ + registry/ 병행 로더(SSOT 신구조) ──────────
+# 기존 load_registry(slug 단위 legal_basis.draft.yaml)와 별개로 추가만 함(프로덕션 영향 0).
+# resolve(slug) 가 기존 load_registry().get(slug) 와 동일 결과를 내도록 설계(검증됨).
+_LM_DIR = _BASE / "docs" / "legal_master"
+_REG_DIR = _BASE / "docs" / "registry"
+_lm_cache = None
+_reg_cache = None
+
+
+def _read_dir(d: Path) -> dict:
+    """디렉토리 내 *.yaml 을 merge(키=entity_id 또는 slug). 없으면 {}."""
+    merged = {}
+    if d.exists():
+        for f in sorted(d.glob("*.yaml")):
+            part = _read_yaml(f)   # schema_version 제거 포함
+            if isinstance(part, dict):
+                merged.update(part)
+    return merged
+
+
+def load_legal_master(force: bool = False) -> dict:
+    """entity_id → 법령필드 dict. legal_master/*.yaml merge. 1회 캐시."""
+    global _lm_cache
+    if _lm_cache is None or force:
+        _lm_cache = _read_dir(_LM_DIR)
+    return _lm_cache
+
+
+def load_registry_v3(force: bool = False) -> dict:
+    """slug → 계산기필드(+legal_refs) dict. registry/*.yaml merge. 1회 캐시."""
+    global _reg_cache
+    if _reg_cache is None or force:
+        _reg_cache = _read_dir(_REG_DIR)
+    return _reg_cache
+
+
+def resolve(slug: str, force: bool = False) -> dict | None:
+    """slug → (참조 법령 필드 + 계산기 필드) 병합 dict. 기존 load_registry().get(slug)와 동등.
+    법령 필드 먼저, 계산기 필드 나중(겹침 없음). 신구조 미존재 시 None."""
+    reg = load_registry_v3(force)
+    r = reg.get(slug)
+    if r is None:
+        return None
+    merged: dict = {}
+    for ref in r.get("legal_refs", []) or []:
+        merged.update(load_legal_master(force).get(ref, {}))
+    merged.update(r)   # 계산기 필드(legal_refs 포함)
+    return merged
 
 
 _AUTO_HEADER = (
