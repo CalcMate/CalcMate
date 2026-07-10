@@ -10,3 +10,9 @@ data/cache/
 data/outputs/
 *.db
 data/logs/*.log
+
+# 런타임 데이터(코드 아님 — 실행 중 생성/갱신). 코드/데이터 분리.
+data/logs/*.json          # budget.json / health_last.json 등 런타임 상태
+data/schedule/            # 발행 스케줄러 런타임(today_schedule/history/lock)
+data/legal/               # Revision Detector 상태(revision_state.json)
+data/workspace/           # 조사/실험 임시 산출물
