@@ -27,6 +27,36 @@ LOG = get_logger()
 # change_type 분류(사용자 지시): 이후 자동수정 로직 단순화를 위한 태그.
 CHANGE_TYPES = ("rate_changed", "article_changed", "wording_changed", "abolished", "new_article")
 
+# Sprint B-3: change_type → 영향도(Impact Level). HIGH일수록 재평가 우선.
+_CHANGE_SEVERITY = {
+    "rate_changed": "HIGH", "formula_changed": "HIGH", "abolished": "HIGH",
+    "article_changed": "MEDIUM", "new_article": "MEDIUM",
+    "wording_changed": "LOW",
+}
+_SEVERITY_RANK = {"NONE": 0, "LOW": 1, "MEDIUM": 2, "HIGH": 3}
+_RANK_SEVERITY = {v: k for k, v in _SEVERITY_RANK.items()}
+
+
+def impact_level(change_types: list) -> str:
+    """change_type 목록 → 최고 영향도(HIGH/MEDIUM/LOW/NONE)."""
+    if not change_types:
+        return "NONE"
+    top = max(_SEVERITY_RANK[_CHANGE_SEVERITY.get(c, "LOW")] for c in change_types)
+    return _RANK_SEVERITY[top]
+
+
+def analyze_impact(entity_id: str, change_types: list) -> dict:
+    """법령 변경 → 영향 분석(Detect→Analyze, 자동수정 없음).
+    반환: {legal_id, change_type, affected:[{slug,name}], severity}."""
+    from .registry_loader import find_impacted, calculator_name
+    slugs = find_impacted(entity_id)
+    return {
+        "legal_id": entity_id,
+        "change_type": change_types,
+        "affected": [{"slug": s, "name": calculator_name(s)} for s in slugs],
+        "severity": impact_level(change_types),
+    }
+
 
 def _state_path(cfg: dict) -> Path:
     root = Path(cfg.get("_root", "."))
@@ -144,55 +174,54 @@ def detect_revisions(cfg: dict, only: list = None, fetch=fetch_official) -> dict
             state[eid] = st
             continue
 
-        # 변경 감지 — Detect Only: 상태 갱신 + 알림만(legal_master 미수정)
+        # 변경 감지 — Detect→Analyze. Detect Only: 상태 갱신 + 알림만(legal_master 미수정)
         change_type = classify_change(st.get("number_fingerprint", []), new_nums,
                                       st.get("_last_content", ""), content)
         state[eid] = {"source_hash": new_hash, "etag": fetched.get("etag"),
                       "number_fingerprint": new_nums, "last_checked": now,
                       "last_changed": now, "change_type": change_type,
                       "prev_hash": st.get("source_hash")}
-        item = {"entity": eid, "law": law_ref, "change_type": change_type,
-                "impacted": _impacted(eid)}
+        analysis = analyze_impact(eid, change_type)     # {legal_id, change_type, affected, severity}
+        item = {"entity": eid, "law": law_ref, **analysis}
         rep["changed"].append(item)
         _notify_change(cfg, item)
 
     _save_state(cfg, state)
+    # 재평가 우선순위: severity HIGH를 상단에(자동 실행 아님 — 표시만)
+    rep["changed"].sort(key=lambda c: _SEVERITY_RANK.get(c.get("severity", "NONE"), 0), reverse=True)
+    rep["reeval_candidates"] = [c["legal_id"] for c in rep["changed"]
+                                if c.get("severity") in ("HIGH", "MEDIUM")]
     if rep["changed"]:
         _notify_summary(cfg, rep)
-    LOG.info("[revision] 감지 완료: 검사 %d / 변경없음 %d / 변경 %d / baseline %d / skip %d / err %d",
-             rep["checked"], rep["unchanged"], len(rep["changed"]), len(rep["baseline"]),
-             len(rep["skipped"]), len(rep["errors"]))
+    LOG.info("[revision] 감지 완료: 검사 %d / 변경없음 %d / 변경 %d(HIGH=%d) / baseline %d / skip %d / err %d",
+             rep["checked"], rep["unchanged"], len(rep["changed"]),
+             sum(1 for c in rep["changed"] if c.get("severity") == "HIGH"),
+             len(rep["baseline"]), len(rep["skipped"]), len(rep["errors"]))
     return rep
 
 
-def _impacted(entity_id: str) -> list:
-    """참고용: 영향 계산기(Sprint B-3에서 본격화). legal_refs 역인덱스(View)."""
-    try:
-        from .registry_loader import load_registry_v3
-        reg = load_registry_v3()
-        return [slug for slug, r in reg.items()
-                if entity_id in (r.get("legal_refs") or [])]
-    except Exception:
-        return []
-
-
 def _notify_change(cfg: dict, item: dict) -> None:
+    """사람이 바로 이해하는 형태(법령 → 변경종류/영향도 → 영향 계산기 목록)."""
     try:
-        imp = ", ".join(item.get("impacted") or []) or "-"
-        telegram_ops.notify_level(
-            cfg, "WARNING", f"법령 변경 감지: {item['law']}",
-            f"change_type={', '.join(item['change_type'])} · 영향 계산기(참고): {imp}\n"
-            f"(감지만 — 자동 수정 없음. 확인 후 조치 필요)",
-            event="legal_revision")
+        names = [a["name"] for a in item.get("affected", [])]
+        body = (f"변경: {', '.join(item['change_type'])} · 영향도 {item['severity']}\n"
+                f"영향 계산기 {len(names)}개:\n" +
+                ("\n".join(f" - {n}" for n in names[:10]) if names else " - (참조 계산기 없음)") +
+                "\n(감지만 — 자동 수정 없음. 확인 후 조치)")
+        telegram_ops.notify_level(cfg, "WARNING", f"법령 변경 감지: {item['law']}",
+                                  body, event="legal_revision")
     except Exception as e:
         LOG.warning("[revision] 변경 알림 실패(무시): %s", e)
 
 
 def _notify_summary(cfg: dict, rep: dict) -> None:
     try:
-        laws = "\n".join(f"• {c['law']} ({', '.join(c['change_type'])})" for c in rep["changed"][:15])
+        lines = []
+        for c in rep["changed"][:15]:
+            n = len(c.get("affected", []))
+            lines.append(f"• [{c['severity']}] {c['law']} ({', '.join(c['change_type'])}) → 계산기 {n}개")
         telegram_ops.notify_level(
-            cfg, "WARNING", f"법령 변경 감지 요약 — {len(rep['changed'])}건",
-            laws, event="legal_revision")
+            cfg, "WARNING", f"법령 변경 감지 요약 — {len(rep['changed'])}건 (재평가 대상 {len(rep['reeval_candidates'])})",
+            "\n".join(lines), event="legal_revision")
     except Exception as e:
         LOG.warning("[revision] 요약 알림 실패(무시): %s", e)

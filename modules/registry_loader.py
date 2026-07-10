@@ -103,6 +103,21 @@ def resolve(slug: str, force: bool = False) -> dict | None:
     return merged
 
 
+def find_impacted(entity_id: str, force: bool = False) -> list[str]:
+    """법령 엔티티 ID를 참조하는 계산기 slug 목록(legal_refs 역인덱스 = 조회 View).
+    설계 §6/§9: 저장하지 않고 registry에서 매번 도출(SSOT). '법령 변경 → 영향 계산기'의 기반."""
+    reg = load_registry_v3(force)
+    eid = str(entity_id)
+    return [slug for slug, r in reg.items()
+            if eid in ((r or {}).get("legal_refs") or [])]
+
+
+def calculator_name(slug: str) -> str:
+    """slug → 사람 가독 이름(registry.name). 없으면 slug 그대로(알림 표기용)."""
+    r = load_registry_v3().get(slug) or {}
+    return r.get("name") or slug
+
+
 _AUTO_HEADER = (
     "# registry_auto.yaml — App Factory 자동생성 계산기 registry (작업지시서 E §1)\n"
     "#\n"
