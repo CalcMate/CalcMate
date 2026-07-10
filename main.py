@@ -49,6 +49,8 @@ def parse_args():
                    help="--reevaluate-hold와 함께: 재도전 대상이 있으면 즉시 재생성 1회 실행")
     p.add_argument("--only-slug", default=None,
                    help="--reevaluate-hold와 함께: 특정 계산기(slug)만 재평가/재생성 대상으로 한정")
+    p.add_argument("--detect-revisions", action="store_true",
+                   help="법령 변경 감지(Detect Only): 공식 소스 hash 비교 → 변경 시 Telegram. 자동 수정 없음")
     return p.parse_args()
 
 # ─────────────────────────────────────────────────────────────
@@ -406,6 +408,13 @@ def main():
         LOG.info("품질보류 재평가%s%s", " + 즉시 재생성(--apply)" if args.apply else "(리포트)",
                  f" [slug={args.only_slug}]" if args.only_slug else "")
         res = reevaluate_holds(cfg, apply=args.apply, only_slug=args.only_slug)
+        print(json.dumps(res, ensure_ascii=False, indent=2))
+        return
+
+    if args.detect_revisions:
+        from modules.revision_detector import detect_revisions
+        LOG.info("법령 변경 감지(Detect Only) 실행")
+        res = detect_revisions(cfg)
         print(json.dumps(res, ensure_ascii=False, indent=2))
         return
 
