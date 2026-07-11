@@ -79,6 +79,16 @@ def check_budget_alerts(cfg: dict) -> dict:
     return s
 
 
+def pause(cfg: dict):
+    """수동 일시정지(운영자 중지). is_paused/resume과 같은 상태(paused_date)를 재사용하므로
+    run_scheduler_loop이 기존 is_paused 체크로 발행을 건너뛴다(scheduler 로직 무변경).
+    ※ 날짜가 바뀌면 is_paused가 자동 해제(익일 재개) — 예산 일시정지와 동일 정책."""
+    st = _load()
+    st["paused_date"] = date.today().isoformat()
+    _save(st)
+    LOG.info("[cost] 수동 일시정지(중지)")
+
+
 def resume(cfg: dict):
     """수동 재개(일시정지 해제)."""
     st = _load()

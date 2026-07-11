@@ -69,6 +69,11 @@ cfg = load_cfg()
 @st.cache_resource
 def _start_scheduler_thread():
     import threading
+    # 프로세스당 1개 보장: 이미 살아있는 scheduler-loop가 있으면 새로 만들지 않음
+    # (st.cache_resource.clear() 등으로 캐시가 비워져 재호출돼도 스레드 중복 기동 방지)
+    for _t in threading.enumerate():
+        if _t.name == "scheduler-loop" and _t.is_alive():
+            return _t
     from modules.scheduler import run_scheduler_loop
     import main as _PIPE
 
@@ -103,6 +108,10 @@ if cfg.get("OPERATION_MODE", "scheduled") == "scheduled" \
 @st.cache_resource
 def _start_content_sync_thread():
     import threading
+    # 프로세스당 1개 보장(scheduler와 동일 가드)
+    for _t in threading.enumerate():
+        if _t.name == "content-sync-loop" and _t.is_alive():
+            return _t
     from modules.content_sync import run_sync_loop
 
     def _loop():
@@ -827,6 +836,38 @@ elif tab == "📅 오늘 발행 일정":
         except Exception:
             return _dt.strptime(fallback, "%H:%M").time()
 
+    # ── 스케줄러 컨트롤 패널 (상태 + 원스톱 버튼) ──
+    from modules import cost_manager as CM
+    import threading as _th
+    import main as PIPE
+    today = date.today().isoformat()
+    _sc = SCH.load_schedule(cfg)
+    _summ = (SCH.summarize(_sc) if _sc and _sc.get("date") == today
+             else {"completed": 0, "pending": 0, "failed": 0, "next": None})
+    _enabled = bool((cfg.get("PUBLISH_SCHEDULE") or {}).get("enabled", True))
+    _paused = CM.is_paused(cfg)
+    _alive = any(t.name == "scheduler-loop" and t.is_alive() for t in _th.enumerate())
+    _running = _alive and _enabled and not _paused
+    with st.container(border=True):
+        s1, s2, s3 = st.columns(3)
+        s1.markdown("**상태**: " + ("🟢 Running" if _running else ("🔴 Paused(중지)" if _paused else "🔴 정지")))
+        s2.markdown(f"**enabled**: {'on' if _enabled else 'off'} · 스레드 {'live' if _alive else 'dead'}")
+        s3.markdown(f"**다음 실행**: {_summ.get('next') or '-'}")
+        st.caption(f"오늘 요약 — 완료 {_summ['completed']} · 대기 {_summ['pending']} · 실패 {_summ['failed']}")
+        bc = st.columns(6)
+        if bc[0].button("🆕 생성", key="ctl_gen", use_container_width=True):
+            SCH.generate_today_schedule(cfg); st.rerun()
+        if bc[1].button("♻️ 재생성", key="ctl_regen", use_container_width=True):
+            SCH.reset_today(cfg); SCH.generate_today_schedule(cfg); st.rerun()
+        if bc[2].button("🗑️ 초기화", key="ctl_reset", use_container_width=True):
+            SCH.reset_today(cfg); st.rerun()
+        if bc[3].button("⚡ 즉시발행", key="ctl_now", use_container_width=True):
+            st.session_state["_sched_confirm"] = True
+        if bc[4].button("⏸️ 중지", key="ctl_pause", disabled=_paused, use_container_width=True):
+            CM.pause(cfg); st.rerun()
+        if bc[5].button("▶️ 재개", key="ctl_resume", disabled=not _paused, use_container_width=True):
+            CM.resume(cfg); st.rerun()
+
     # ── 현재 일정 표시 ──
     sched = SCH.load_schedule(cfg)
     today = date.today().isoformat()
@@ -868,16 +909,7 @@ elif tab == "📅 오늘 발행 일정":
     else:
         st.info("오늘 생성된 일정이 없습니다. 아래에서 '스케줄 생성'을 누르세요.")
 
-    b1, b2, b3, b4 = st.columns(4)
-    if b1.button("🆕 스케줄 생성", type="primary"):
-        SCH.generate_today_schedule(cfg); st.rerun()
-    if b2.button("♻️ 스케줄 재생성"):
-        SCH.reset_today(cfg); SCH.generate_today_schedule(cfg); st.rerun()
-    if b3.button("🗑️ 오늘 일정 초기화"):
-        SCH.reset_today(cfg); st.rerun()
-    if b4.button("⚡ 즉시 발행"):
-        st.session_state["_sched_confirm"] = True
-
+    # (생성/재생성/초기화/즉시발행 버튼은 상단 컨트롤 패널로 통합됨)
     if st.session_state.get("_sched_confirm"):
         with st.container(border=True):
             st.warning("즉시 1건 발행할까요? (예약시간 무시)")
@@ -937,7 +969,7 @@ elif tab == "📅 오늘 발행 일정":
         for e in errs:
             st.warning(e)
 
-    if st.button("💾 슬롯 설정 저장", type="primary"):
+    if st.button("💾 슬롯 설정 저장 + 즉시 반영", type="primary"):
         if errs:
             st.error("검증 오류를 먼저 해결하세요.")
         else:
@@ -953,8 +985,18 @@ elif tab == "📅 오늘 발행 일정":
             raw["DAILY_POST_COUNT"] = int(count)  # 슬롯 수 = 하루 발행 개수 동기화
             with open(cfg_path, "w", encoding="utf-8") as f:
                 yaml.dump(raw, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
-            st.success(f"✅ 슬롯 설정 저장 완료 (하루 {count}건). '스케줄 재생성'으로 오늘 일정에 반영하세요.")
-            st.cache_resource.clear()
+            # cfg 캐시만 갱신(스케줄러 스레드 캐시는 건드리지 않음 — 스레드 중복 기동 방지)
+            load_cfg.clear()
+            cfg = load_cfg()
+            # 저장 즉시 오늘 일정 반영: reset + generate. available_slots로 과거 슬롯 자동 제외.
+            _, _day_slots = SCH.get_slots_for(cfg, date.today())
+            _total = len(_day_slots)
+            SCH.reset_today(cfg)
+            _new = SCH.generate_today_schedule(cfg)
+            _m = len(_new.get("schedule", []))
+            _n = max(0, _total - _m)
+            st.success(f"✅ 적용 완료 (오늘 일정 즉시 반영) · 과거 {_n}개 제외 / 새 {_m}개 슬롯 생성")
+            st.rerun()
 
 # ══════════════════════════════════════════════════════════════
 # 탭: 🌐 사이트 관리 (사이트/계산기 생성 마법사 + 관리)
