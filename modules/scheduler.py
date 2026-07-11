@@ -166,10 +166,38 @@ def _rand_time_in(start: str, end: str, taken: set) -> str:
     taken.add(sm)
     return _to_hhmm(sm)
 
+def available_slots(now: datetime, slot_candidates: list) -> list:
+    """now 이후에 실행 가능한 슬롯만 반환. 하루 시작/수동 재생성/내일 일정 미리 생성 등
+    모든 '슬롯 생성' 경로에서 재사용(get_due_posts 등 실행 경로는 건드리지 않는다).
+      - 완전 과거 슬롯(종료 ≤ now): 제외
+      - 진행 중 슬롯(시작 ≤ now < 종료): 시작을 now 직후로 당겨 과거 시각 생성 방지
+      - 미래 슬롯: 그대로
+    now=None(오늘이 아닌 날짜=내일 일정 미리 생성 등)이면 필터하지 않고 전체 반환."""
+    if now is None:
+        return list(slot_candidates)
+    now_min = now.hour * 60 + now.minute
+    out = []
+    for s in slot_candidates:
+        try:
+            sm, em = _to_min(s.get("start", "")), _to_min(s.get("end", ""))
+        except Exception:
+            out.append(s)
+            continue
+        if em <= now_min:
+            continue   # 완전 과거 슬롯 → 생성하지 않음
+        start = s.get("start") if sm > now_min else _to_hhmm(min(now_min + 1, em - 1))
+        out.append({**s, "start": start})
+    return out
+
+
 def generate_today_schedule(cfg: dict, d: date = None) -> dict:
     """오늘(또는 지정일) 스케줄 생성 후 저장."""
     d = d or date.today()
     day_type, slots = get_slots_for(cfg, d)
+    # 오늘 일정 재생성 시 이미 지난 시각 슬롯은 만들지 않는다(available_slots).
+    # 미래 날짜(내일 일정 미리 생성 등)는 필터하지 않음(now=None).
+    now = datetime.now() if d == date.today() else None
+    slots = available_slots(now, slots)
     taken = set()
     entries = []
     for i, slot in enumerate(slots, 1):
