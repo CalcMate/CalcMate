@@ -33,6 +33,15 @@ LOG = get_logger()
 FAILURE_MODES = ("none", "retry_in_slot", "next_slot")
 STATUSES = ("pending", "running", "completed", "failed", "retry")
 
+# 재시도해도 결과가 안 바뀌는 미생산 사유(신규 후보 없음/예산 등) → 슬롯 내 재시도 무의미.
+# 이런 사유는 즉시 failed 처리해 retry_in_slot 폭주(분당 재시도)를 막는다.
+# (일시적 오류/예외는 여기 없음 → 기존 retry_in_slot 유지)
+NON_RETRYABLE_REASONS = ("no_calculators", "후보소진", "모든후보HOLD", "no_items")
+
+def _is_non_retryable_reason(reason) -> bool:
+    r = str(reason or "").strip()
+    return r.startswith("budget") or r in NON_RETRYABLE_REASONS
+
 # 루프 예외 알림 스팸 방지용 스로틀(태그별 마지막 발송 시각). poll(기본 30s)마다
 # 같은 예외가 반복돼도 min_interval 이내엔 재발송하지 않는다.
 _last_alert_ts: dict = {}
@@ -306,9 +315,17 @@ def execute_due_post(cfg: dict, sched: dict, entry: dict, run_once_fn) -> str:
             entry["result"] = "성공"
             LOG.info("✅ 글%s 발행 완료", entry["post_no"])
         else:
-            entry["result"] = f"미생산({stats.get('reason','')})"
-            _apply_failure_mode(cfg, sched, entry)
+            reason = stats.get("reason", "")
+            entry["result"] = f"미생산({reason})"
+            # 재시도 무의미 사유(신규 후보 없음/예산 등)는 즉시 실패 — 슬롯 내 재시도 폭주 방지.
+            if _is_non_retryable_reason(reason):
+                entry["status"] = "failed"
+                LOG.info("글%s 미생산(%s) — 재시도 무의미, 즉시 실패(폭주 방지)",
+                         entry["post_no"], reason)
+            else:
+                _apply_failure_mode(cfg, sched, entry)
     except Exception as e:
+        # 일시적 오류/예외는 재시도 의미 있음 → 기존 retry_in_slot 유지
         entry["result"] = f"오류:{str(e)[:80]}"
         LOG.error("글%s 실행 오류: %s", entry["post_no"], e, exc_info=True)
         _apply_failure_mode(cfg, sched, entry)
