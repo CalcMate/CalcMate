@@ -182,11 +182,41 @@ def _legal_basis_block(calc: dict) -> str:
     return "\n".join(parts)
 
 
+def _resolve_context_block(calc: dict) -> str:
+    """resolve()로 legal_master.deduction_rules/calculation_flow + registry.writer_context를 조회해
+    writer 프롬프트에 '계산 근거 데이터'로 주입한다. 해당 데이터가 없는 계산기는 빈 문자열(no-op)
+    → 다른 계산기에는 영향 없음. (Legal Platform v1.0 resolve와 writer를 잇는 최소 연결)"""
+    try:
+        from .registry_loader import resolve
+        r = resolve(str(calc.get("slug", "")).strip()) or {}
+    except Exception:
+        return ""
+    dr = r.get("deduction_rules") or {}
+    cf = r.get("calculation_flow") or []
+    wc = r.get("writer_context") or {}
+    if not (dr or cf or wc):
+        return ""
+    parts = ["\n[계산 근거 데이터 — 아래 검증된 수치를 활용해 구체적으로 서술한다. 없는 숫자를 지어내지 말 것]"]
+    for name, v in dr.items():
+        detail = " · ".join(f"{k}={val}" for k, val in v.items()) if isinstance(v, dict) else str(v)
+        parts.append(f"- {name}: {detail}")
+    if cf:
+        parts.append("계산 흐름: " + " → ".join(str(x) for x in cf))
+    if wc.get("emphasize"):
+        parts.append("강조 공제: " + ", ".join(str(x) for x in wc["emphasize"]))
+    if wc.get("example_patterns"):
+        parts.append("예시 패턴(서로 다른 조건 2개): " + " / ".join(str(x) for x in wc["example_patterns"]))
+    if wc.get("calculation_story"):
+        parts.append("핵심 스토리: " + ", ".join(str(x) for x in wc["calculation_story"]))
+    return "\n".join(parts)
+
+
 def _write_article(cfg: dict, calc: dict, keyword: str, seo: dict, faq: list,
                    failed_rules=None) -> tuple:
     provider, model = make_provider(cfg, "writer")
-    # 정적 기본 프롬프트 + (config 금지문체) + (계산기별 검증 법적근거) + (재생성 시 보완지시)
-    system = _load_prompt() + _style_block(cfg) + _legal_basis_block(calc) + _rewrite_block(failed_rules)
+    # 정적 기본 프롬프트 + (config 금지문체) + (계산기별 검증 법적근거) + (resolve 계산근거 데이터) + (재생성 보완지시)
+    system = (_load_prompt() + _style_block(cfg) + _legal_basis_block(calc)
+              + _resolve_context_block(calc) + _rewrite_block(failed_rules))
     user = (
         f"계산기명: {calc.get('name')}\n"
         f"타겟 키워드(글 주제): {keyword}\n"

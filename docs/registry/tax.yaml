@@ -24,3 +24,14 @@
   - 육아휴직_급여_계산기
   legal_refs:
   - income_tax_act_137
+  # 강조 대상/예시 패턴만(법적 수치는 legal_master.deduction_rules 참조). writer 프롬프트 합성용.
+  writer_context:
+    emphasize:
+    - 의료비공제
+    - 신용카드공제
+    - 연금저축공제
+    example_patterns:
+    - 부양가족 있고 의료비 지출 있는 케이스
+    - 1인가구, 연금저축 납입 케이스
+    calculation_story:
+    - 환급액은 결정세액과 기납부세액의 차이
