@@ -943,8 +943,13 @@ elif tab == "📅 오늘 발행 일정":
                                "next_slot": "모드3: 다음 빈 슬롯으로 이동"}.get(m, m),
         key="sch_fmode")
 
-    def _slot_editor(day_type: str, label: str):
-        st.markdown(f"**{label}**")
+    def _slot_editor(day_type: str, label: str, is_today: bool = False):
+        # 헤더 표시만 조건부(오늘 적용 요일 강조). 아래 슬롯 값/반환 로직은 무변경.
+        if is_today:
+            st.success(f"✅ {label} · 오늘 적용")
+        else:
+            st.markdown(f"**{label}**")
+            st.caption("오늘 미적용 (다음 해당 요일에 적용)")
         existing = ps.get(day_type) or SCH.default_slots(count)
         new_slots = []
         for i in range(count):
@@ -957,11 +962,12 @@ elif tab == "📅 오늘 발행 일정":
             new_slots.append({"start": s.strftime("%H:%M"), "end": e.strftime("%H:%M")})
         return new_slots
 
+    _today_type = "weekend" if date.today().weekday() >= 5 else "weekday"
     cwd, cwe = st.columns(2)
     with cwd:
-        weekday_slots = _slot_editor("weekday", "평일(월~금)")
+        weekday_slots = _slot_editor("weekday", "평일(월~금)", is_today=(_today_type == "weekday"))
     with cwe:
-        weekend_slots = _slot_editor("weekend", "주말(토~일)")
+        weekend_slots = _slot_editor("weekend", "주말(토~일)", is_today=(_today_type == "weekend"))
 
     # 검증
     errs = SCH.validate_slots(weekday_slots, count) + SCH.validate_slots(weekend_slots, count)
