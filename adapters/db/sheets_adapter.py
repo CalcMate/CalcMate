@@ -14,12 +14,26 @@ import time
 import logging
 import gspread
 from gspread.exceptions import APIError, WorksheetNotFound
+from requests.exceptions import ConnectionError as _ReqConnError, ChunkedEncodingError as _ChunkErr, Timeout as _ReqTimeout
 from google.oauth2.service_account import Credentials
 from pathlib import Path
 from datetime import datetime
 from .base import AbstractDBAdapter
 
 LOG = logging.getLogger("sheets_adapter")
+
+
+def _notify_sheet_failure(cfg: dict, detail: str) -> None:
+    """시트 작업이 재시도 소진 후 실패했을 때 운영자에게 Telegram 알림(best-effort).
+    저수준 어댑터라 telegram_ops를 lazy import + 실패 무시(알림이 본 흐름을 막지 않음)."""
+    try:
+        from modules import telegram_ops
+        telegram_ops.notify_level(
+            cfg or {}, "ERROR", "Google Sheets 작업 실패 — 운영자 확인 필요",
+            f"{detail}\n(재시도 소진. rollback/상태 반영이 누락됐을 수 있음)", event="error")
+    except Exception:
+        pass
+
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -66,8 +80,10 @@ class SheetsAdapter(AbstractDBAdapter):
 
     # ── 재시도 래퍼 ────────────────────────────────────────────
     def _with_retry(self, fn, *args, **kwargs):
-        """gspread API 호출 래퍼. 429(rate limit)/5xx 시 exponential backoff 재시도.
-        그 외 APIError(권한/미존재 등)는 즉시 전파. WorksheetNotFound 등 비-APIError도 그대로 전파."""
+        """gspread API 호출 래퍼. 429(rate limit)/5xx 및 네트워크 오류(연결 끊김/타임아웃)
+        시 exponential backoff 재시도(최대 _MAX_RETRIES회). 최종 실패 시 ERROR 로그 +
+        Telegram 알림(best-effort) 후 전파 → rollback 등 시트 쓰기의 견고성 확보.
+        그 외 APIError(권한/미존재 등)·WorksheetNotFound는 즉시 전파."""
         delay = 1.0
         for attempt in range(1, _MAX_RETRIES + 1):
             try:
@@ -75,9 +91,21 @@ class SheetsAdapter(AbstractDBAdapter):
             except APIError as e:
                 status = getattr(getattr(e, "response", None), "status_code", None)
                 if status not in _RETRY_STATUS or attempt >= _MAX_RETRIES:
+                    if status in _RETRY_STATUS:
+                        _notify_sheet_failure(self._cfg, f"HTTP {status} (재시도 {_MAX_RETRIES}회 소진)")
                     raise
                 LOG.warning("Sheets API %s — %d/%d 재시도 (%.1fs 대기)",
                             status, attempt, _MAX_RETRIES, delay)
+                time.sleep(delay)
+                delay *= 2
+            except (_ReqConnError, _ChunkErr, _ReqTimeout) as e:
+                # RemoteDisconnected 등 네트워크 오류 — 재시도 대상(기존엔 미처리라 rollback 실패했음)
+                if attempt >= _MAX_RETRIES:
+                    LOG.error("Sheets 작업 실패(네트워크, %d회 재시도 소진): %s", _MAX_RETRIES, e)
+                    _notify_sheet_failure(self._cfg, f"네트워크 오류: {str(e)[:120]}")
+                    raise
+                LOG.warning("Sheets 네트워크 오류 — %d/%d 재시도 (%.1fs 대기): %s",
+                            attempt, _MAX_RETRIES, delay, str(e)[:80])
                 time.sleep(delay)
                 delay *= 2
 
