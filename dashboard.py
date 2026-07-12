@@ -868,6 +868,39 @@ elif tab == "📅 오늘 발행 일정":
         if bc[5].button("▶️ 재개", key="ctl_resume", disabled=not _paused, use_container_width=True):
             CM.resume(cfg); st.rerun()
 
+    # ── Content Sync 수동 트리거 (WordPress ↔ Sheets 상태 동기화) ──
+    # run_sync_once 100% 재사용. content_sync.lock으로 자동 03:00 실행과 상호배제.
+    with st.expander("🔄 Content Sync (WordPress ↔ Sheets 상태 동기화 · 자동 03:00 + 수동)"):
+        st.caption("발행글의 WP 상태를 조회해 시트 sync_flag 갱신(WP_DELETED/URL_CHANGED/ORPHAN). "
+                   "매일 03:00 자동 실행 + 여기서 즉시 수동 실행.")
+        _scm = st.radio("범위", ["recent", "full"], horizontal=True, key="sync_mode",
+                        help="recent=최근 30일 발행분 / full=전체 스캔")
+        if st.button("🔄 Sync Now", key="sync_now", type="primary"):
+            from modules import content_sync as CS
+            import time as _time
+            if not CS._acquire_lock(cfg):
+                st.warning("다른 동기화가 진행 중입니다(자동 03:00 또는 다른 창). 잠시 후 재시도하세요.")
+            else:
+                res = None
+                try:
+                    _t0 = _time.time()
+                    with st.spinner("WordPress ↔ Sheets 동기화 중..."):
+                        res = CS.run_sync_once(cfg, mode=_scm)
+                    _el = round(_time.time() - _t0, 1)
+                finally:
+                    CS._release_lock(cfg)
+                if not res or not res.get("ok"):
+                    st.warning(f"동기화 미실행: {(res or {}).get('reason','?')} (WordPress 미구성 등)")
+                else:
+                    from collections import Counter as _Ctr
+                    _fc = _Ctr(a.get("flag") for a in res.get("anomalies", []))
+                    st.success(f"✅ 동기화 완료 · 검사 {res['checked']}건 / 변경 {res['changed']}건 / {_el}초")
+                    st.write("이상: WP_DELETED %d · URL_CHANGED %d · ORPHAN_WP %d · ORPHAN_SHEET %d" % (
+                        _fc.get("WP_DELETED",0), _fc.get("URL_CHANGED",0),
+                        _fc.get("ORPHAN_WP",0), _fc.get("ORPHAN_SHEET",0)))
+                    for a in res.get("anomalies", [])[:10]:
+                        st.write(f"- {a.get('flag')} · {a.get('name','')} (post_id={a.get('post_id','-')})")
+
     # ── 현재 일정 표시 ──
     sched = SCH.load_schedule(cfg)
     today = date.today().isoformat()
