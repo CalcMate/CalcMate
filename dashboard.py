@@ -441,7 +441,7 @@ def render_quick_actions():
                 _run_action("글 생성(1건)", lambda: PIPE.run_once(cfg, max_count=1)); st.rerun()
             if st.button("🌐 워드프레스 발행", use_container_width=True, key="qa_wp"):
                 from modules import scheduler as SCH
-                _run_action("즉시 발행", lambda: SCH.immediate_publish(cfg, PIPE.run_once, "pull")[1]); st.rerun()
+                _run_action("즉시 발행", lambda: SCH.immediate_publish(cfg, PIPE.resolve_publish_fn(cfg), "pull")[1]); st.rerun()
 
 def render_recent_activity():
     with st.container(border=True):
@@ -937,7 +937,7 @@ elif tab == "📅 오늘 발행 일정":
                 entry = failed[[f"글{e['post_no']} ({e.get('result','')})" for e in failed].index(pick)]
                 entry["status"] = "pending"  # 재실행 대상으로 전환
                 with st.spinner("재시도 실행 중..."):
-                    SCH.execute_due_post(cfg, sched, entry, PIPE.run_once)
+                    SCH.execute_due_post(cfg, sched, entry, PIPE.resolve_publish_fn(cfg))
                 st.rerun()
     else:
         st.info("오늘 생성된 일정이 없습니다. 아래에서 '스케줄 생성'을 누르세요.")
@@ -951,7 +951,7 @@ elif tab == "📅 오늘 발행 일정":
             if x1.button("✅ 예, 발행", type="primary", key="_sched_yes"):
                 import main as PIPE
                 with st.spinner("즉시 발행 중..."):
-                    ok, msg = SCH.immediate_publish(cfg, PIPE.run_once, "pull" if "당겨" in m else "add")
+                    ok, msg = SCH.immediate_publish(cfg, PIPE.resolve_publish_fn(cfg), "pull" if "당겨" in m else "add")
                 (st.success if ok else st.error)(msg)
                 st.session_state["_sched_confirm"] = False; st.rerun()
             if x2.button("취소", key="_sched_no"):
