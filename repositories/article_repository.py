@@ -59,11 +59,13 @@ class ArticleRepository:
         return sum(1 for r in src
                    if str(r.get("상태값", "")).strip() not in INACTIVE_ARTICLE_STATUSES)
 
-    def has_quality_hold(self, calculator_id, prompt_version=None, rows=None) -> bool:
+    def has_quality_hold(self, calculator_id, prompt_version=None, rows=None, keyword=None) -> bool:
         """해당 계산기에 자동 품질검수 HOLD("품질보류") 이력이 있는지.
         상태값 문자열 판단은 이 Repository 내부에만 둔다(파이프라인은 True/False만 사용).
         prompt_version 지정 시: 그 버전으로 HOLD된 건이 하나라도 있으면 True
         (프롬프트가 그대로면 재도전 불필요). None이면 HOLD 이력 존재 여부만.
+        keyword 지정 시: 그 키워드(정책명)로 HOLD된 건만 판정 대상(키워드 단위 hold_skip).
+        None이면 계산기 단위(모든 키워드)로 판정 — legal 미검증 게이트 등 계산기 전체 차단용.
         rows 전달 시 그 스냅샷을 필터(sheet read 절감). None이면 기존대로 get_where."""
         cid = str(calculator_id or "").strip()
         if not cid:
@@ -73,6 +75,9 @@ class ArticleRepository:
         else:
             src = [r for r in rows if str(r.get("calculator_id", "")).strip() == cid]
         holds = [r for r in src if str(r.get("상태값", "")).strip() == "품질보류"]
+        if keyword is not None:
+            kw = str(keyword).strip()
+            holds = [r for r in holds if str(r.get("정책명", "")).strip() == kw]
         if prompt_version is None:
             return bool(holds)
         return any(str(r.get("quality_prompt_version", "")).strip() == str(prompt_version) for r in holds)

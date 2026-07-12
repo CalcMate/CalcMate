@@ -317,15 +317,15 @@ def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None) 
             # 여기서 품질 서명(sig)으로 재도전 여부를 결정(상태 판단은 Repository 헬퍼에 위임).
             if cid:
                 if reeval:
-                    # 현재 서명으로 이미 HOLD된 계산기 → 재시도 무의미(스킵).
-                    # 서명이 바뀌었으면(legal/게이트/프롬프트 변경) 통과 → 재도전.
-                    if art_repo.has_quality_hold(cid, prompt_version=sig, rows=snapshot):
+                    # 현재 서명 + 같은 키워드로 이미 HOLD된 건 → 재시도 무의미(스킵).
+                    # 다른 키워드는 통과(키워드 단위 hold_skip). 서명 변경 시도 통과 → 재도전.
+                    if art_repo.has_quality_hold(cid, prompt_version=sig, rows=snapshot, keyword=keyword):
                         stats["hold_skip"] += 1
                         LOG.info("[HOLD스킵] %s (cid=%s)", keyword, cid)
                         continue
                 else:
-                    # 재평가 off → HOLD 이력 있으면 영구 제외.
-                    if art_repo.has_quality_hold(cid, rows=snapshot):
+                    # 재평가 off → 같은 키워드 HOLD 이력 있으면 영구 제외(다른 키워드는 허용).
+                    if art_repo.has_quality_hold(cid, rows=snapshot, keyword=keyword):
                         stats["hold_skip"] += 1
                         LOG.info("[HOLD스킵] %s (cid=%s)", keyword, cid)
                         continue
@@ -480,9 +480,10 @@ def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None) 
                     except Exception as _e:
                         LOG.warning("품질 HOLD(WARNING) 알림 실패(무시): %s", _e)
                 existing.add(seo.get("seo_title"))
-                # 같은 run 내 후속 후보 판정을 위해 스냅샷에 반영(품질보류 + 프롬프트버전)
+                # 같은 run 내 후속 후보 판정을 위해 스냅샷에 반영(품질보류 + 프롬프트버전 + 키워드)
+                # 정책명(keyword) 포함 — 키워드 단위 hold_skip이 동일-run에서도 정확히 작동하도록.
                 snapshot.append({"calculator_id": cid, "상태값": "품질보류",
-                                 "quality_prompt_version": sig,
+                                 "quality_prompt_version": sig, "정책명": keyword,
                                  "최종추천제목": seo.get("seo_title", "")})
                 stats["quality_hold"] += 1
                 continue
