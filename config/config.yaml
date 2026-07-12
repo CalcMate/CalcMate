@@ -79,12 +79,9 @@ PUBLISH_SCHEDULE:
     end: '14:00'
   - start: '19:00'
     end: '20:00'
-# Content Sync Engine (WordPress 기준 → Google Sheets 동기화, Publish Scheduler와 별개 서비스)
-#   run_sync.py 로 독립 기동. 매일 run_at(새벽, Publish 슬롯과 안 겹치는 시간)에 1회 실행.
-#   full_scan_weekday(0=월) 요일에는 전체 스캔(full), 그 외 요일은 recent(최근 recent_days일).
 CONTENT_SYNC:
   enabled: true
-  run_at: '03:00'
+  run_at: 03:00
   full_scan_weekday: 0
   recent_days: 30
   poll_seconds: 60
