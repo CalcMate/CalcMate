@@ -1,0 +1,5 @@
+# 실험 실행 산출물(생성 HTML·요약 JSON·콘솔 로그)은 버전관리 제외. 프롬프트 원문·문서만 추적.
+runs_full/
+runs_baseline/
+runs/
+*.log
