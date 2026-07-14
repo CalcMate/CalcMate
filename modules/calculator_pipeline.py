@@ -539,6 +539,18 @@ def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None) 
             if pub_status != "published":
                 stats["no_wp"] += 1
             LOG.info("계산기 글 생산: %s (%s)", seo.get("seo_title"), pub_status)
+            # 발행 완료 알림(개발/테스트). 실제 WP 발행 확정("발행완료")일 때만 1회 — 검수대기(WP 미구성)는 제외.
+            # publish_success=false면 telegram_ops가 설정 기반으로 무발송. 실패해도 발행 흐름 무영향.
+            if pub_status == "published":
+                try:
+                    tops.notify_publish_success(
+                        cfg, site=cfg.get("SITE_NAME", "SalaryMate"),
+                        calculator=calc.get("name", ""), keyword=keyword,
+                        title=seo.get("seo_title", ""),
+                        published_at=datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        url=pub.get("wp_permalink") or pub.get("wordpress", ""))
+                except Exception as _e:
+                    LOG.warning("발행 완료 알림 실패(무시): %s", _e)
         except Exception as e:
             stats["failed"] += 1
             LOG.error("계산기 글 생성 오류(%s): %s", keyword, e, exc_info=True)

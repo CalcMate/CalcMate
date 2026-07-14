@@ -2310,7 +2310,7 @@ elif tab == "🔧 설정":
         _ev_def = cfg.get("TELEGRAM_EVENTS") or {}
         _EVENTS = [("error", "오류 발생"), ("budget", "비용 경고"),
                    ("daily_summary", "일일 요약"), ("publish_request", "발행 승인 요청"),
-                   ("quality_critical_hold", "품질 HOLD(Critical)")]
+                   ("quality_critical_hold", "품질 HOLD(Critical)"), ("publish_success", "발행 완료")]
         _ecols = st.columns(len(_EVENTS))
         tg_events = {}
         for _i, (_k, _lbl) in enumerate(_EVENTS):

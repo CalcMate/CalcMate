@@ -15,7 +15,8 @@ LOG = get_logger()
 
 # 이벤트별 ON/OFF 게이팅. config.yaml의 TELEGRAM_EVENTS(dict)로 제어.
 # 미설정 시 기본 True(하위호환 — 기존 동작 유지).
-EVENT_KEYS = ("error", "budget", "daily_summary", "publish_request", "quality_critical_hold")
+EVENT_KEYS = ("error", "budget", "daily_summary", "publish_request", "quality_critical_hold",
+              "publish_success")
 
 
 def _enabled(cfg: dict, event: str) -> bool:
@@ -70,6 +71,21 @@ def notify_quality_hold(cfg: dict, name: str, slug: str = "",
         f"마지막 시도: {last_at}\n"
         f"상태: 품질보류 (자동 재도전 대상 — 프롬프트 개선 시 재평가)"
     ))
+
+
+def notify_publish_success(cfg: dict, site: str = "", calculator: str = "", keyword: str = "",
+                           title: str = "", published_at: str = "", url: str = "") -> None:
+    """정상 발행 완료 알림(개발/테스트 편의). 'publish_success' 이벤트로 게이팅 —
+    운영 전환 시 config에서 publish_success=false로 끄면 절대 발송하지 않는다(코드 분기 없이 설정 기반).
+    URL이 없으면 해당 줄을 생략한다."""
+    if not _enabled(cfg, "publish_success"):
+        return
+    lines = ["✅ 발행 완료", ""]
+    for label, value in (("사이트", site), ("계산기", calculator), ("키워드", keyword),
+                         ("제목", title), ("발행시간", published_at), ("URL", url)):
+        if value:
+            lines += [label, str(value), ""]
+    TN.send(cfg, "\n".join(lines).rstrip())
 
 
 def notify(cfg: dict, message: str) -> None:
