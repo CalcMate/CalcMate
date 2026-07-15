@@ -341,6 +341,14 @@ def execute_due_post(cfg: dict, sched: dict, entry: dict, run_once_fn) -> str:
         if produced >= 1:
             entry["status"] = "completed"
             entry["result"] = "성공"
+            # 슬롯에 발행 결과 메타 저장(대시보드 표시용). 예약/발행/스케줄 알고리즘은 불변 — 결과 기록만.
+            meta = stats.get("published") or {}
+            if meta:
+                entry["keyword"] = meta.get("keyword", "")
+                entry["title"] = meta.get("title", "")
+                entry["wp_post_id"] = meta.get("wp_post_id", "")
+                entry["wp_url"] = meta.get("wp_url", "")
+            entry["completed_at"] = entry.get("actual_time", "")
             LOG.info("✅ 글%s 발행 완료", entry["post_no"])
         else:
             reason = stats.get("reason", "")
@@ -413,6 +421,14 @@ def immediate_publish(cfg: dict, run_once_fn, mode: str = "pull") -> tuple:
             target["actual_time"] = now.strftime("%H:%M")
             target["result"] = f"즉시({result})"
             target["attempts"] = int(target.get("attempts", 0)) + 1
+            # 슬롯 표시용 발행 메타(스케줄러 슬롯과 동일 표시). 발행/예약 로직 불변 — 결과 기록만.
+            _meta = stats.get("published") or {} if isinstance(stats, dict) else {}
+            if _meta:
+                target["keyword"] = _meta.get("keyword", "")
+                target["title"] = _meta.get("title", "")
+                target["wp_post_id"] = _meta.get("wp_post_id", "")
+                target["wp_url"] = _meta.get("wp_url", "")
+            target["completed_at"] = target["actual_time"]
             target["delay_min"] = 0
             _append_history(cfg, sched, {**target, "scheduled_time": "즉시실행"})
         else:                    # 추가 발행

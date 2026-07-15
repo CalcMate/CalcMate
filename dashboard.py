@@ -931,24 +931,68 @@ elif tab == "📅 오늘 발행 일정":
     today = date.today().isoformat()
     if sched and sched.get("date") == today:
         st.caption(f"기준일: {sched['date']} ({sched.get('day_type')}) · 실패모드: {sched.get('failure_mode')}")
-        import pandas as pd
-        rows = []
-        for e in sched.get("schedule", []):
-            icon = {"pending": "🟡", "running": "🔵", "completed": "🟢",
-                    "failed": "🔴", "retry": "🟠"}.get(e.get("status"), "⬜")
-            rows.append({
-                "글번호": e.get("post_no"),
-                "슬롯": f"{e.get('slot_start')}~{e.get('slot_end')}",
-                "예약시간": e.get("scheduled_time"),
-                "실제실행": e.get("actual_time") or "-",
-                "지연(분)": e.get("delay_min", ""),
-                "상태": f"{icon} {e.get('status')}",
-                "결과": e.get("result") or "-",
-            })
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
-        done = sum(1 for e in sched["schedule"] if e.get("status") == "completed")
-        st.progress(done / max(len(sched["schedule"]), 1),
-                    text=f"완료 {done}/{len(sched['schedule'])}")
+        # 슬롯별 실행 결과 카드 — Empty 대신 상태 유지 표시(저장된 메타 keyword/title/wp만 읽어 표시).
+        _entries = sched.get("schedule", [])
+
+        def _slot_status(e):
+            s = str(e.get("status", "")).strip()
+            r = str(e.get("result", ""))
+            if s == "completed":
+                return "✅ 발행완료", "#16a34a"
+            if s == "running":
+                return "▶ 처리중", "#3b82f6"
+            if s == "retry":
+                return "🟠 재시도", "#f59e0b"
+            if s == "pending":
+                return "⏳ 예정", "#f59e0b"
+            if s == "failed":
+                if any(k in r for k in ("HOLD", "품질보류", "모든후보HOLD")):
+                    return "⚠ HOLD", "#eab308"
+                if any(k in r for k in ("후보소진", "no_calculators", "no_items", "budget")):
+                    return "⏭ Skip", "#94a3b8"
+                return "❌ 실패", "#ef4444"
+            return "⏳ 예정", "#f59e0b"
+
+        if _entries:
+            for e in _entries:
+                label, col = _slot_status(e)
+                with st.container(border=True):
+                    cA, cB = st.columns([1, 3])
+                    cA.markdown(
+                        f"<div style='font-size:18px;font-weight:700'>{e.get('scheduled_time') or e.get('slot_start','-')}</div>"
+                        f"<div style='font-size:11px;color:#64748b'>슬롯 {e.get('slot_start','')}~{e.get('slot_end','')}</div>",
+                        unsafe_allow_html=True)
+                    parts = [f"<span style='color:{col};font-weight:600'>{label}</span>"]
+                    if e.get("keyword"):
+                        parts.append(f"🔑 {e['keyword']}")
+                    if e.get("title"):
+                        parts.append(f"📝 {e['title']}")
+                    tail = []
+                    _t = e.get("completed_at") or e.get("actual_time")
+                    if _t:
+                        tail.append(f"⏱ {_t}")
+                    if e.get("wp_post_id"):
+                        tail.append(f"<a href='{e['wp_url']}' target='_blank'>WP #{e['wp_post_id']}</a>"
+                                    if e.get("wp_url") else f"WP #{e['wp_post_id']}")
+                    if str(e.get("delay_min", "")) not in ("", "-", "None"):
+                        tail.append(f"지연 {e['delay_min']}분")
+                    if tail:
+                        parts.append(f"<span style='font-size:12px;color:#64748b'>{' · '.join(str(x) for x in tail)}</span>")
+                    if not e.get("keyword") and e.get("result"):
+                        parts.append(f"<span style='font-size:12px;color:#64748b'>{e['result']}</span>")
+                    cB.markdown("<br>".join(parts), unsafe_allow_html=True)
+            done = sum(1 for e in _entries if e.get("status") == "completed")
+            st.progress(done / max(len(_entries), 1), text=f"완료 {done}/{len(_entries)}")
+        else:
+            st.info("오늘 생성된 예약 슬롯이 없습니다. (설정 시각이 이미 지나 생성에서 제외됐을 수 있습니다.)")
+            try:
+                _dt, _cfg_slots = SCH.get_slots_for(cfg, date.today())
+            except Exception:
+                _cfg_slots = []
+            if _cfg_slots:
+                st.caption("설정된 슬롯(참고 — 오늘 미생성):")
+                for s in _cfg_slots:
+                    st.write(f"• {s.get('start')}~{s.get('end')}  ⏭ 오늘 미생성")
 
         # 실패 건 즉시 재시도
         failed = [e for e in sched["schedule"] if e.get("status") == "failed"]

@@ -284,7 +284,7 @@ def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None) 
     existing = set(r.get("최종추천제목", "") for r in snapshot if r.get("상태값") == "발행완료")
 
     stats = {"produced": 0, "processed": 0, "failed": 0, "no_wp": 0, "dup": 0,
-             "quality_hold": 0, "hold_skip": 0}
+             "quality_hold": 0, "hold_skip": 0, "published": None}
     rcfg = cfg.get("QUALITY_RETRY", {}) or {}
     # §5 legal 미검증 차단 스위치(기본 true). needs_human_legal + 실제 legal 공백 계산기를
     # GPT 호출 전 품질보류. legal-HOLD는 아래 sentinel 버전으로 기록해, 프롬프트 버전 기반
@@ -539,6 +539,13 @@ def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None) 
             if pub_status != "published":
                 stats["no_wp"] += 1
             LOG.info("계산기 글 생산: %s (%s)", seo.get("seo_title"), pub_status)
+            # 슬롯 표시용 발행 메타(반환값 enrich만 — 발행/WP/시트 동작 불변). 스케줄러는 max_count=1 단건.
+            stats["published"] = {
+                "keyword": keyword, "title": seo.get("seo_title", ""),
+                "wp_post_id": pub.get("wp_post_id", ""),
+                "wp_url": pub.get("wp_permalink") or pub.get("wordpress", ""),
+                "status": pub_status,
+            }
             # 발행 완료 알림(개발/테스트). 실제 WP 발행 확정("발행완료")일 때만 1회 — 검수대기(WP 미구성)는 제외.
             # publish_success=false면 telegram_ops가 설정 기반으로 무발송. 실패해도 발행 흐름 무영향.
             if pub_status == "published":
