@@ -986,7 +986,7 @@ elif tab == "📅 오늘 발행 일정":
         else:
             st.info("오늘 생성된 예약 슬롯이 없습니다. (설정 시각이 이미 지나 생성에서 제외됐을 수 있습니다.)")
             try:
-                _dt, _cfg_slots = SCH.get_slots_for(cfg, date.today())
+                _daytype, _cfg_slots = SCH.get_slots_for(cfg, date.today())
             except Exception:
                 _cfg_slots = []
             if _cfg_slots:
