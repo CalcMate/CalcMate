@@ -929,6 +929,72 @@ elif tab == "📅 오늘 발행 일정":
     # ── 현재 일정 표시 ──
     sched = SCH.load_schedule(cfg)
     today = date.today().isoformat()
+
+    # ── 스케줄 탭 전용 자동 새로고침(테스트용) ──
+    # 예약 시각이 지난 슬롯이 '예정/처리중/재시도'인 동안 1분마다 자동 새로고침하고,
+    # '발행완료/실패/HOLD/Skip'(terminal)이 되면 즉시 종료. 안전장치로 최대 10분까지만.
+    # 이 탭에서만 동작(다른 탭은 이 코드 미실행). UI 표시 전용 — 예약/스케줄러/발행/WP/Telegram 로직과
+    # 무관. 새로고침 횟수·마지막 시각·감시상태는 session_state로만 관리.
+    import time as _time
+    _ss = st.session_state
+    for _k, _v in (("sched_ar_start", 0.0), ("sched_ar_last", 0.0), ("sched_ar_count", 0),
+                   ("sched_ar_watching", False), ("sched_ar_render", 0.0)):
+        _ss.setdefault(_k, _v)
+
+    def _hm2min(t):
+        try:
+            _h, _m = str(t).split(":")[:2]
+            return int(_h) * 60 + int(_m)
+        except Exception:
+            return -1
+
+    _AR_CAP = 600                                     # 안전장치: 최대 10분
+    _ACTIVE_ST = ("pending", "running", "retry")      # 미완료(계속) / completed·failed = terminal(종료)
+    _now = _dt.now()
+    _now_min = _now.hour * 60 + _now.minute
+    _now_ts = _time.time()
+    _entries_today = (sched.get("schedule") or []) if (sched and sched.get("date") == today) else []
+    # 예약시각이 도래했는데 아직 미완료인 슬롯이 있으면 '감시(watching)' → 계속 새로고침
+    _due_pending = [e for e in _entries_today
+                    if 0 <= _hm2min(e.get("scheduled_time")) <= _now_min
+                    and str(e.get("status", "")).strip() in _ACTIVE_ST]
+    _watching = len(_due_pending) > 0
+
+    _prev_watching = _ss["sched_ar_watching"]
+    if _watching and not _prev_watching:              # 감시 시작(에지) → 캡 기준시각·카운트 초기화
+        _ss["sched_ar_start"] = _now_ts
+        _ss["sched_ar_last"] = _now_ts
+        _ss["sched_ar_count"] = 0
+    elif (_watching or _prev_watching) and _ss["sched_ar_last"] and (_now_ts - _ss["sched_ar_last"]) >= 55:
+        _ss["sched_ar_count"] += 1                    # 타이머 촉발 새로고침 1회로 집계(terminal 감지 tick 포함)
+        _ss["sched_ar_last"] = _now_ts
+    _ss["sched_ar_watching"] = _watching
+
+    _elapsed = _now_ts - (_ss["sched_ar_start"] or _now_ts)
+    _ar_active = _watching and _elapsed < _AR_CAP     # 미완료 슬롯 있고 & 10분 이내면 계속
+
+    if _ar_active:
+        _ar_interval = 60                             # 1분 간격 새로고침
+    else:
+        # 감시 아님 → 다음 예약(미도래 pending) 시각까지 대기, 없으면 정지
+        _future_pending = sorted([_hm2min(e.get("scheduled_time")) for e in _entries_today
+                                  if _hm2min(e.get("scheduled_time")) > _now_min
+                                  and str(e.get("status", "")).strip() in ("pending", "retry")])
+        _ar_interval = min(3600, max(20, (_future_pending[0] - _now_min) * 60 + 5)) if _future_pending else None
+
+    _ss["sched_ar_render"] = _now_ts
+    if _ar_interval is not None:
+        @st.fragment(run_every=_ar_interval)
+        def _sched_auto_refresh():
+            # 타이머 만료 시에만 전체 앱 재실행(초기 렌더는 render_ts 가드로 제외 → 무한루프 방지)
+            if _time.time() - _ss["sched_ar_render"] >= (_ar_interval - 3):
+                st.rerun()
+        _sched_auto_refresh()
+
+    if _ar_active:
+        st.caption(f"⏱ 자동 새로고침 중 · 미완료 슬롯 {len(_due_pending)}개 · {_ss['sched_ar_count']}회 · "
+                   f"경과 {int(_elapsed // 60)}분/최대 10분 · {_now.strftime('%H:%M:%S')} (완료 시 자동 종료)")
+
     if sched and sched.get("date") == today:
         st.caption(f"기준일: {sched['date']} ({sched.get('day_type')}) · 실패모드: {sched.get('failure_mode')}")
         # 슬롯별 실행 결과 카드 — Empty 대신 상태 유지 표시(저장된 메타 keyword/title/wp만 읽어 표시).
