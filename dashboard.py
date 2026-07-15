@@ -710,21 +710,46 @@ elif tab == "🗑️ 휴지통":
 
 elif tab == "⚠️ 오류 로그":
     st.title("⚠️ 최근 오류 로그")
-    st.caption("운영로그(logs) 테이블에서 실패 기록을 조회합니다.")
+    st.caption("운영로그(logs) 실패 + 계산기(articles) 품질보류/REWRITE를 함께 조회합니다.")
     try:
         rows = cached_table("logs")
         # 가동결과에 '오류' 포함되거나 실패모듈이 있는 행
         errors = [r for r in rows
                   if "오류" in str(r.get("가동결과", "")) or str(r.get("실패모듈", "")).strip()]
         errors = errors[-20:][::-1]  # 최근 20건, 최신 우선
+
+        # 계산기 파이프라인 실패는 logs가 아닌 articles에 기록됨 → 함께 표시(표시 전용).
+        # 활성 실패 상태는 '품질보류' 하나뿐(REWRITE/legal 미검증 홀드 모두 이 상태값). quality_status는
+        # 발행완료·재처리완료·삭제됨 행에도 'REWRITE'가 잔존해 오탐하므로, 상태값으로만 판정한다.
+        def _is_calc_fail(r):
+            return str(r.get("상태값", "")).strip() == "품질보류"
+        try:
+            calc_fails = [r for r in cached_table("articles") if _is_calc_fail(r)][-20:][::-1]
+        except Exception:
+            calc_fails = []
+
+        st.metric("최근 오류 건수", len(errors) + len(calc_fails))
+        import pandas as pd
+
+        st.subheader("운영로그(logs) 오류")
         if errors:
-            import pandas as pd
             cols = ["실행일시", "마스터ID", "대상정책명", "실패모듈", "오류내용"]
             df = pd.DataFrame(errors)
             show = [c for c in cols if c in df.columns]
-            st.metric("최근 오류 건수", len(errors))
             st.dataframe(df[show] if show else df, use_container_width=True)
         else:
+            st.caption("운영로그 오류 없음")
+
+        st.subheader("계산기 품질보류 / REWRITE (articles)")
+        if calc_fails:
+            cols = ["발행일시", "최종추천제목", "정책명", "상태값", "quality_status", "quality_failed_rules"]
+            df = pd.DataFrame(calc_fails)
+            show = [c for c in cols if c in df.columns]
+            st.dataframe(df[show] if show else df, use_container_width=True)
+        else:
+            st.caption("계산기 품질보류 없음")
+
+        if not errors and not calc_fails:
             st.success("최근 오류 없음 ✅")
     except Exception as e:
         st.error(f"로그 로드 오류: {e}")
@@ -2569,8 +2594,33 @@ elif tab == "📡 실시간 로그":
         html = ['<div style="font-family:monospace;font-size:12px;line-height:1.5;'
                 'max-height:460px;overflow:auto;background:#0f172a;padding:10px;border-radius:8px">']
         import html as _h
-        for line, lv in rows[-200:]:
-            html.append(f'<div style="color:{color[lv]};white-space:pre-wrap">{_h.escape(line)}</div>')
+        import re as _re
+        def _body(s):   # 타임스탬프 접두사 제외 본문(연속 반복 판정용)
+            return _re.sub(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\s*', '', s)
+        def _hms(s):
+            m = _re.match(r'^\d{4}-\d{2}-\d{2} (\d{2}:\d{2}:\d{2})', s)
+            return m.group(1) if m else ''
+
+        def _emit(_line, _lv):
+            html.append(f'<div style="color:{color[_lv]};white-space:pre-wrap">{_h.escape(_line)}</div>')
+
+        disp = rows[-200:]
+        i = 0
+        while i < len(disp):
+            line, lv = disp[i]
+            key = _body(line)
+            j = i + 1
+            while j < len(disp) and _body(disp[j][0]) == key:
+                j += 1
+            run = j - i
+            _emit(line, lv)                      # 첫 줄은 항상 표시
+            if run >= 3:                         # 3회 이상 연속 → 나머지 압축(표시만)
+                note = f'⋯ 동일 메시지 {run - 1}회 생략(마지막: {_hms(disp[j - 1][0])})'
+                html.append(f'<div style="color:#64748b;font-style:italic;white-space:pre-wrap">{_h.escape(note)}</div>')
+            else:                                # 1~2회는 그대로 전부 표시
+                for k in range(i + 1, j):
+                    _emit(disp[k][0], disp[k][1])
+            i = j
         html.append("</div>")
         st.markdown("".join(html), unsafe_allow_html=True)
 
