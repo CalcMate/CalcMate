@@ -212,23 +212,50 @@ def available_slots(now: datetime, slot_candidates: list) -> list:
 
 
 def generate_today_schedule(cfg: dict, d: date = None) -> dict:
-    """오늘(또는 지정일) 스케줄 생성 후 저장."""
+    """오늘(또는 지정일) 스케줄 생성 후 저장.
+
+    재생성 시 병합 규칙(오늘 날짜 한정):
+      - completed / failed / running 항목은 절대 삭제하지 않고 유지(실행 이력 보존).
+      - pending / retry 항목만 재생성 대상 — 새 슬롯 설정으로 교체.
+      - 병합 기준: scheduled_time. 보존 시각과 동일 시각의 신규 슬롯은 생성 금지(중복 방지).
+      - 날짜가 다른 경우(내일 미리 생성 등)에는 보존 없이 새로 생성.
+    """
     d = d or date.today()
     day_type, slots = get_slots_for(cfg, d)
     # 오늘 일정 재생성 시 이미 지난 시각 슬롯은 만들지 않는다(available_slots).
     # 미래 날짜(내일 일정 미리 생성 등)는 필터하지 않음(now=None).
     now = datetime.now() if d == date.today() else None
     slots = available_slots(now, slots)
+
+    # ── 기존 실행 이력 보존(오늘 재생성 시에만) ──────────────────────
+    # 날짜가 다르면(내일 미리 생성 / 날짜 변경 직후) 보존 없이 새로 생성.
+    preserved = []
+    if now is not None:
+        existing = load_schedule(cfg)
+        if existing and existing.get("date") == d.isoformat():
+            preserved = [e for e in existing.get("schedule", [])
+                         if str(e.get("status", "")).strip() in ("completed", "failed", "running")]
+
+    # 보존 항목의 scheduled_time(분)을 taken 초기값으로 설정 → 신규 슬롯이 같은 시각 생성 금지
     taken = set()
-    entries = []
-    for i, slot in enumerate(slots, 1):
+    for e in preserved:
+        t = e.get("scheduled_time", "")
+        if t and ":" in str(t):
+            try:
+                taken.add(_to_min(t))
+            except Exception:
+                pass
+
+    # ── 신규 pending 슬롯 생성 ────────────────────────────────────────
+    new_entries = []
+    for slot in slots:
         st, en = slot.get("start", "09:00"), slot.get("end", "10:00")
         try:
             sched_time = _rand_time_in(st, en, taken)
         except Exception:
             sched_time = st
-        entries.append({
-            "post_no": i,
+        new_entries.append({
+            "post_no": 0,          # 병합 후 재부여
             "slot_start": st,
             "slot_end": en,
             "scheduled_time": sched_time,
@@ -238,15 +265,21 @@ def generate_today_schedule(cfg: dict, d: date = None) -> dict:
             "result": "",
             "attempts": 0,
         })
-    entries.sort(key=lambda e: e["scheduled_time"])
+
+    # ── 병합: 보존 + 신규 → 시각 순 정렬 → post_no 재부여 ───────────
+    merged = sorted(preserved + new_entries, key=lambda e: e.get("scheduled_time", ""))
+    for i, e in enumerate(merged, 1):
+        e["post_no"] = i
+
     sched = {
         "date": d.isoformat(),
         "day_type": day_type,
         "failure_mode": failure_mode(cfg),
-        "schedule": entries,
+        "schedule": merged,
     }
     save_schedule(cfg, sched)
-    LOG.info("오늘(%s, %s) 발행 일정 생성: %d건", d.isoformat(), day_type, len(entries))
+    LOG.info("오늘(%s, %s) 발행 일정 생성: %d건 (보존 %d + 신규 %d)",
+             d.isoformat(), day_type, len(merged), len(preserved), len(new_entries))
     return sched
 
 def load_schedule(cfg: dict) -> dict | None:
