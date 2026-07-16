@@ -60,6 +60,27 @@ def _alert_throttled(cfg: dict, tag: str, level: str, title: str, detail="",
         pass
 
 
+def _notify_slot_result(cfg: dict, entry: dict, reason: str) -> None:
+    """슬롯 레벨 실패 알림 — HOLD/후보소진 전용. 실패해도 스케줄러 흐름 무영향.
+    성공은 calculator_pipeline.py의 publish_success가 담당하므로 여기선 침묵."""
+    slot = entry.get("scheduled_time", "-")
+    no = entry.get("post_no", "?")
+    try:
+        from . import telegram_ops
+        if reason == "모든후보HOLD":
+            telegram_ops.notify_level(cfg, "WARNING",
+                f"글{no} 슬롯 품질보류 ({slot})",
+                "모든 후보가 품질 재시도 한도 초과로 발행 보류됨 — 프롬프트 개선 시 자동 재도전",
+                event="quality_critical_hold")
+        elif reason == "후보소진":
+            telegram_ops.notify_level(cfg, "WARNING",
+                f"글{no} 슬롯 후보소진 ({slot})",
+                "발행 가능한 신규 후보 없음 — 계산기 전부 발행됨 또는 HOLD 상태",
+                event="quality_critical_hold")
+    except Exception:
+        pass
+
+
 # ── 경로 ──────────────────────────────────────────────────────────
 def _schedule_dir(cfg: dict) -> Path:
     root = Path(cfg.get("_root", "."))
@@ -358,6 +379,7 @@ def execute_due_post(cfg: dict, sched: dict, entry: dict, run_once_fn) -> str:
                 entry["status"] = "failed"
                 LOG.info("글%s 미생산(%s) — 재시도 무의미, 즉시 실패(폭주 방지)",
                          entry["post_no"], reason)
+                _notify_slot_result(cfg, entry, reason)
             else:
                 _apply_failure_mode(cfg, sched, entry)
     except Exception as e:
