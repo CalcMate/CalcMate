@@ -54,7 +54,11 @@ def generate_meta_description(cfg: dict, calc: dict) -> str:
 def generate_seo(cfg: dict, name: str, keyword: str = "") -> dict:
     year = datetime.now().year
     system = ("너는 SEO 전문가다. 주어진 계산기/키워드에 대한 SEO 메타데이터를 작성하라. "
-              "제목은 28~40자, 연도 포함 가능. 순수 JSON만 반환: "
+              "규칙: "
+              "1) seo_title은 28~40자, 연도 포함. "
+              "2) 타겟 키워드를 제목에 반드시 포함할 것(예: '계산법' 키워드면 '계산법'이 제목에 있어야 함). "
+              "3) 서로 다른 키워드는 반드시 서로 다른 제목을 만들 것 — '총정리/가이드/안내' 등 동일 suffix로 수렴 금지. "
+              "순수 JSON만 반환: "
               '{"seo_title":"","seo_description":"","seo_keywords":[]}')
     user = f"계산기명: {name}\n타겟 키워드: {keyword or name}\n연도: {year}"
     try:

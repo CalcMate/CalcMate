@@ -281,7 +281,16 @@ def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None) 
         snapshot = list(art_repo.get_all())
     except Exception:
         snapshot = []
-    existing = set(r.get("최종추천제목", "") for r in snapshot if r.get("상태값") == "발행완료")
+    # 계산기 단위 중복 방지 — 동일 계산기의 기존 발행 제목만 비교(cross-calculator 비교 불필요:
+    # 계산기명이 제목에 포함되므로 계산기 간 제목 충돌 가능성 극히 낮음).
+    # 같은 run 내 새 제목도 아래 루프에서 calc별로 추가되어 intra-run dedup도 유지.
+    existing_by_calc: dict[str, set] = {}
+    for _r in snapshot:
+        if _r.get("상태값") == "발행완료":
+            _c = str(_r.get("calculator_id", "") or "")
+            _t = _r.get("최종추천제목", "") or ""
+            if _c and _t:
+                existing_by_calc.setdefault(_c, set()).add(_t)
 
     stats = {"produced": 0, "processed": 0, "failed": 0, "no_wp": 0, "dup": 0,
              "quality_hold": 0, "hold_skip": 0, "published": None}
@@ -370,7 +379,7 @@ def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None) 
                     stats["quality_hold"] += 1
                     continue
             seo = generate_seo(cfg, calc.get("name", keyword), keyword)
-            if seo.get("seo_title") in existing:
+            if seo.get("seo_title") in existing_by_calc.get(cid, set()):
                 stats["dup"] += 1
                 continue
             attempted += 1   # 모든 스킵 게이트 통과 → 실제 생성 진입(후보 상한 카운트)
@@ -479,7 +488,7 @@ def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None) 
                             event="quality_critical_hold")
                     except Exception as _e:
                         LOG.warning("품질 HOLD(WARNING) 알림 실패(무시): %s", _e)
-                existing.add(seo.get("seo_title"))
+                existing_by_calc.setdefault(cid, set()).add(seo.get("seo_title"))
                 # 같은 run 내 후속 후보 판정을 위해 스냅샷에 반영(품질보류 + 프롬프트버전 + 키워드)
                 # 정책명(keyword) 포함 — 키워드 단위 hold_skip이 동일-run에서도 정확히 작동하도록.
                 snapshot.append({"calculator_id": cid, "상태값": "품질보류",
@@ -529,7 +538,7 @@ def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None) 
                                  _nres, cid)
                 except Exception as _e:
                     LOG.warning("품질보류 정리 실패(무시): %s", _e)
-            existing.add(seo.get("seo_title"))
+            existing_by_calc.setdefault(cid, set()).add(seo.get("seo_title"))
             # 같은 run 내 후속 후보의 count_active_articles 판정을 위해 스냅샷에 반영
             snapshot.append({"calculator_id": cid,
                              "상태값": "발행완료" if pub_status == "published" else "검수대기",
