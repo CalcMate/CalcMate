@@ -226,7 +226,8 @@ def _read_assets_js() -> str:
 
 
 def _compute_js(calc) -> str:
-    """계산기별 computeResult(inputs) 생성. 기존 formula/퇴직금 date분기 로직 유지."""
+    """계산기별 computeResult(inputs) 생성. 기존 formula/퇴직금 date분기 로직 유지.
+    registry의 compute_rules가 있으면 입력 검증(양수/최솟값/최저임금) 코드를 자동 주입한다."""
     if _compute_type(calc) == "date_based":   # 날짜 기반(입사일/퇴사일 → total_days) — 로직 무변경, 분기조건만 registry화
         return (
             'window.computeResult = function(inputs){\n'
@@ -243,9 +244,72 @@ def _compute_js(calc) -> str:
     formula = _pj(calc.get("formula"), calc.get("formula", ""))
     fmap = _formula_map(formula, outs)
     reads = "".join(f'  var {n} = inputs["{n}"] || 0;\n' for n in ins.keys())
-    body = "  var out = {};\n" + "".join(
-        f'  out["{k}"] = ({_to_js(expr)});\n' for k, expr in fmap.items())
+
+    slug = str(calc.get("slug", ""))
+    rules = (_registry().get(slug) or {}).get("compute_rules") or {}
+    validation = _compute_validation_js(rules, fmap) if rules else ""
+
+    if validation:
+        # 검증 블록 있음: reads → notices 초기화 → 검증 → 수식 → _formula → return
+        out_key = next(iter(fmap))
+        out_expr = _to_js(next(iter(fmap.values())))
+        primary_label = _label(out_key)
+        in_keys = list(ins.keys())
+        formula_str = (f"{in_keys[0]}.toLocaleString() + '원 × (' "
+                       f"+ {in_keys[1]} + '÷40×8) = ' "
+                       f"+ Math.round({out_expr}).toLocaleString() + '원'"
+                       if len(in_keys) == 2 else '""')
+        body = (
+            "  var out = {};\n"
+            "  out.notices = [];\n"
+            + validation
+            + f'  out["{out_key}"] = ({out_expr});\n'
+            + f'  out._formula = {formula_str};\n'
+        )
+    else:
+        body = "  var out = {};\n" + "".join(
+            f'  out["{k}"] = ({_to_js(expr)});\n' for k, expr in fmap.items())
+
     return "window.computeResult = function(inputs){\n" + reads + body + "  return out;\n};\n"
+
+
+def _compute_validation_js(rules: dict, fmap: dict) -> str:
+    """compute_rules YAML → JS 검증 코드 블록 생성.
+    양수 입력 체크 → 최솟값(주 시간 등) 체크 → 최저임금 경고 순."""
+    lines = []
+    positive = rules.get("positive_inputs") or []
+    if positive:
+        cond = " || ".join(f"{n} <= 0" for n in positive)
+        lines.append(f"  if ({cond}) {{ return null; }}\n")
+
+    min_hours = rules.get("min_weekly_hours")
+    min_hours_field = "weekly_hours"
+    min_hours_law = rules.get("min_weekly_hours_law", "")
+    if min_hours is not None:
+        out_key = next(iter(fmap))
+        notice_msg = (f"주 {min_hours}시간 미만 근무 시 주휴수당이 발생하지 않습니다"
+                      + (f" ({min_hours_law})." if min_hours_law else "."))
+        lines.append(
+            f"  if ({min_hours_field} < {min_hours}) {{\n"
+            f'    out["{out_key}"] = 0;\n'
+            f'    out.notices.push("{notice_msg}");\n'
+            f'    out._formula = "주 " + {min_hours_field} + "시간 미만({min_hours}시간 기준) — 주휴수당 미발생";\n'
+            f"    return out;\n"
+            f"  }}\n"
+        )
+
+    min_wage = rules.get("min_wage")
+    min_wage_year = rules.get("min_wage_year", "")
+    min_wage_field = rules.get("min_wage_field", "")
+    if min_wage and min_wage_field:
+        label_str = f"{min_wage_year}년 최저임금({min_wage:,}원)" if min_wage_year else f"최저임금({min_wage:,}원)"
+        lines.append(
+            f"  if ({min_wage_field} < {min_wage}) {{\n"
+            f'    out.notices.push("입력한 시급(" + {min_wage_field}.toLocaleString() + "원)이 {label_str}보다 낮습니다.");\n'
+            f"  }}\n"
+        )
+
+    return "".join(lines)
 
 
 def _formula_map(formula, output_schema) -> dict:

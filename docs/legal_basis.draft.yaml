@@ -48,6 +48,14 @@ weekly-holiday-allowance:
     content_caveat: null
   related_slugs: [severance-pay, annual-leave-allowance, unemployment-benefit, four-insurances, 연말정산_환급액_계산기, 육아휴직_급여_계산기]
   # 코드정합: input(hourly_wage, weekly_hours) / formula hourly_wage*(weekly_hours/40*8).
+  # compute_rules: _compute_js()가 읽어 JS 검증 코드를 자동 주입한다.
+  compute_rules:
+    min_weekly_hours: 15                          # 미만 시 0원 + notices 안내
+    min_weekly_hours_law: 근로기준법 제18조제3항   # notice 인용 조항
+    min_wage: 10030                               # 미만 시 경고 notices (계산 차단 안 함)
+    min_wage_year: 2026
+    min_wage_field: hourly_wage                   # 최저임금 비교 대상 입력 필드
+    positive_inputs: [hourly_wage, weekly_hours]  # 0 이하 시 null 반환(입력 오류)
 
 severance-pay:
   name: 퇴직금 계산기

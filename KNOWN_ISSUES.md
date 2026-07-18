@@ -163,6 +163,21 @@ Status: 🟡 Monitoring
 - **영향**: gate threshold(1800)는 안전망으로 유지. writer target과 rewrite 목표를 정렬.
 - **성격**: 품질 기준 변경 아님. 생성 피드백 목표 정렬 문제.
 
+### R6. 주휴수당 computeResult 경계값 버그 3종 해결 (2026-07-19)
+
+- **원인**: JS `computeResult` 함수가 주 15시간 미만 조건 분기 없이 계산 → 14시간 입력 시 28,000원 표시(법적으로 지급 불가).
+  음수/0 시급 입력에도 결과 반환(UX 오류). 최저임금 경고 안내 없음.
+- **발견**: 계산기 품질 표준 v1.0 경계값 검증(B-1/B-2/B-3) — 주휴수당이 기준 모델.
+- **해결**:
+  - B-1(critical): `compute_rules.min_weekly_hours: 15` → JS `if (weekly_hours < 15) { return 0 + notice }`
+  - B-2(major): `compute_rules.positive_inputs` → JS `if (hourly_wage <= 0 || weekly_hours <= 0) { return null }`
+  - B-3(major): `compute_rules.min_wage: 10030` → JS `out.notices.push(...)` (계산 차단 없음)
+  - B-4(minor): `out._formula` 문자열 반환 → UI 계산 과정 표시
+- **아키텍처**: `legal_basis.draft.yaml`의 `compute_rules` 필드(YAML 단일 진실 소스)
+  → `app_generator._compute_validation_js()` → 생성 JS에 주입. 나머지 6개 계산기에 동일 패턴 적용 가능.
+- **테스트**: `tests/test_weekly_holiday_compute.py` 11케이스 영구 등록 (7 핵심 + 4 SEO 정합성). ALL PASS.
+- **회귀 방지**: `tests/golden/calculator_snapshots.json` 업데이트 완료. weekly-holiday-allowance script.js 해시 고정.
+
 ### R3. G5 내부링크 게이트 — Cold Start 순환 교착 (2026-07-18 해결)
 - **원인**: 로컬 데이터 초기화(07-17) 이후 발행완료 기사가 0건이 되면서, 내부링크 최소 2개 요구(G5)가
   "발행할 기사가 없어 내부링크 후보도 없고, 내부링크가 없어 발행도 안 되는" 순환 교착에 빠짐.
