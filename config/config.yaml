@@ -73,12 +73,12 @@ PUBLISH_SCHEDULE:
   - start: '18:30'
     end: '19:00'
   weekend:
-  - start: 09:00
-    end: '10:00'
-  - start: '13:00'
-    end: '14:00'
-  - start: '19:00'
-    end: '20:00'
+  - start: 06:00
+    end: 06:30
+  - start: '12:00'
+    end: '12:30'
+  - start: '18:30'
+    end: '19:00'
 CONTENT_SYNC:
   enabled: true
   run_at: 03:00
@@ -91,9 +91,10 @@ TELEGRAM_EVENTS:
   daily_summary: true
   publish_request: true
   quality_critical_hold: true
-  publish_success: true   # 개발/테스트: 정상 발행 시 알림. 운영 전환 시 false로 끄고 daily_summary 사용.
+  publish_success: true
 QUALITY_GATE:
   MIN_LENGTH: 1800
+  WRITER_TARGET_LENGTH: 1900
   MAX_LENGTH: 2500
   MIN_H2: 5
   MAX_H2: 7
@@ -122,7 +123,7 @@ SITE_MODE: pre_adsense
 SHOW_ADSENSE: false
 SHOW_CPA: false
 SHOW_SHARE: true
-SHOW_PWA: true
+SHOW_PWA: false
 SHOW_RESULT_SAVE: true
 SHOW_FAQ: true
 SHOW_NOTICE: true

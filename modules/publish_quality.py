@@ -130,9 +130,19 @@ def check_gates(body_html: str, final_html: str, cfg: dict, link_pool_size: int 
     body_text = _plain_text(body_html)
 
     length = len(body_text)
-    if not (g.get("MIN_LENGTH", 1800) <= length <= g.get("MAX_LENGTH", 2500)):
-        failed.append({"gate": "G1", "grade": "major",
-                       "detail": f"본문 {length}자 → {g.get('MIN_LENGTH',1800)}~{g.get('MAX_LENGTH',2500)}자 필요"})
+    min_len = g.get("MIN_LENGTH", 1800)
+    max_len = g.get("MAX_LENGTH", 2500)
+    if not (min_len <= length <= max_len):
+        if length < min_len:
+            writer_target = g.get("WRITER_TARGET_LENGTH", 1900)
+            shortfall = writer_target - length
+            detail = (
+                f"본문 {length}자 → 최소 {writer_target}자(가시 텍스트) 필요"
+                + (f", {shortfall}자 추가 작성 필요" if shortfall > 0 else "")
+            )
+        else:
+            detail = f"본문 {length}자 → 최대 {max_len}자 초과, {length - max_len}자 단축 필요"
+        failed.append({"gate": "G1", "grade": "major", "detail": detail})
 
     h2 = _count_h2(body_html)
     if not (g.get("MIN_H2", 5) <= h2 <= g.get("MAX_H2", 7)):
