@@ -61,10 +61,19 @@ def _count_faq(html: str) -> int:
 
 def _count_examples(html: str) -> int:
     """계산 예시 개수(존재 여부 판정용 휴리스틱 — 품질은 S1이 판정).
-    '예를 들어/예시/가정하면' 도입부 또는 '= 10,000원' 형태 계산식 등장 횟수."""
+    '예를 들어/예시/가정하면' 도입부 또는 '= 10,000원'/'= 50만원' 형태 계산식 등장 횟수.
+    두 번째 예시 표현("또 다른 예시/예로", "두 번째 예시")과 한국어 단위형(만/억/천원)도 인식.
+    마커 패턴은 예[시로] 필수 후치로 '예외/예방' 등 비예시 단어 오탐을 차단한다."""
     text = _plain_text(html)
-    markers = re.findall(r"예를\s*들어|예시로|가정하(?:면|여|고)|계산해\s*보면", text)
-    numeric = re.findall(r"=\s*[\d,]+\s*원|[\d,]+\s*원\s*[×xX*]", text)
+    markers = re.findall(
+        r"예를\s*들어|예시로|가정하(?:면|여|고)|계산해\s*보면"
+        r"|또\s*다른\s*예[시로]|두\s*번째\s*예시",
+        text
+    )
+    numeric = re.findall(
+        r"=\s*[\d,]+\s*(?:만|억|천)?\s*원|[\d,]+\s*(?:만|억|천)?\s*원\s*[×xX*]",
+        text
+    )
     return len(markers) + len(numeric)
 
 
