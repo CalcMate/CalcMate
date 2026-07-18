@@ -410,6 +410,11 @@ def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None) 
                 LOG.warning("내부링크 후보 조회 실패(무시): %s", _e)
                 rel_calc, rel_art = [], []
                 inject_internal_links = lambda h, *a: h
+            # Adaptive G5용: inject_internal_links가 실제로 렌더할 유효 후보 수 (URL 보유 항목만)
+            _link_pool_size = (
+                sum(1 for c in rel_calc if c.get("url")) +
+                sum(1 for a in rel_art if a.get("title") and a.get("url"))
+            )
 
             def _assemble(_body):
                 fh = f"{_body}\n<hr/>\n<h2>계산기 사용하기</h2>\n<p>{CTA_TEXT}</p>\n{widget}"
@@ -423,7 +428,8 @@ def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None) 
             from .publish_quality import check_publish_quality
             body_html, _ = _write_article(cfg, calc, keyword, seo, faq)
             final_html = _assemble(body_html)
-            qc = check_publish_quality(cfg, body_html, final_html, calc)
+            qc = check_publish_quality(cfg, body_html, final_html, calc,
+                                       link_pool_size=_link_pool_size)
             max_total = int(rcfg.get("MAX_TOTAL_RETRY", 3) or 3)     # 총 재시도 하드상한(무한루프 방지)
             crit_limit = int(rcfg.get("CRITICAL_RETRY_LIMIT", 2) or 2)  # Critical 연속실패 임계
             q_retries, consec_critical, critical_exhausted = 0, 0, False
@@ -440,7 +446,8 @@ def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None) 
                 body_html, _ = _write_article(cfg, calc, keyword, seo, faq,
                                               failed_rules=qc.get("failed_rules"))
                 final_html = _assemble(body_html)
-                qc = check_publish_quality(cfg, body_html, final_html, calc)
+                qc = check_publish_quality(cfg, body_html, final_html, calc,
+                                           link_pool_size=_link_pool_size)
 
             final_html = qc.get("html") or final_html   # G6 CTA중복 코드수정 반영본
             q_fields = {

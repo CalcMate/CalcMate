@@ -112,9 +112,10 @@ _GATE_GRADE = {"G1": "major", "G2": "major", "G3": "major", "G4": "major",
                "G5": "critical", "G6": "critical", "G7": "minor"}
 
 
-def check_gates(body_html: str, final_html: str, cfg: dict) -> tuple:
+def check_gates(body_html: str, final_html: str, cfg: dict, link_pool_size: int = 0) -> tuple:
     """(passed: bool, failed_gates: list[dict]). 각 항목: {gate, detail, grade, ...}.
-    body 기준 게이트는 body_html, 조립 기준 게이트(G5/G6)는 final_html을 본다."""
+    body 기준 게이트는 body_html, 조립 기준 게이트(G5/G6)는 final_html을 본다.
+    link_pool_size: inject_internal_links에 전달된 유효 후보 수(URL 보유). 미전달 시 0(G5 완화)."""
     g = (cfg or {}).get("QUALITY_GATE", {}) or {}
     failed = []
     body_text = _plain_text(body_html)
@@ -141,12 +142,26 @@ def check_gates(body_html: str, final_html: str, cfg: dict) -> tuple:
 
     dead = _count_dead_links(final_html)
     internal = _count_internal_links(final_html)
+    min_int = g.get("MIN_INTERNAL_LINKS", 2)
+    # Adaptive G5: 요구치 = min(가용 후보 수, MIN_INTERNAL_LINKS).
+    # pool=0 → required=0(Cold Start 완전 면제), pool=1 → required=1(1→2 교착 해소),
+    # pool≥2 → required=2(정상 G5 적용). href="#" dead link 검사는 pool 무관 항상 적용.
+    required = min(link_pool_size, min_int)
     if dead > 0:
+        LOG.warning("[G5] 실패 — href=\"#\" 데드링크 %d개 (internal=%d, pool=%d)",
+                    dead, internal, link_pool_size)
         failed.append({"gate": "G5", "grade": "critical", "critical": True,
                        "detail": f'href="#" {dead}개 잔존'})
-    elif internal < g.get("MIN_INTERNAL_LINKS", 2):
+    elif internal < required:
+        LOG.warning("[G5] 실패 — 내부링크 %d개 (최소 %d개 필요, pool=%d, dead=0)",
+                    internal, required, link_pool_size)
         failed.append({"gate": "G5", "grade": "critical", "critical": True,
-                       "detail": f"내부링크 {internal}개 → 최소 {g.get('MIN_INTERNAL_LINKS',2)}개 필요"})
+                       "detail": f"내부링크 {internal}개 → 최소 {required}개 필요"})
+    elif link_pool_size == 0:
+        LOG.warning("[G5] Adaptive G5 PASS — pool=0 (Cold Start, 내부링크 조건 면제)")
+    elif link_pool_size < min_int:
+        LOG.warning("[G5] Adaptive G5 PASS — pool=%d < 최소 %d, 요구치 완화(%d→%d)",
+                    link_pool_size, min_int, min_int, required)
 
     cta = _count_cta(final_html)
     if cta != g.get("CTA_COUNT", 1):
@@ -332,19 +347,21 @@ def _check_g8(body_html: str, calc: dict) -> list:
 
 
 # ── 공개 API: Gate → Score → Rewrite Contract ─────────────────────
-def check_publish_quality(cfg: dict, body_html: str, final_html: str, calc: dict = None) -> dict:
+def check_publish_quality(cfg: dict, body_html: str, final_html: str,
+                          calc: dict = None, link_pool_size: int = 0) -> dict:
     """발행 글 품질 검수. Gate(코드) 실패면 GPT 미호출 REWRITE, 통과면 Score(GPT).
 
     반환(Rewrite Contract, §9 + 운영 필드):
       {result: PASS|WARN|REWRITE, score: int|None, severity: str|None,
        failed_rules: list|None, html: <G6 코드수정 반영본>, quality_review_model: str|None}
+    link_pool_size: inject_internal_links에 전달된 유효 후보 수. calculator_pipeline이 전달.
     """
     # G6 코드수정: CTA 중복이면 초과분 제거 후 그 결과로 판정/발행
     fixed_html, removed = _dedupe_cta(final_html or "", keep=(cfg or {}).get("QUALITY_GATE", {}).get("CTA_COUNT", 1))
     if removed:
         LOG.info("[품질] CTA 중복 %d개 코드수정 제거", removed)
 
-    passed, failed = check_gates(body_html, fixed_html, cfg)
+    passed, failed = check_gates(body_html, fixed_html, cfg, link_pool_size=link_pool_size)
     # G8(결정론적 법적근거 검증) — check_gates 시그니처 무변경, 결과만 병합(GPT 호출 전).
     g8 = _check_g8(body_html, calc)
     if g8:
