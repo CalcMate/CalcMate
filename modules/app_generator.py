@@ -228,15 +228,29 @@ def _read_assets_js() -> str:
 def _compute_js(calc) -> str:
     """계산기별 computeResult(inputs) 생성. 기존 formula/퇴직금 date분기 로직 유지.
     registry의 compute_rules가 있으면 입력 검증(양수/최솟값/최저임금) 코드를 자동 주입한다."""
-    if _compute_type(calc) == "date_based":   # 날짜 기반(입사일/퇴사일 → total_days) — 로직 무변경, 분기조건만 registry화
+    if _compute_type(calc) == "date_based":   # 날짜 기반(입사일/퇴사일 → total_days)
         return (
             'window.computeResult = function(inputs){\n'
             '  var s = new Date(inputs["start_date"]); var e = new Date(inputs["end_date"]);\n'
+            # SP-3: 날짜 미입력/Invalid Date → null (입력 오류)
+            '  if (isNaN(s.getTime()) || isNaN(e.getTime())) { return null; }\n'
             '  var total_days = Math.floor((e - s) / (1000*60*60*24));\n'
             '  var avg_monthly_wage = inputs["avg_monthly_wage"] || 0;\n'
+            # SP-4: 평균임금 0 이하 → null (입력 오류)
+            '  if (avg_monthly_wage <= 0) { return null; }\n'
             '  var out = {};\n'
-            '  out["severance_pay"] = (total_days > 0) ? avg_monthly_wage * (total_days / 365) : 0;\n'
-            '  out._detail = [{label:"재직일수", value:(total_days > 0 ? total_days : 0) + "일"}];\n'
+            '  out.notices = [];\n'
+            # SP-1: 재직 1년(365일) 미만 → 0원 + notice (근로자퇴직급여보장법 제8조)
+            '  if (total_days < 365) {\n'
+            '    out["severance_pay"] = 0;\n'
+            '    out.notices.push("계속근로기간이 1년 미만이면 퇴직금 지급 의무가 없습니다 (근로자퇴직급여보장법 제8조).");\n'
+            '    out._detail = [{label:"재직일수", value:(total_days > 0 ? total_days : 0) + "일 (1년 미만)"}];\n'
+            '    out._formula = total_days + "일 근무 — 1년(365일) 미만으로 퇴직금 미발생";\n'
+            '    return out;\n'
+            '  }\n'
+            '  out["severance_pay"] = avg_monthly_wage * (total_days / 365);\n'
+            '  out._detail = [{label:"재직일수", value:total_days + "일"}];\n'
+            '  out._formula = avg_monthly_wage.toLocaleString() + "원 × (" + total_days + "÷365) = " + Math.round(avg_monthly_wage * (total_days / 365)).toLocaleString() + "원";\n'
             '  return out;\n};\n'
         )
     ins = _pj(calc.get("input_schema"), {})

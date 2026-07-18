@@ -163,6 +163,20 @@ Status: 🟡 Monitoring
 - **영향**: gate threshold(1800)는 안전망으로 유지. writer target과 rewrite 목표를 정렬.
 - **성격**: 품질 기준 변경 아님. 생성 피드백 목표 정렬 문제.
 
+### R7. 퇴직금 computeResult 경계값 버그 3종 해결 (2026-07-19)
+
+- **원인**: JS `computeResult` 함수가 재직 1년 미만 조건 분기 없이 계산 → 1일 재직에도 퇴직금 표시(법적으로 지급 의무 없음). 날짜 미입력 시 0원 결과카드 표시. 음수/0 평균임금에 음수 결과 표시.
+- **발견**: 퇴직금 계산기 품질 검증 2라운드 (계산기 품질 표준 v1.0 적용).
+- **해결**:
+  - SP-1(critical): `total_days < 365` → `severance_pay=0 + notices(근로자퇴직급여보장법 제8조)`
+  - SP-3(major): `isNaN(s.getTime()) || isNaN(e.getTime())` → `return null`
+  - SP-4(major): `avg_monthly_wage <= 0` → `return null`
+  - 추가: 정상 케이스에 `_formula` 문자열 반환 (계산 과정 표시)
+- **아키텍처**: date_based 계산기는 `_compute_js()` 하드코딩 분기에 직접 검증 로직 삽입. `compute_rules` 구조(주휴수당)는 date_based에 적용 안 됨 — `out.notices[]` 배열 구조는 공유.
+- **테스트**: `tests/test_severance_compute.py` 11케이스 영구 등록. ALL PASS.
+- **회귀 방지**: `tests/golden/calculator_snapshots.json` 업데이트 완료. severance-pay script.js 해시 고정.
+- **잔여(미수정)**: SP-2(폐지 법령 "근로기준법 제34조" 인용), SP-5(날짜 레이블 영문), SP-6(상여금 설명 오류) — 콘텐츠 재생성 또는 별도 배치로 처리.
+
 ### R6. 주휴수당 computeResult 경계값 버그 3종 해결 (2026-07-19)
 
 - **원인**: JS `computeResult` 함수가 주 15시간 미만 조건 분기 없이 계산 → 14시간 입력 시 28,000원 표시(법적으로 지급 불가).
