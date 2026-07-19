@@ -225,9 +225,70 @@ def _read_assets_js() -> str:
     return "\n".join(parts)
 
 
+def _ub_days_table_js(rows: list) -> str:
+    """소정급여일수 행 리스트 → JS 배열 리터럴. months_hi None → Infinity."""
+    parts = []
+    for r in rows:
+        hi = r.get("months_hi")
+        hi_js = "Infinity" if hi is None else str(int(hi))
+        parts.append(f"{{lo:{int(r['months_lo'])},hi:{hi_js},d:{int(r['days'])}}}")
+    return "[" + ",".join(parts) + "]"
+
+
 def _compute_js(calc) -> str:
     """계산기별 computeResult(inputs) 생성. 기존 formula/퇴직금 date분기 로직 유지.
     registry의 compute_rules가 있으면 입력 검증(양수/최솟값/최저임금) 코드를 자동 주입한다."""
+    if str(calc.get("slug", "")) == "unemployment-benefit":
+        ub_reg = (_registry().get("unemployment-benefit") or {})
+        ba = ub_reg.get("benefit_amounts") or {}
+        daily_max = int(ba.get("daily_max", 66000))
+        min_wage = int(ba.get("min_wage_hourly", 10030))
+        daily_min = round(min_wage * 8 * 0.8)
+        bdt = ub_reg.get("benefit_days_table") or {}
+        u50_js = _ub_days_table_js(bdt.get("under_50") or [])
+        a50_js = _ub_days_table_js(bdt.get("age_50_plus") or [])
+        return (
+            'window.computeResult = function(inputs){\n'
+            '  var avg_daily_wage = inputs["avg_daily_wage"] || 0;\n'
+            '  var age = inputs["age"] || 0;\n'
+            '  var employment_months = inputs["employment_months"] || 0;\n'
+            '  if (avg_daily_wage <= 0 || age <= 0 || employment_months <= 0) { return null; }\n'
+            '  var out = {};\n'
+            '  out.notices = [];\n'
+            # UB-3: 피보험단위기간 6개월(약 180일) 미만 → 수급 불가 (고용보험법 제40조)
+            '  if (employment_months < 6) {\n'
+            '    out["daily_benefit"] = 0;\n'
+            '    out["benefit_days"] = 0;\n'
+            '    out["total_benefit"] = 0;\n'
+            '    out.notices.push("피보험단위기간이 180일(약 6개월) 미만이면 구직급여를 받을 수 없습니다 (고용보험법 제40조).");\n'
+            '    out._formula = employment_months + "개월 — 6개월 미만으로 수급 불가";\n'
+            '    return out;\n'
+            '  }\n'
+            f'  var DAILY_MAX = {daily_max};\n'
+            f'  var DAILY_MIN = {daily_min};\n'
+            '  var raw_daily = avg_daily_wage * 0.6;\n'
+            '  var daily_benefit = Math.min(Math.max(raw_daily, DAILY_MIN), DAILY_MAX);\n'
+            f'  var under50 = {u50_js};\n'
+            f'  var age50p = {a50_js};\n'
+            '  var table = (age >= 50) ? age50p : under50;\n'
+            '  var benefit_days = table[table.length - 1].d;\n'
+            '  for (var i = 0; i < table.length; i++) {\n'
+            '    if (employment_months >= table[i].lo && employment_months < table[i].hi) {\n'
+            '      benefit_days = table[i].d; break;\n'
+            '    }\n'
+            '  }\n'
+            '  var total_benefit = daily_benefit * benefit_days;\n'
+            '  out["daily_benefit"] = daily_benefit;\n'
+            '  out["benefit_days"] = benefit_days;\n'
+            '  out["total_benefit"] = total_benefit;\n'
+            '  if (raw_daily < DAILY_MIN) {\n'
+            '    out.notices.push("일 구직급여가 하한(" + DAILY_MIN.toLocaleString() + "원)보다 낮아 하한액이 적용됩니다 (고용보험법 제46조 제2항).");\n'
+            '  } else if (raw_daily > DAILY_MAX) {\n'
+            '    out.notices.push("일 구직급여가 상한(" + DAILY_MAX.toLocaleString() + "원)을 초과하여 상한액이 적용됩니다 (고용노동부 고시).");\n'
+            '  }\n'
+            '  out._formula = avg_daily_wage.toLocaleString() + "원 × 0.6 = " + Math.round(raw_daily).toLocaleString() + "원 → 클램프 = " + Math.round(daily_benefit).toLocaleString() + "원/일 × " + benefit_days + "일 = " + Math.round(total_benefit).toLocaleString() + "원";\n'
+            '  return out;\n};\n'
+        )
     if _compute_type(calc) == "date_based":   # 날짜 기반(입사일/퇴사일 → total_days)
         return (
             'window.computeResult = function(inputs){\n'

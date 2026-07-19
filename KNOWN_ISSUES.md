@@ -174,6 +174,26 @@ Status: 🟡 Monitoring
 - **영향**: gate threshold(1800)는 안전망으로 유지. writer target과 rewrite 목표를 정렬.
 - **성격**: 품질 기준 변경 아님. 생성 피드백 목표 정렬 문제.
 
+### R10. 실업급여 Phase 1 — 계산 로직 전면 교체 (2026-07-19)
+
+- **원인**: 기존 `computeResult`가 `avg_daily_wage × 0.6`만 계산 — 상한/하한 클램프 없음, 소정급여일수 미산출, total_benefit 미반환, 입력 오류 처리 없음.
+- **발견**: 실업급여 전수 검증 (UB-1~9 진단).
+- **해결**:
+  - UB-1(major): `avg_daily_wage ≤ 0 || age ≤ 0 || employment_months ≤ 0` → `return null`
+  - UB-3(critical): `employment_months < 6` → `daily_benefit=0, total_benefit=0 + notice("고용보험법 제40조")`
+  - UB-4(critical): 상한 클램프 `min(raw_daily, 66,000원)` (고용노동부 고시)
+  - UB-5(critical): 하한 클램프 `max(raw_daily, 최저임금 × 8 × 0.8)` = 64,192원 (고용보험법 제46조 제2항)
+  - 소정급여일수 2차원 테이블 (고용보험법 별표1, 2019년 개정 이후): 가입기간 × 연령(50세 미만/이상) → 120~270일
+  - `total_benefit = daily_benefit × benefit_days` 출력 추가
+  - `_formula` 문자열 반환 (계산 과정 표시)
+- **수치 소스**: `docs/legal_basis.draft.yaml` unemployment-benefit.benefit_amounts/benefit_days_table (연 1회 갱신 체계)
+- **아키텍처**: `modules/app_generator._compute_js()`에 `slug=="unemployment-benefit"` 전용 분기 추가.
+- **테스트**: `tests/test_unemployment_benefit_compute.py` 15케이스 영구 등록. ALL PASS.
+  - 경계 케이스: 5개월 수급불가, 6개월 경계, 49/50세 경계, 10년 이상 최대 일수
+  - 클램프 케이스: 상한 초과, 하한 미만
+- **회귀**: 기존 22케이스(주휴수당 11 + 퇴직금 11) ALL PASS.
+- **이번 범위 아님**: Phase 2(콘텐츠 수정 — UB-2 "최대 300일" 오류, UB-9 FAQ 법령 보강)
+
 ### R9. SP-6 상여금/초과근무수당 포함 여부 설명 오류 해결 (2026-07-19)
 
 - **원인**: 퇴직금 계산기 HTML 주의사항 및 FAQ 4번에 "초과 근무수당이나 상여금은 포함하지 않아야 합니다"라고 안내. 근로기준법 제2조제1항제6호·시행령 제2조 기준과 정반대.

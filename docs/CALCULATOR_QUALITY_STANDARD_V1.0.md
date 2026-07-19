@@ -121,11 +121,36 @@ Minor 3건은 기능 영향 없음, 공통 UI 개선 단계로 이월.
 
 ---
 
+---
+
+## 실업급여 계산기 검증 결과 (2026-07-19, Phase 1 완료)
+
+| 항목 | 결과 |
+|------|------|
+| 계산식 | ✅ UB-4/5 해결: 상한(66,000원)/하한(64,192원) 클램프 적용 |
+| 법령 | ⚠️ Phase 2 예정: "최대 300일"(UB-2) → 실제 최대 270일로 교체, FAQ 법령 보강(UB-9) |
+| 경계값 | ✅ UB-3 해결: employment_months < 6 → 0원 + notice(고용보험법 제40조) |
+| 예외 처리 | ✅ UB-1 해결: 음수/0 입력 → null |
+| UI | ⚠️ Phase 3 예정: _formula 반환 ✅, UB-6(formula 상세) / UB-7(notices 상세화) 잔여 |
+| SEO 정합성 | ⚠️ Phase 2 이후 교차 확인 예정 |
+| FAQ | ⚠️ Phase 2 예정: 법령 근거 보강(UB-9) |
+| 예시 계산 | 미확인 |
+| 반올림 | ✅ JS Math.round 적용 |
+| 테스트 케이스 | ✅ 15케이스 영구 등록 (tests/test_unemployment_benefit_compute.py) |
+
+설계 범위: **급여액 계산기** — 일 구직급여 × 소정급여일수 × 총수령액. 수급자격(180일·이직사유) 판단 안 함 (설계).
+
+**실업급여 Phase 1 상태 (2026-07-19)**
+계산 로직 교체 완료. Critical 0 / Major 0 / Minor 3건 (UB-6 formula 미상세, UB-7 notices 미상세, UB-9 FAQ 법령 미보강)
+콘텐츠 수정(Phase 2: UB-2·UB-9)은 다음 단계.
+
+---
+
 ## 나머지 5개 계산기 적용 순서 (갱신)
 
 1. ~~퇴직금 (severance-pay)~~ ✅ 완료 (2026-07-19, SP-2 법령 오류 해결 포함)
-2. 연차수당 (annual-leave-allowance) — 연차 개수 경계값
-3. 실업급여 (unemployment-benefit) — 수급요건 복합 조건
+2. ~~실업급여 (unemployment-benefit)~~ ✅ Phase 1 완료 (2026-07-19, 계산 로직) / Phase 2(콘텐츠) 대기
+3. 연차수당 (annual-leave-allowance) — 연차 개수 경계값
 4. 4대보험 (four-insurances) — 요율 dict formula, 4가지 계산
 5. 연말정산 (연말정산_환급액_계산기) — 간이 근사 계산 명시
 6. 육아휴직 (육아휴직_급여_계산기) — 상한/하한 고용노동부 고시 의존

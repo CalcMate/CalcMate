@@ -196,6 +196,26 @@ unemployment-benefit:
   related_slugs: [weekly-holiday-allowance, severance-pay, annual-leave-allowance, four-insurances, 연말정산_환급액_계산기, 육아휴직_급여_계산기]
   # 코드정합: input(avg_daily_wage, age, employment_months) / daily_benefit=avg_daily_wage*0.6.
   # 요건(180일·수급자격)은 계산기가 산출하지 않고 급여액만 계산 — writer_note는 글 맥락용.
+  benefit_amounts:
+    # 구직급여 상한/하한 수치 — 매년 확인 필요 (연초에 갱신)
+    daily_max: 66000          # 고용노동부 고시 (2019년 이후, 2025년 기준 — 매년 재확인)
+    min_wage_hourly: 10030    # 최저임금 시간급 (2025년 기준, 2026년 미확인 — law.go.kr 접근 실패)
+    # 하한 = min_wage_hourly × 8 × 0.8 (고용보험법 제46조 제2항)
+  benefit_days_table:
+    # 고용보험법 별표1 소정급여일수 (2019년 개정 이후 현행)
+    # months_lo 이상 ~ months_hi 미만. months_hi: null = 상한 없음(Infinity)
+    under_50:
+      - {months_lo: 0,   months_hi: 12,  days: 120}
+      - {months_lo: 12,  months_hi: 36,  days: 150}
+      - {months_lo: 36,  months_hi: 60,  days: 180}
+      - {months_lo: 60,  months_hi: 120, days: 210}
+      - {months_lo: 120, months_hi: null, days: 240}
+    age_50_plus:
+      - {months_lo: 0,   months_hi: 12,  days: 120}
+      - {months_lo: 12,  months_hi: 36,  days: 180}
+      - {months_lo: 36,  months_hi: 60,  days: 210}
+      - {months_lo: 60,  months_hi: 120, days: 240}
+      - {months_lo: 120, months_hi: null, days: 270}
 
 four-insurances:
   name: 4대보험 계산기
