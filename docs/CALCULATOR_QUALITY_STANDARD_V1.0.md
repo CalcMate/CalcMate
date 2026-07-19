@@ -145,6 +145,28 @@ Critical 0 / Major 0 / Minor 0 — UB-1~9 전체 해결. 기준 사례 docs/refe
 
 ---
 
+## 4대보험 계산기 검증 결과 (2026-07-19, Phase 1·2·3 완료) ✅ Verified
+
+| 항목 | 결과 |
+|------|------|
+| 계산식 | ✅ FI-1/2/3/4 해결: 장기요양(건강보험료에 곱), NP 클램프, total 4종 합산, 입력 검증 |
+| 법령 | ✅ FI-10 해결: legal_basis.draft.yaml insurance_rates 외부화. YAML↔상수 동기화 테스트 |
+| 경계값 | ✅ FI-2 해결: NP 기준소득월액 하한(390,000)·상한(6,170,000) 경계 3점 + 극단값 |
+| 예외 처리 | ✅ FI-4 해결: 음수/0 → null |
+| UI | ✅ FI-8 해결(Phase 3): _formula 5단계 순서 표시 — 장기요양 "건강보험료 N원 × 12.96%" 형태. FI-9 강화: 우선순위 배열 + 산재보험 notice 항상 포함 |
+| 콘텐츠 정합성 | ✅ FI-5/6/7 해결(Phase 2): 산재보험 UI 안내, faq[2] 예시 교정(compute_fi 결과 직접 인용), faq[3] 고용보험 부담 비율 교정 |
+| FAQ | ✅ 이중 검증 원칙 적용: ①예시==compute_fi 결과, ②total==NP+HI+LTC+EI |
+| 예시 계산 | ✅ 300만원 기준: NP=135,000, HI=106,350, LTC=13,783, EI=27,000, TOTAL=282,133 |
+| 반올림 | ✅ JS Math.round() 적용 (소수점 발생 시 반올림) |
+| 테스트 케이스 | ✅ 43케이스 ALL PASS (tests/test_four_insurances_compute.py) — Phase 3 신규: FI-8 순서 3종 + FI-9 동시발생 5종 |
+
+설계 범위: **근로자 부담분 계산기** — 산재보험(사업주 전액) 제외. 요율 변경 시 YAML + 상수 + fixture 갱신.
+
+**4대보험 최종 상태 (2026-07-19)**
+Critical 0 / Major 0 / Minor 0 — FI-1~10 전체 해결. 요율 외부화 + 단계 순서 보호 완료.
+
+---
+
 ## 계산기 Verified 상태 트래커
 
 | 계산기 | 상태 | 완료일 |
@@ -152,20 +174,20 @@ Critical 0 / Major 0 / Minor 0 — UB-1~9 전체 해결. 기준 사례 docs/refe
 | 주휴수당 (weekly-holiday-allowance) | ✅ Verified | 2026-07-19 |
 | 퇴직금 (severance-pay) | ✅ Verified | 2026-07-19 |
 | 실업급여 (unemployment-benefit) | ✅ Verified | 2026-07-19 |
-| 4대보험 (four-insurances) | ⏳ 검증 대기 | — |
+| 4대보험 (four-insurances) | ✅ Verified | 2026-07-19 |
 | 연차수당 (annual-leave-allowance) | ⏳ 검증 대기 | — |
 | 육아휴직 (육아휴직_급여_계산기) | ⏳ 검증 대기 | — |
 | 연말정산 (연말정산_환급액_계산기) | ⏳ 검증 대기 | — |
 
 ---
 
-## 나머지 4개 계산기 적용 순서
+## 나머지 3개 계산기 적용 순서
 
 1. ~~퇴직금 (severance-pay)~~ ✅ Verified (2026-07-19)
 2. ~~실업급여 (unemployment-benefit)~~ ✅ Verified (2026-07-19, Phase 1·2·3)
-3. 4대보험 (four-insurances) — 요율 dict formula, 4가지 계산, 매년 요율 갱신 → legal_basis 외부화 우선
+3. ~~4대보험 (four-insurances)~~ ✅ Verified (2026-07-19, Phase 1·2·3)
 4. 연차수당 (annual-leave-allowance) — 연차 개수 경계값
 5. 육아휴직 (육아휴직_급여_계산기) — 상한/하한 고용노동부 고시 의존
 6. 연말정산 (연말정산_환급액_계산기) — 간이 근사 계산 명시
 
-완료 후: 세 계산기(주휴수당/퇴직금/실업급여) 최종 회귀 → 공통 Minor 일괄 정리
+완료 후: 4개 계산기(주휴수당/퇴직금/실업급여/4대보험) 최종 회귀 → 공통 Minor 일괄 정리

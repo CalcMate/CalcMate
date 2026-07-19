@@ -27,7 +27,6 @@ def compute_fi(monthly_salary: float) -> dict | None:
     if monthly_salary <= 0:
         return None
     out = {}
-    notices = []
 
     # FI-2: 국민연금 기준소득월액 클램프
     np_base = min(max(monthly_salary, NP_MIN), NP_MAX)
@@ -41,18 +40,44 @@ def compute_fi(monthly_salary: float) -> dict | None:
     # FI-3: total = 4종 합산
     total = national_pension + health_insurance + long_term_care + employment_insurance
 
-    out["national_pension"]    = national_pension
-    out["health_insurance"]    = health_insurance
-    out["long_term_care"]      = long_term_care
+    out["national_pension"]     = national_pension
+    out["health_insurance"]     = health_insurance
+    out["long_term_care"]       = long_term_care
     out["employment_insurance"] = employment_insurance
-    out["total"]               = total
-    out["notices"]             = notices
+    out["total"]                = total
 
-    # FI-9: notices
+    # FI-9: notices — 우선순위별 별도 배열 → concat으로 명시적 순서 확정
+    # 순서: [1] 국민연금 상·하한, [2] 산재보험 안내
+    _np_notices = []
+    _si_notices = []
+
     if monthly_salary < NP_MIN:
-        notices.append(f"월급여({monthly_salary:,.0f}원)가 기준소득월액 하한({NP_MIN:,}원)보다 낮아 국민연금은 하한 기준으로 계산됩니다.")
+        _np_notices.append(
+            f"월급여({monthly_salary:,.0f}원)가 기준소득월액 하한({NP_MIN:,}원)보다 낮아 "
+            "국민연금은 하한 기준으로 계산됩니다 (국민연금법 제88조)."
+        )
     elif monthly_salary > NP_MAX:
-        notices.append(f"월급여({monthly_salary:,.0f}원)가 기준소득월액 상한({NP_MAX:,}원)을 초과하여 국민연금은 상한 기준으로 계산됩니다.")
+        _np_notices.append(
+            f"월급여({monthly_salary:,.0f}원)가 기준소득월액 상한({NP_MAX:,}원)을 초과하여 "
+            "국민연금은 상한 기준으로 계산됩니다 (국민연금법 제88조)."
+        )
+
+    _si_notices.append(
+        "산재보험은 사업주가 전액 부담합니다 — "
+        "근로자 급여에서 공제되지 않습니다 (산업재해보상보험법 제13조)."
+    )
+
+    out["notices"] = _np_notices + _si_notices
+
+    # FI-8: _formula — 5단계 순서 표시 (장기요양 단계에 건강보험료 금액 명시)
+    np_label_val = (NP_MIN if monthly_salary < NP_MIN
+                    else (NP_MAX if monthly_salary > NP_MAX else monthly_salary))
+    out["_formula"] = (
+        f"국민연금 {np_label_val:,.0f}원 × {NP_RATE*100:g}% = {round(national_pension):,}원 | "
+        f"건강보험 {monthly_salary:,.0f}원 × {HI_RATE*100:g}% = {round(health_insurance):,}원 | "
+        f"장기요양 건강보험료 {round(health_insurance):,}원 × {LTC_RATE*100:g}% = {round(long_term_care):,}원 | "
+        f"고용보험 {monthly_salary:,.0f}원 × {EI_RATE*100:g}% = {round(employment_insurance):,}원"
+    )
 
     return out
 
@@ -102,7 +127,9 @@ def test_normal_300():
     assert _round(out["employment_insurance"])== 27_000    # 3,000,000 × 0.9%
     assert _round(out["total"])              == 282_133    # 합산
     _assert_total_equals_sum(out)
-    assert out["notices"] == []
+    # 정상 범위: NP notices 없음, 산재보험 notice만 1개
+    assert len(out["notices"]) == 1
+    assert "산재보험" in out["notices"][0]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -210,67 +237,72 @@ def test_legal_basis_sync_ltc_rate():
 # ── 하한 경계 3점 ──────────────────────────────────────────────────────────────
 
 def test_np_boundary_below_min():
-    """하한 미만(200,000원): NP는 하한 기준으로 계산, total 정상."""
+    """하한 미만(200,000원): NP는 하한 기준으로 계산, notices [NP하한, 산재] 순서."""
     out = compute_fi(200_000)
     assert out is not None
     expected_np = NP_MIN * NP_RATE  # 390,000 × 4.5% = 17,550
     assert abs(out["national_pension"] - expected_np) < 0.01
-    assert len(out["notices"]) == 1
+    assert len(out["notices"]) == 2
     assert "하한" in out["notices"][0]
+    assert "산재보험" in out["notices"][1]
     _assert_total_equals_sum(out)
 
 def test_np_boundary_at_min():
-    """하한 정확히(390,000원): 클램프 미발동, notice 없음."""
+    """하한 정확히(390,000원): NP 클램프 미발동, notices [산재] 1개."""
     out = compute_fi(NP_MIN)
     assert out is not None
     expected_np = NP_MIN * NP_RATE  # 17,550
     assert abs(out["national_pension"] - expected_np) < 0.01
-    assert out["notices"] == []
+    assert len(out["notices"]) == 1
+    assert "산재보험" in out["notices"][0]
     _assert_total_equals_sum(out)
 
 def test_np_boundary_just_above_min():
-    """하한 직후(390,001원): 급여 기준 계산, notice 없음."""
+    """하한 직후(390,001원): 급여 기준 계산, notices [산재] 1개."""
     salary = NP_MIN + 1
     out = compute_fi(salary)
     assert out is not None
     expected_np = salary * NP_RATE
     assert abs(out["national_pension"] - expected_np) < 0.01
-    assert out["notices"] == []
+    assert len(out["notices"]) == 1
+    assert "산재보험" in out["notices"][0]
     _assert_total_equals_sum(out)
 
 # ── 상한 경계 3점 ──────────────────────────────────────────────────────────────
 
 def test_np_boundary_just_below_max():
-    """상한 직전(6,169,999원): 급여 기준 계산, notice 없음."""
+    """상한 직전(6,169,999원): 급여 기준 계산, notices [산재] 1개."""
     salary = NP_MAX - 1
     out = compute_fi(salary)
     assert out is not None
     expected_np = salary * NP_RATE
     assert abs(out["national_pension"] - expected_np) < 0.01
-    assert out["notices"] == []
+    assert len(out["notices"]) == 1
+    assert "산재보험" in out["notices"][0]
     _assert_total_equals_sum(out)
 
 def test_np_boundary_at_max():
-    """상한 정확히(6,170,000원): 클램프 미발동, notice 없음."""
+    """상한 정확히(6,170,000원): NP 클램프 미발동, notices [산재] 1개."""
     out = compute_fi(NP_MAX)
     assert out is not None
     expected_np = NP_MAX * NP_RATE  # 277,650
     assert abs(out["national_pension"] - expected_np) < 0.01
-    assert out["notices"] == []
+    assert len(out["notices"]) == 1
+    assert "산재보험" in out["notices"][0]
     _assert_total_equals_sum(out)
 
 def test_np_boundary_above_max():
-    """상한 초과(10,000,000원): NP는 상한 기준, notice 있음, total 정상."""
+    """상한 초과(10,000,000원): NP는 상한 기준, notices [NP상한, 산재] 순서."""
     salary = 10_000_000
     out = compute_fi(salary)
     assert out is not None
     expected_np = NP_MAX * NP_RATE  # 277,650 (상한 기준)
-    # 현재 코드가 NP 클램프 없이 450,000원을 반환하면 이 테스트가 실패
     assert abs(out["national_pension"] - expected_np) < 0.01, (
         f"NP 상한 미적용 의심: {out['national_pension']:.0f}원 (올바른 {expected_np:.0f}원)"
     )
-    assert len(out["notices"]) == 1
+    assert len(out["notices"]) == 2
     assert "상한" in out["notices"][0]
+    assert "산재보험" in out["notices"][1]
     _assert_total_equals_sum(out)
 
 # ── 진단에서 실제 오차가 드러난 극단값 ─────────────────────────────────────────
@@ -368,9 +400,10 @@ def test_yaml_driven_300():
 # ─── 기타 ──────────────────────────────────────────────────────────────────────
 
 def test_notices_empty_for_normal():
-    """정상 범위 급여에서 notice 없음."""
+    """정상 범위 급여에서 NP notice 없음 — 산재보험 notice는 항상 1개."""
     out = compute_fi(3_000_000)
-    assert out["notices"] == []
+    assert len(out["notices"]) == 1
+    assert "산재보험" in out["notices"][0]
 
 def test_notices_floor_clamp():
     """하한 미만 급여에서 하한 notice 포함."""
@@ -383,6 +416,115 @@ def test_notices_ceiling_clamp():
     assert any("상한" in n for n in out["notices"])
 
 def test_formula_key_exists():
-    """_formula 키 존재."""
+    """_formula 키 존재 및 비어 있지 않음."""
     out = compute_fi(3_000_000)
-    assert "_formula" not in out or True   # JS에서 존재 — Python 미러에는 미구현, JS 쪽에서 검증
+    assert "_formula" in out
+    assert len(out["_formula"]) > 0
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 8. [Phase 3] FI-8 — _formula 5단계 순서 검증
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def test_formula_stage_order():
+    """_formula 5단계 순서: 국민연금 | 건강보험 | 장기요양 | 고용보험."""
+    out = compute_fi(3_000_000)
+    f = out["_formula"]
+
+    # 4개 파이프 구분자 존재
+    assert f.count(" | ") == 3, f"파이프 구분자 수 오류: {f.count(' | ')}"
+
+    idx_np  = f.index("국민연금")
+    idx_hi  = f.index("건강보험 ")
+    idx_ltc = f.index("장기요양")
+    idx_ei  = f.index("고용보험")
+
+    assert idx_np < idx_hi < idx_ltc < idx_ei, (
+        f"_formula 단계 순서 오류: NP={idx_np}, HI={idx_hi}, LTC={idx_ltc}, EI={idx_ei}"
+    )
+
+
+def test_formula_ltc_shows_health_insurance_amount():
+    """FI-8 강화: 장기요양 단계에 '건강보험료 N원 × 12.96%' 형태 — 금액 명시."""
+    out = compute_fi(3_000_000)
+    f = out["_formula"]
+
+    # 장기요양 단계 추출 (| 뒤 세 번째 세그먼트)
+    segments = f.split(" | ")
+    assert len(segments) == 4
+    ltc_seg = segments[2]  # "장기요양 건강보험료 106,350원 × 12.96% = 13,783원"
+
+    # 건강보험료 금액이 명시되는지 확인
+    assert "건강보험료" in ltc_seg, f"'건강보험료' 없음: {ltc_seg!r}"
+    assert "× 12.96%" in ltc_seg or "× 12.960%" in ltc_seg or "× 12.96%" in ltc_seg, (
+        f"장기요양 비율 표시 없음: {ltc_seg!r}"
+    )
+    # 건강보험료 실제 금액(106,350)이 포함되어 있어야 함
+    expected_hi_str = f"{round(3_000_000 * HI_RATE):,}"  # "106,350"
+    assert expected_hi_str in ltc_seg, (
+        f"건강보험료 금액({expected_hi_str}) 미포함: {ltc_seg!r}"
+    )
+
+
+def test_formula_clamp_cases():
+    """NP 클램프 케이스에서도 _formula 5단계 순서 유지."""
+    for salary in [200_000, 10_000_000]:
+        out = compute_fi(salary)
+        f = out["_formula"]
+        assert "국민연금" in f and "건강보험" in f and "장기요양" in f and "고용보험" in f
+        assert f.count(" | ") == 3
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 9. [Phase 3] FI-9 — notices 우선순위 순서 검증 (동시 발생 케이스)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def test_notices_sangjae_always_present():
+    """산재보험 notice는 모든 케이스에서 항상 존재."""
+    for salary in [200_000, NP_MIN, 3_000_000, NP_MAX, 10_000_000]:
+        out = compute_fi(salary)
+        assert any("산재보험" in n for n in out["notices"]), (
+            f"salary={salary:,}: 산재보험 notice 없음"
+        )
+
+
+def test_notices_order_np_ceiling_with_sangjae():
+    """FI-9: 상한 초과 케이스 — notices[0]=국민연금 상한, notices[1]=산재보험."""
+    out = compute_fi(10_000_000)
+    assert len(out["notices"]) == 2
+    assert "상한" in out["notices"][0], f"notices[0] 국민연금 상한 아님: {out['notices'][0]!r}"
+    assert "산재보험" in out["notices"][1], f"notices[1] 산재보험 아님: {out['notices'][1]!r}"
+
+
+def test_notices_order_np_floor_with_sangjae():
+    """FI-9: 하한 미만 케이스 — notices[0]=국민연금 하한, notices[1]=산재보험."""
+    out = compute_fi(200_000)
+    assert len(out["notices"]) == 2
+    assert "하한" in out["notices"][0], f"notices[0] 국민연금 하한 아님: {out['notices'][0]!r}"
+    assert "산재보험" in out["notices"][1], f"notices[1] 산재보험 아님: {out['notices'][1]!r}"
+
+
+def test_notices_sangjae_is_last():
+    """산재보험 notice는 항상 마지막 위치."""
+    for salary in [200_000, NP_MIN, 3_000_000, NP_MAX, 10_000_000]:
+        out = compute_fi(salary)
+        notices = out["notices"]
+        assert len(notices) >= 1
+        assert "산재보험" in notices[-1], (
+            f"salary={salary:,}: 산재보험이 마지막 아님 — {notices[-1]!r}"
+        )
+
+
+@pytest.mark.parametrize("salary,expected_len", [
+    (200_000,    2),   # 하한 미만: NP하한 + 산재
+    (NP_MIN,     1),   # 하한 정확히: 산재만
+    (3_000_000,  1),   # 정상: 산재만
+    (NP_MAX,     1),   # 상한 정확히: 산재만
+    (10_000_000, 2),   # 상한 초과: NP상한 + 산재
+])
+def test_notices_count_parametrized(salary, expected_len):
+    """케이스별 notices 개수 검증."""
+    out = compute_fi(salary)
+    assert len(out["notices"]) == expected_len, (
+        f"salary={salary:,}: notices 개수 오류 — 기대={expected_len}, 실제={len(out['notices'])}"
+    )

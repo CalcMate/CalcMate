@@ -317,7 +317,6 @@ def _compute_js(calc) -> str:
             '  var monthly_salary = inputs["monthly_salary"] || 0;\n'
             '  if (monthly_salary <= 0) { return null; }\n'
             '  var out = {};\n'
-            '  out.notices = [];\n'
             # FI-2: 국민연금 기준소득월액 상한/하한 클램프 (국민연금법 제88조)
             f'  var NP_MIN = {NP_MIN};\n'
             f'  var NP_MAX = {NP_MAX};\n'
@@ -334,15 +333,20 @@ def _compute_js(calc) -> str:
             '  out["long_term_care"] = long_term_care;\n'
             '  out["employment_insurance"] = employment_insurance;\n'
             '  out["total"] = total;\n'
-            # FI-9: notices — 국민연금 클램프 적용 시 안내
+            # FI-9: notices — 우선순위별 별도 배열 → concat으로 명시적 순서 확정
+            # 순서: [1] 국민연금 상·하한, [2] 산재보험 안내
+            '  var _np_notices = [];\n'
+            '  var _si_notices = [];\n'
             '  if (monthly_salary < NP_MIN) {\n'
-            '    out.notices.push("월급여(" + monthly_salary.toLocaleString() + "원)가 기준소득월액 하한(" + NP_MIN.toLocaleString() + "원)보다 낮아 국민연금은 하한 기준으로 계산됩니다 (국민연금법 제88조).");\n'
+            '    _np_notices.push("월급여(" + monthly_salary.toLocaleString() + "원)가 기준소득월액 하한(" + NP_MIN.toLocaleString() + "원)보다 낮아 국민연금은 하한 기준으로 계산됩니다 (국민연금법 제88조).");\n'
             '  } else if (monthly_salary > NP_MAX) {\n'
-            '    out.notices.push("월급여(" + monthly_salary.toLocaleString() + "원)가 기준소득월액 상한(" + NP_MAX.toLocaleString() + "원)을 초과하여 국민연금은 상한 기준으로 계산됩니다 (국민연금법 제88조).");\n'
+            '    _np_notices.push("월급여(" + monthly_salary.toLocaleString() + "원)가 기준소득월액 상한(" + NP_MAX.toLocaleString() + "원)을 초과하여 국민연금은 상한 기준으로 계산됩니다 (국민연금법 제88조).");\n'
             '  }\n'
-            # FI-8: _formula — 케이스별(하한/상한/정상) 단계 표시
+            '  _si_notices.push("산재보험은 사업주가 전액 부담합니다 — 근로자 급여에서 공제되지 않습니다 (산업재해보상보험법 제13조).");\n'
+            '  out.notices = [].concat(_np_notices, _si_notices);\n'
+            # FI-8: _formula — 5단계 순서 표시 (장기요양 단계에 건강보험료 금액 명시)
             '  var np_label = (monthly_salary < NP_MIN ? NP_MIN.toLocaleString() : (monthly_salary > NP_MAX ? NP_MAX.toLocaleString() : monthly_salary.toLocaleString()));\n'
-            f'  out._formula = "국민연금 " + np_label + "원 × {np_pct}% = " + Math.round(national_pension).toLocaleString() + "원 | 건강보험 " + monthly_salary.toLocaleString() + "원 × {hi_pct}% = " + Math.round(health_insurance).toLocaleString() + "원 | 장기요양 건강보험료 × {ltc_pct}% = " + Math.round(long_term_care).toLocaleString() + "원 | 고용보험 " + monthly_salary.toLocaleString() + "원 × {ei_pct}% = " + Math.round(employment_insurance).toLocaleString() + "원";\n'
+            f'  out._formula = "국민연금 " + np_label + "원 × {np_pct}% = " + Math.round(national_pension).toLocaleString() + "원 | 건강보험 " + monthly_salary.toLocaleString() + "원 × {hi_pct}% = " + Math.round(health_insurance).toLocaleString() + "원 | 장기요양 건강보험료 " + Math.round(health_insurance).toLocaleString() + "원 × {ltc_pct}% = " + Math.round(long_term_care).toLocaleString() + "원 | 고용보험 " + monthly_salary.toLocaleString() + "원 × {ei_pct}% = " + Math.round(employment_insurance).toLocaleString() + "원";\n'
             '  return out;\n};\n'
         )
     if _compute_type(calc) == "date_based":   # 날짜 기반(입사일/퇴사일 → total_days)

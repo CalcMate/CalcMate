@@ -282,11 +282,11 @@ Status: 🟡 Monitoring
 
 ---
 
-## 4대보험 계산기 — Phase 1 완료 (Phase 2 대기 중)
+## 4대보험 계산기 — ✅ VERIFIED (Phase 1~3 완료)
 
-> 진단일: 2026-07-19 | Phase 1 완료: 2026-07-19 | Phase 2 완료: 2026-07-19
+> 진단일: 2026-07-19 | Phase 1 완료: 2026-07-19 | Phase 2 완료: 2026-07-19 | Phase 3 완료: 2026-07-19
 > 상세: `docs/reference_cases/four_insurances_diagnosis.md` | 기준 케이스: `docs/reference_cases/four_insurances_2026.md`
-> 테스트: `tests/test_four_insurances_compute.py` 31케이스 ALL PASS
+> 테스트: `tests/test_four_insurances_compute.py` 43케이스 ALL PASS
 
 ### FI-1 [Critical] ✅ 해결 — 장기요양보험 구현
 - `health_insurance × 0.1296` 순서 엄수. 급여 직접 곱 방지 테스트 영구 등록.
@@ -309,11 +309,11 @@ Status: 🟡 Monitoring
 ### FI-7 [Major] ✅ 해결 — faq[3] 고용보험 부담 비율 교정
 - "각 보험료 절반씩 부담" → 국민연금·건강보험·장기요양은 절반씩, 고용보험 근로자 0.9%·사업주 0.9%+α, 산재보험 사업주 전액으로 정확히 구분.
 
-### FI-8 [Minor] ✅ 해결 — _formula 구현
-- 케이스별(하한/상한/정상) 단계 표시. JS에 생성됨.
+### FI-8 [Minor] ✅ 해결 — _formula 구현 (Phase 3 강화)
+- 케이스별(하한/상한/정상) 5단계 순서 표시. 장기요양 단계: "건강보험료 N원 × 12.96% = Y원" 형태(건강보험료 금액 명시). 테스트: `test_formula_stage_order`, `test_formula_ltc_shows_health_insurance_amount`.
 
-### FI-9 [Minor] ✅ 해결 — notices 구현
-- 상한/하한 클램프 적용 시 국민연금법 제88조 인용 안내.
+### FI-9 [Minor] ✅ 해결 — notices 명시적 우선순위 구조 (Phase 3 강화)
+- 별도 배열(`_np_notices`, `_si_notices`) + `[].concat(...)` 으로 순서 확정. 산재보험 notice 항상 마지막. 동시 발생 케이스 테스트: `test_notices_order_np_ceiling_with_sangjae`, `test_notices_order_np_floor_with_sangjae`.
 
 ### FI-10 [Minor] ✅ 해결 — legal_basis 외부화
 - `docs/legal_basis.draft.yaml` four-insurances.insurance_rates 섹션 추가.
