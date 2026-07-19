@@ -269,6 +269,19 @@ Status: 🟡 Monitoring
 - **테스트**: `tests/test_weekly_holiday_compute.py` 11케이스 영구 등록 (7 핵심 + 4 SEO 정합성). ALL PASS.
 - **회귀 방지**: `tests/golden/calculator_snapshots.json` 업데이트 완료. weekly-holiday-allowance script.js 해시 고정.
 
+### R11. SP-8 전수 감사 — 4개 계산기 구 HTML form 제거 (2026-07-19 해결)
+
+- **원인**: 주휴수당·실업급여·4대보험·연차수당 article_content에 구 `<form>` 태그 + 입력 안내 h2 + 결과 해설 h2 섹션이 레거시로 잔존. 주휴수당 faq[2]에 코드 스타일 공식 `'주휴수당 = 시급 x (주간 근무시간 / 40 x 8)'` 노출.
+- **발견**: SP-8 Verified 계산기 전수 감사 (`scripts/audit_sp8_all.py`).
+- **해결**:
+  - 주휴수당: article_content 구 form + 결과해설 섹션 제거. faq[2] 자연어 교체 ("시급에 주당 근무시간 비율(÷40)을 곱한 뒤 8을 곱하여 산출").
+  - 실업급여: article_content 입력폼 안내 + form + 결과해설 섹션 제거.
+  - 4대보험: article_content 입력 h2 + form + 결과 ul(span id 잔재) 섹션 제거.
+  - 연차수당: article_content 입력폼 안내 + form + 결과해설 섹션 제거.
+  - 4개 계산기 workspace 재생성. golden 해시 갱신.
+- **검증**: `_verify_sp8.py` FORBIDDEN 패턴 0건 ALL PASS. 141 회귀 테스트 ALL PASS.
+- **스크립트**: `scripts/fix_sp8_audit.py` (DB 수정) + `scripts/_regen_sp8.py` (재생성).
+
 ### R3. G5 내부링크 게이트 — Cold Start 순환 교착 (2026-07-18 해결)
 - **원인**: 로컬 데이터 초기화(07-17) 이후 발행완료 기사가 0건이 되면서, 내부링크 최소 2개 요구(G5)가
   "발행할 기사가 없어 내부링크 후보도 없고, 내부링크가 없어 발행도 안 되는" 순환 교착에 빠짐.

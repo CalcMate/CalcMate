@@ -123,9 +123,10 @@
 | 예외 처리 | ✅ B-2 해결: 음수/0 → null. B-3 해결: 최저임금 안내 추가 |
 | UI | ✅ B-4 해결: _formula 반환으로 계산 과정 표시 |
 | SEO 정합성 | ✅ 4건 전수 확인, 모든 예시 금액 일치 |
-| FAQ | ✅ 6문항, 수치/조항 포함 |
+| FAQ | ✅ 6문항, 수치/조항 포함. ✅ SP-8 감사: faq[2] 코드 공식 → 자연어 교체 (2026-07-19) |
 | 예시 계산 | ✅ 2개 이상, 검증 완료 |
 | 반올림 | ⚠️ JS/Python 미세 차이 (사용자 체감 없음, minor) |
+| SP-8 감사 | ✅ 구 HTML form 제거, faq[2] 코드 공식 자연어 교체. FORBIDDEN 0건 (2026-07-19) |
 | 테스트 케이스 | ✅ 11케이스 영구 등록 (tests/test_weekly_holiday_compute.py) |
 
 ---
@@ -174,6 +175,7 @@ SP-8(코드 문자열 노출) Phase 3에서 해결. 잔여 Minor 2건은 기능 
 
 **실업급여 최종 상태 (2026-07-19)**
 Critical 0 / Major 0 / Minor 0 — UB-1~9 전체 해결. 기준 사례 docs/reference_cases/unemployment_benefit.md 영구 등록.
+SP-8 전수 감사 (2026-07-19): 구 HTML form + 결과해설 섹션 제거 완료. FORBIDDEN 0건 확인.
 
 ---
 
@@ -196,6 +198,7 @@ Critical 0 / Major 0 / Minor 0 — UB-1~9 전체 해결. 기준 사례 docs/refe
 
 **4대보험 최종 상태 (2026-07-19)**
 Critical 0 / Major 0 / Minor 0 — FI-1~10 전체 해결. 요율 외부화 + 단계 순서 보호 완료.
+SP-8 전수 감사 (2026-07-19): 구 HTML form(월급여 input) + 결과 ul 섹션(span id 잔재) 제거 완료. FORBIDDEN 0건 확인.
 
 ---
 
@@ -219,6 +222,7 @@ Critical 0 / Major 0 / Minor 0 — FI-1~10 전체 해결. 요율 외부화 + 단
 
 **연차수당 최종 상태 (Phase 1·2 완료)**
 Critical 0 / Major 0 / Minor 0 — AL-1~7 전체 해결. AL-8(연차 발생 개수 계산) 별도 설계 확장 트랙으로 분리.
+SP-8 전수 감사 (2026-07-19): 구 HTML form(daily_wage·unused_days input) + 결과해설 섹션 제거 완료. FORBIDDEN 0건 확인.
 
 ---
 
@@ -274,7 +278,7 @@ Critical 0 / Major 0 / Minor 0 — PL-1~15 전체 해결.
 1. ~~퇴직금 (severance-pay)~~ ✅ Verified (2026-07-19)
 2. ~~실업급여 (unemployment-benefit)~~ ✅ Verified (2026-07-19, Phase 1·2·3)
 3. ~~4대보험 (four-insurances)~~ ✅ Verified (2026-07-19, Phase 1·2·3)
-4. 연차수당 (annual-leave-allowance) — 연차 개수 경계값
+4. ~~연차수당 (annual-leave-allowance)~~ ✅ Verified (2026-07-19, Phase 1·2 완료)
 5. ~~육아휴직 (육아휴직_급여_계산기)~~ ✅ Verified (2026-07-19, Phase 1·2·3 완료)
 6. 연말정산 (연말정산_환급액_계산기) — 간이 근사 계산 명시
 
