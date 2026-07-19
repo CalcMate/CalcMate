@@ -1,0 +1,21 @@
+feat(unemployment): Phase 3 UX 마무리 — UB-6 formula 단계 표시 + UB-7 notices 우선순위 + UB-8 확인 + Verified 선언
+
+UB-6: _formula 케이스별 단계 표시
+  하한: "기초일액 N원 → 하한액 적용(64,192원) → N원/일 x M일 = T원"
+  상한: "기초일액 N원 → 상한액 적용(66,000원) → N원/일 x M일 = T원"
+  정상: "기초일액 N원/일 x M일 = T원"
+
+UB-7: notices 우선순위 명시
+  6개월 미만(수급 불가) return 이후 상한/하한 notice 없음
+  모순 notice 동시 표시 불가 확인
+
+UB-8: legal_basis.draft.yaml 외부화 확인
+  daily_max=66,000 / min_wage=10,030 / 테이블 5x2행 yaml에서 로드
+
+테스트: 22케이스 (신규 7 포함), 전체 44/44 PASS
+실업급여 Verified 선언 — Critical 0 / Major 0 / Minor 0
+
+CALCULATOR_QUALITY_STANDARD: Verified 트래커 추가 (주휴수당/퇴직금/실업급여 완료)
+다음: 4대보험 → 연차수당 → 육아휴직 → 연말정산
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>

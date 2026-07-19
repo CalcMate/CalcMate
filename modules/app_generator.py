@@ -281,12 +281,22 @@ def _compute_js(calc) -> str:
             '  out["daily_benefit"] = daily_benefit;\n'
             '  out["benefit_days"] = benefit_days;\n'
             '  out["total_benefit"] = total_benefit;\n'
+            # UB-7: notices — 수급 가능 케이스에서만 상한/하한 안내 (180일 미만은 이미 return됨)
             '  if (raw_daily < DAILY_MIN) {\n'
-            '    out.notices.push("일 구직급여가 하한(" + DAILY_MIN.toLocaleString() + "원)보다 낮아 하한액이 적용됩니다 (고용보험법 제46조 제2항).");\n'
+            '    out.notices.push("기초일액(" + Math.round(raw_daily).toLocaleString() + "원)이 하한액보다 낮아 하한액(" + DAILY_MIN.toLocaleString() + "원)이 적용됩니다 (고용보험법 제46조 제2항).");\n'
             '  } else if (raw_daily > DAILY_MAX) {\n'
-            '    out.notices.push("일 구직급여가 상한(" + DAILY_MAX.toLocaleString() + "원)을 초과하여 상한액이 적용됩니다 (고용노동부 고시).");\n'
+            '    out.notices.push("기초일액(" + Math.round(raw_daily).toLocaleString() + "원)이 상한액을 초과하여 상한액(" + DAILY_MAX.toLocaleString() + "원)이 적용됩니다 (고용노동부 고시).");\n'
             '  }\n'
-            '  out._formula = avg_daily_wage.toLocaleString() + "원 × 0.6 = " + Math.round(raw_daily).toLocaleString() + "원 → 클램프 = " + Math.round(daily_benefit).toLocaleString() + "원/일 × " + benefit_days + "일 = " + Math.round(total_benefit).toLocaleString() + "원";\n'
+            # UB-6: _formula — 케이스별(하한/상한/정상) 단계 표시
+            '  var _ub_formula;\n'
+            '  if (raw_daily < DAILY_MIN) {\n'
+            '    _ub_formula = "기초일액 " + Math.round(raw_daily).toLocaleString() + "원 → 하한액 적용(" + DAILY_MIN.toLocaleString() + "원) → " + Math.round(daily_benefit).toLocaleString() + "원/일 × " + benefit_days + "일 = " + Math.round(total_benefit).toLocaleString() + "원";\n'
+            '  } else if (raw_daily > DAILY_MAX) {\n'
+            '    _ub_formula = "기초일액 " + Math.round(raw_daily).toLocaleString() + "원 → 상한액 적용(" + DAILY_MAX.toLocaleString() + "원) → " + Math.round(daily_benefit).toLocaleString() + "원/일 × " + benefit_days + "일 = " + Math.round(total_benefit).toLocaleString() + "원";\n'
+            '  } else {\n'
+            '    _ub_formula = "기초일액 " + Math.round(raw_daily).toLocaleString() + "원/일 × " + benefit_days + "일 = " + Math.round(total_benefit).toLocaleString() + "원";\n'
+            '  }\n'
+            '  out._formula = _ub_formula;\n'
             '  return out;\n};\n'
         )
     if _compute_type(calc) == "date_based":   # 날짜 기반(입사일/퇴사일 → total_days)

@@ -123,34 +123,49 @@ Minor 3건은 기능 영향 없음, 공통 UI 개선 단계로 이월.
 
 ---
 
-## 실업급여 계산기 검증 결과 (2026-07-19, Phase 1 완료)
+## 실업급여 계산기 검증 결과 (2026-07-19, Phase 1·2·3 완료) ✅ Verified
 
 | 항목 | 결과 |
 |------|------|
 | 계산식 | ✅ UB-4/5 해결: 상한(66,000원)/하한(64,192원) 클램프 적용 |
-| 법령 | ⚠️ Phase 2 예정: "최대 300일"(UB-2) → 실제 최대 270일로 교체, FAQ 법령 보강(UB-9) |
+| 법령 | ✅ UB-2/9 해결(Phase 2): "최대 300일" → 120~270일 교체, 고용보험법 제40조·제45조·제46조·별표1 명시 |
 | 경계값 | ✅ UB-3 해결: employment_months < 6 → 0원 + notice(고용보험법 제40조) |
 | 예외 처리 | ✅ UB-1 해결: 음수/0 입력 → null |
-| UI | ⚠️ Phase 3 예정: _formula 반환 ✅, UB-6(formula 상세) / UB-7(notices 상세화) 잔여 |
-| SEO 정합성 | ⚠️ Phase 2 이후 교차 확인 예정 |
-| FAQ | ⚠️ Phase 2 예정: 법령 근거 보강(UB-9) |
-| 예시 계산 | 미확인 |
+| UI | ✅ UB-6 해결(Phase 3): _formula 케이스별(하한/상한/정상) 단계 표시. UB-7 해결: notices 우선순위 확립 |
+| SEO 정합성 | ✅ 예시 금액 compute_ub() 함수 결과값 인용 (수기 계산 금지 원칙 적용) |
+| FAQ | ✅ UB-9 해결(Phase 2): 법령 근거 보강 완료. 5문항 이상 |
+| 예시 계산 | ✅ compute_ub() 결과 2개 (케이스 A·D) 교차 확인 |
 | 반올림 | ✅ JS Math.round 적용 |
-| 테스트 케이스 | ✅ 15케이스 영구 등록 (tests/test_unemployment_benefit_compute.py) |
+| 테스트 케이스 | ✅ 22케이스 영구 등록 (tests/test_unemployment_benefit_compute.py) |
 
 설계 범위: **급여액 계산기** — 일 구직급여 × 소정급여일수 × 총수령액. 수급자격(180일·이직사유) 판단 안 함 (설계).
 
-**실업급여 Phase 1 상태 (2026-07-19)**
-계산 로직 교체 완료. Critical 0 / Major 0 / Minor 3건 (UB-6 formula 미상세, UB-7 notices 미상세, UB-9 FAQ 법령 미보강)
-콘텐츠 수정(Phase 2: UB-2·UB-9)은 다음 단계.
+**실업급여 최종 상태 (2026-07-19)**
+Critical 0 / Major 0 / Minor 0 — UB-1~9 전체 해결. 기준 사례 docs/reference_cases/unemployment_benefit.md 영구 등록.
 
 ---
 
-## 나머지 5개 계산기 적용 순서 (갱신)
+## 계산기 Verified 상태 트래커
 
-1. ~~퇴직금 (severance-pay)~~ ✅ 완료 (2026-07-19, SP-2 법령 오류 해결 포함)
-2. ~~실업급여 (unemployment-benefit)~~ ✅ Phase 1 완료 (2026-07-19, 계산 로직) / Phase 2(콘텐츠) 대기
-3. 연차수당 (annual-leave-allowance) — 연차 개수 경계값
-4. 4대보험 (four-insurances) — 요율 dict formula, 4가지 계산
-5. 연말정산 (연말정산_환급액_계산기) — 간이 근사 계산 명시
-6. 육아휴직 (육아휴직_급여_계산기) — 상한/하한 고용노동부 고시 의존
+| 계산기 | 상태 | 완료일 |
+|---|---|---|
+| 주휴수당 (weekly-holiday-allowance) | ✅ Verified | 2026-07-19 |
+| 퇴직금 (severance-pay) | ✅ Verified | 2026-07-19 |
+| 실업급여 (unemployment-benefit) | ✅ Verified | 2026-07-19 |
+| 4대보험 (four-insurances) | ⏳ 검증 대기 | — |
+| 연차수당 (annual-leave-allowance) | ⏳ 검증 대기 | — |
+| 육아휴직 (육아휴직_급여_계산기) | ⏳ 검증 대기 | — |
+| 연말정산 (연말정산_환급액_계산기) | ⏳ 검증 대기 | — |
+
+---
+
+## 나머지 4개 계산기 적용 순서
+
+1. ~~퇴직금 (severance-pay)~~ ✅ Verified (2026-07-19)
+2. ~~실업급여 (unemployment-benefit)~~ ✅ Verified (2026-07-19, Phase 1·2·3)
+3. 4대보험 (four-insurances) — 요율 dict formula, 4가지 계산, 매년 요율 갱신 → legal_basis 외부화 우선
+4. 연차수당 (annual-leave-allowance) — 연차 개수 경계값
+5. 육아휴직 (육아휴직_급여_계산기) — 상한/하한 고용노동부 고시 의존
+6. 연말정산 (연말정산_환급액_계산기) — 간이 근사 계산 명시
+
+완료 후: 세 계산기(주휴수당/퇴직금/실업급여) 최종 회귀 → 공통 Minor 일괄 정리

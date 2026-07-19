@@ -81,19 +81,31 @@ def compute_ub(avg_daily_wage: float, age: int, employment_months: int) -> dict 
     out["benefit_days"] = benefit_days
     out["total_benefit"] = total_benefit
 
+    # UB-7: notices — 수급 가능 케이스에서만 상한/하한 안내
     if raw_daily < DAILY_MIN:
         out["notices"].append(
-            f"일 구직급여가 하한({DAILY_MIN:,}원)보다 낮아 하한액이 적용됩니다 (고용보험법 제46조 제2항)."
+            f"기초일액({round(raw_daily):,}원)이 하한액보다 낮아 하한액({DAILY_MIN:,}원)이 적용됩니다 (고용보험법 제46조 제2항)."
         )
     elif raw_daily > DAILY_MAX:
         out["notices"].append(
-            f"일 구직급여가 상한({DAILY_MAX:,}원)을 초과하여 상한액이 적용됩니다 (고용노동부 고시)."
+            f"기초일액({round(raw_daily):,}원)이 상한액을 초과하여 상한액({DAILY_MAX:,}원)이 적용됩니다 (고용노동부 고시)."
         )
 
-    out["_formula"] = (
-        f"{avg_daily_wage:,.0f}원 × 0.6 = {round(raw_daily):,}원 → "
-        f"클램프 = {round(daily_benefit):,}원/일 × {benefit_days}일 = {round(total_benefit):,}원"
-    )
+    # UB-6: _formula — 케이스별 단계 표시
+    if raw_daily < DAILY_MIN:
+        out["_formula"] = (
+            f"기초일액 {round(raw_daily):,}원 → 하한액 적용({DAILY_MIN:,}원) → "
+            f"{round(daily_benefit):,}원/일 × {benefit_days}일 = {round(total_benefit):,}원"
+        )
+    elif raw_daily > DAILY_MAX:
+        out["_formula"] = (
+            f"기초일액 {round(raw_daily):,}원 → 상한액 적용({DAILY_MAX:,}원) → "
+            f"{round(daily_benefit):,}원/일 × {benefit_days}일 = {round(total_benefit):,}원"
+        )
+    else:
+        out["_formula"] = (
+            f"기초일액 {round(raw_daily):,}원/일 × {benefit_days}일 = {round(total_benefit):,}원"
+        )
     return out
 
 
@@ -211,6 +223,61 @@ def test_formula_string_populated():
     r = compute_ub(100_000, 40, 24)
     assert r is not None
     assert r.get("_formula") and "원" in r["_formula"]
+
+
+# UB-6: _formula 케이스별 단계 표시 ─────────────────────────────────────────
+
+def test_formula_floor_case():
+    """UB-6 하한 케이스: _formula에 '하한액 적용' 포함."""
+    r = compute_ub(80_000, 40, 24)   # raw=48,000 < DAILY_MIN
+    assert r is not None
+    assert "하한액 적용" in r["_formula"]
+    assert str(DAILY_MIN) in r["_formula"].replace(",", "")
+
+
+def test_formula_ceiling_case():
+    """UB-6 상한 케이스: _formula에 '상한액 적용' 포함."""
+    r = compute_ub(120_000, 40, 24)  # raw=72,000 > DAILY_MAX
+    assert r is not None
+    assert "상한액 적용" in r["_formula"]
+    assert str(DAILY_MAX) in r["_formula"].replace(",", "")
+
+
+def test_formula_normal_case():
+    """UB-6 정상 케이스: _formula에 클램프 문구 없음."""
+    r = compute_ub(DAILY_MAX / 0.6, 40, 24)  # raw == DAILY_MAX
+    assert r is not None
+    assert "적용" not in r["_formula"]
+
+
+# UB-7: notices 우선순위 ────────────────────────────────────────────────────
+
+def test_ineligible_no_clamp_notice():
+    """UB-7: 6개월 미만이면 상한/하한 notice 없음 — 수급 불가 notice만 표시."""
+    r = compute_ub(200_000, 40, 5)  # raw=120,000 > DAILY_MAX지만 수급 불가
+    assert r is not None
+    assert r["benefit_days"] == 0
+    assert len(r["notices"]) == 1
+    assert "고용보험법 제40조" in r["notices"][0]
+    assert not any("상한" in n or "하한" in n for n in r["notices"])
+
+
+def test_eligible_ceiling_notice_only():
+    """UB-7: 수급 가능 + 상한 초과 → 상한 notice만 (수급불가 notice 없음)."""
+    r = compute_ub(200_000, 40, 24)  # 수급 가능, 상한 초과
+    assert r is not None
+    assert r["benefit_days"] > 0
+    assert len(r["notices"]) == 1
+    assert "상한액" in r["notices"][0]
+
+
+def test_eligible_floor_notice_only():
+    """UB-7: 수급 가능 + 하한 미만 → 하한 notice만 (수급불가 notice 없음)."""
+    r = compute_ub(50_000, 40, 24)   # 수급 가능, 하한 미만
+    assert r is not None
+    assert r["benefit_days"] > 0
+    assert len(r["notices"]) == 1
+    assert "하한액" in r["notices"][0]
 
 
 # ── 독립 실행 (run_tests 요약 출력) ──────────────────────────────────────────
