@@ -350,7 +350,9 @@ def _compute_js(calc) -> str:
             '  return out;\n};\n'
         )
     if str(calc.get("slug", "")) == "annual-leave-allowance":
-        # AL-1: 입력 검증 — 음수/0 → null (주휴수당 B-2, 퇴직금 SP-4 패턴 재사용)
+        # AL-1: 입력 검증 — 음수/0 → null
+        # AL-5: notices — 법정 상한(25일) 초과 경고
+        # AL-6: _formula — "통상임금(일급) N원 × M일 = Y원"
         return (
             'window.computeResult = function(inputs){\n'
             '  var daily_wage = inputs["daily_wage"] || 0;\n'
@@ -358,6 +360,12 @@ def _compute_js(calc) -> str:
             '  if (daily_wage <= 0 || unused_days <= 0) { return null; }\n'
             '  var out = {};\n'
             '  out["annual_leave_allowance"] = (daily_wage * unused_days);\n'
+            '  var notices = [];\n'
+            '  if (unused_days > 25) {\n'
+            '    notices.push("입력하신 미사용 연차(" + unused_days + "일)가 법정 상한(25일)을 초과합니다. 사용자가 추가로 부여한 약정 연차가 있는 경우 25일을 초과할 수 있습니다(근로기준법 제60조제4항).");\n'
+            '  }\n'
+            '  out.notices = notices;\n'
+            '  out._formula = "통상임금(일급) " + daily_wage.toLocaleString() + "원 × " + unused_days + "일 = " + Math.round(daily_wage * unused_days).toLocaleString() + "원";\n'
             '  return out;\n};\n'
         )
     if _compute_type(calc) == "date_based":   # 날짜 기반(입사일/퇴사일 → total_days)

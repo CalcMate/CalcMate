@@ -331,9 +331,9 @@ Status: 🟡 Monitoring
 
 ---
 
-## 연차수당 계산기 — Phase 1 완료 (Phase 2 대기)
+## 연차수당 계산기 — ✅ VERIFIED (Phase 1·2 완료)
 
-> 진단일: 2026-07-19 | Phase 1 완료: 2026-07-19
+> 진단일: 2026-07-19 | Phase 1 완료: 2026-07-19 | Phase 2 완료: 2026-07-19
 > 상세: `docs/reference_cases/annual_leave_allowance_diagnosis.md`
 
 ### 설계 범위 규정
@@ -345,29 +345,32 @@ Status: 🟡 Monitoring
 - `if (daily_wage <= 0 || unused_days <= 0) return null;` 추가.
 - 재사용 패턴: `weekly-holiday-allowance`, `severance-pay` 동일 구조
 
-### AL-2 [Critical급] ✅ 해결 — faq[3]+article_content 통상임금 오류 정정
+### AL-2 [Critical급] ✅ 해결 — 통상임금 정의 오류 정정
 - 수정: "기본 일급만 기준" → "통상임금 = 기본급 + 고정수당 (시행령 제6조)"
 - faq[3] + article_content HTML 두 위치 동시 수정. 잔존 0건 확인.
 - 근거: 근로기준법 제2조제1항제5호, 시행령 제6조
 
-### AL-3 [Critical급] ✅ 해결 — faq[1]+article_content 지급 의무 오류 정정
+### AL-3 [Critical급] ✅ 해결 — 지급 의무 오류 정정
 - 수정: "지급되지 않을 수 있다" → "퇴직 시 의무 지급 (제36조 금품 청산). 제61조 촉진제도 시만 예외."
 - faq[1] + article_content HTML 두 위치 동시 수정. 잔존 0건 확인.
 - 근거: 근로기준법 제36조, 제61조
 
-### AL-4 [Major] — 제61조 연차 사용 촉진제도 예외 미언급 (Phase 2)
-- `legal_basis.draft.yaml` reviewer_expectation 위반. 별도 FAQ 항목 추가 예정.
+### AL-4 [Major] ✅ 해결 — 원칙-예외 구조 확립 + 제61조 요건 구체화
+- 수정: faq[1]을 "원칙 → 예외" 구조로 재서술.
+  - 원칙: "반드시 지급 (제60조제5항·제36조)"
+  - 예외: 제61조 촉진제도 — 6개월 전 서면 통지 + 사용 시기 서면 지정 두 절차 모두 완료 시만 면제
+- 일관성 3곳 확인: faq 배열 / article HTML FAQ 목록 / article 주의사항 본문 — 전부 동일 구조 PASS
 
-### AL-5 [Minor] — notices 없음 (Phase 2)
-- 법적 상한(25일) 초과 입력 경고 없음.
+### AL-5 [Minor] ✅ 해결 — notices 추가
+- `unused_days > 25` 시 법정 상한 초과 경고 (근로기준법 제60조제4항) 표시.
 
-### AL-6 [Minor] — _formula 없음 (Phase 2)
-- "일급 N원 × M일 = Y원" 계산 과정 미표시.
+### AL-6 [Minor] ✅ 해결 — _formula 추가
+- "통상임금(일급) N원 × M일 = Y원" 계산 과정 표시.
 
-### AL-7 [Minor] — "일급" 표현 (Phase 2)
-- 법적 용어는 "통상임금". article_content 전반 개선 예정.
+### AL-7 [Minor] ✅ 해결 — "일급" 표현 통상임금 병기
+- FAQ[2], article_content 계산 원리·결과 해설·form label·CTA 등 전위치 "통상임금(일급)" 병기.
 
-### AL-8 [설계 보완] — 연차 발생 개수 미구현 (별도 트랙)
-- 근속연수 → 연차 개수 자동 계산 없음. 사용자가 직접 입력해야 함.
+### AL-8 [설계 확장 검토] — 연차 발생 개수 계산 (별도 트랙)
+- 이 계산기는 미사용 연차수당 금액 계산기. 연차 발생 개수 자동 계산은 별도 트랙.
 - 연차 개수 계단 구조: 1년=15일, 3년차부터 2년마다 +1일, 최대 25일 (21년차 이상).
-- 20년→24일, 21년→25일(상한), 22년→25일(유지) 구간이 미래 구현 시 핵심 엣지 케이스.
+- 핵심 엣지: 20년→24일, 21년→25일(상한), 22년→25일(유지) — 미래 구현 시 반드시 검증.
