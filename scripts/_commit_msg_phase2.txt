@@ -1,0 +1,19 @@
+feat(unemployment): Phase 2 콘텐츠 정확성 — UB-2(300일→270일) + UB-9(법령 보강) + reference cases
+
+UB-2: DB faq[0/2/6] + article_content "최대 300일" → "120~270일 (고용보험법 별표1)"
+소정급여일수 전체 구간(50세 미/이상 x 5구간) 표 형식 추가
+
+UB-9: DB faq[4] 법령 보강
+고용보험법 제40조(수급요건)/제45조(소정급여일수)/제46조(상한하한)/별표1 명시
+
+예시 금액: compute_ub() 함수 실행 결과만 인용, 수기 계산 금지
+케이스A(35세/24개월/100,000원): 64,192원 x 150일 = 9,628,800원
+케이스D(40세/36개월/80,000원): 64,192원 x 180일 = 11,554,560원
+
+reference cases: docs/reference_cases/unemployment_benefit.md
+10대 대표 케이스, 소정급여일수 테이블, 연 갱신 절차 문서화
+
+최대 300일 오류 표현 잔존 0건 확인
+회귀: 38/38 PASS
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
