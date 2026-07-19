@@ -14,7 +14,7 @@
 ### □ 2. 법령 (Legal)
 - [ ] `legal_basis.draft.yaml`에 해당 계산기 항목이 존재하는가
 - [ ] 법령명·조항이 정확하며 현행 조문과 일치하는가
-- [ ] **폐지된 조항을 인용하지 않는가** — 특히 퇴직금: `legal_basis.draft.yaml`에 `forbidden_articles: [근로기준법 제34조]` 명시됨. HTML/FAQ에서 "근로기준법 제34조" 포함 여부 전수 검색
+- [ ] **폐지된 조항을 인용하지 않는가** — `legal_basis.draft.yaml` `forbidden_articles` 기준으로 DB `faq` + `article_content` + 계산기 HTML(workspace) 전수 검색 (G8는 writer body_html만 검사 — DB 필드는 사각지대, #17)
 - [ ] `writer_note`에 예외 조항(15시간 미만 / 1년 미만 등)이 명시되어 있는가
 
 ### □ 3. 경계값 (Boundary)
@@ -103,12 +103,12 @@
 | 항목 | 결과 |
 |------|------|
 | 계산식 | ✅ 법령 기준 일치 (3건 정부공식 비교) |
-| 법령 | ❌ HTML/FAQ에 폐지 조항 "근로기준법 제34조" 인용 (SP-2, 콘텐츠 재생성 필요) |
+| 법령 | ✅ SP-2 해결(2026-07-19): DB faq·article_content "근로기준법 제34조" → 근로자퇴직급여보장법 제8조 교체 |
 | 경계값 | ✅ SP-1 해결(2026-07-19): 1년 미만 → 0원+notice (근로자퇴직급여보장법 제8조) |
 | 예외 처리 | ✅ SP-3 해결: 날짜 미입력 → null. SP-4 해결: 음수/0 임금 → null |
 | UI | ✅ SP-7 부분: _formula 반환, 재직일수 _detail 표시. 날짜 레이블 영문(SP-5 미수정) |
 | SEO 정합성 | ✅ 예시(월300만×2년=600만원) 계산기와 일치. 1년 미만 케이스와 모순 없음 |
-| FAQ | ⚠️ "근로기준법 제34조" 인용(SP-2), 코드 문자열 노출(SP-8) — 콘텐츠 재생성 시 해결 |
+| FAQ | ✅ SP-2 해결: DB faq 법령 조항 수정 완료. ⚠️ 코드 문자열 노출(SP-8) 잔여 |
 | 예시 계산 | ✅ 1건 확인 (2년=600만원) |
 | 반올림 | ✅ _formula에서 Math.round() 적용 |
 | 테스트 케이스 | ✅ 11케이스 영구 등록 (tests/test_severance_compute.py) |
@@ -119,7 +119,7 @@
 
 ## 나머지 5개 계산기 적용 순서 (갱신)
 
-1. ~~퇴직금 (severance-pay)~~ ✅ 완료 (2026-07-19, SP-2 법령 오류만 잔여)
+1. ~~퇴직금 (severance-pay)~~ ✅ 완료 (2026-07-19, SP-2 법령 오류 해결 포함)
 2. 연차수당 (annual-leave-allowance) — 연차 개수 경계값
 3. 실업급여 (unemployment-benefit) — 수급요건 복합 조건
 4. 4대보험 (four-insurances) — 요율 dict formula, 4가지 계산
