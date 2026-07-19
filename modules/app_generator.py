@@ -299,6 +299,52 @@ def _compute_js(calc) -> str:
             '  out._formula = _ub_formula;\n'
             '  return out;\n};\n'
         )
+    if str(calc.get("slug", "")) == "four-insurances":
+        fi_reg = (_registry().get("four-insurances") or {})
+        ir = fi_reg.get("insurance_rates") or {}
+        NP_RATE  = float(ir.get("np_rate",  0.045))
+        NP_MIN   = int(ir.get("np_min",   390000))
+        NP_MAX   = int(ir.get("np_max",   6170000))
+        HI_RATE  = float(ir.get("hi_rate",  0.03545))
+        LTC_RATE = float(ir.get("ltc_rate", 0.1296))
+        EI_RATE  = float(ir.get("ei_rate",  0.009))
+        np_pct   = f"{NP_RATE  * 100:g}"
+        hi_pct   = f"{HI_RATE  * 100:g}"
+        ltc_pct  = f"{LTC_RATE * 100:g}"
+        ei_pct   = f"{EI_RATE  * 100:g}"
+        return (
+            'window.computeResult = function(inputs){\n'
+            '  var monthly_salary = inputs["monthly_salary"] || 0;\n'
+            '  if (monthly_salary <= 0) { return null; }\n'
+            '  var out = {};\n'
+            '  out.notices = [];\n'
+            # FI-2: 국민연금 기준소득월액 상한/하한 클램프 (국민연금법 제88조)
+            f'  var NP_MIN = {NP_MIN};\n'
+            f'  var NP_MAX = {NP_MAX};\n'
+            '  var np_base = Math.min(Math.max(monthly_salary, NP_MIN), NP_MAX);\n'
+            f'  var national_pension = np_base * {NP_RATE};\n'
+            # FI-1: 건강보험 먼저 계산 → 장기요양은 반드시 health_insurance에 곱 (급여 직접 곱 금지)
+            f'  var health_insurance = monthly_salary * {HI_RATE};\n'
+            f'  var long_term_care = health_insurance * {LTC_RATE};\n'
+            f'  var employment_insurance = monthly_salary * {EI_RATE};\n'
+            # FI-3: total에 4종 모두 합산
+            '  var total = national_pension + health_insurance + long_term_care + employment_insurance;\n'
+            '  out["national_pension"] = national_pension;\n'
+            '  out["health_insurance"] = health_insurance;\n'
+            '  out["long_term_care"] = long_term_care;\n'
+            '  out["employment_insurance"] = employment_insurance;\n'
+            '  out["total"] = total;\n'
+            # FI-9: notices — 국민연금 클램프 적용 시 안내
+            '  if (monthly_salary < NP_MIN) {\n'
+            '    out.notices.push("월급여(" + monthly_salary.toLocaleString() + "원)가 기준소득월액 하한(" + NP_MIN.toLocaleString() + "원)보다 낮아 국민연금은 하한 기준으로 계산됩니다 (국민연금법 제88조).");\n'
+            '  } else if (monthly_salary > NP_MAX) {\n'
+            '    out.notices.push("월급여(" + monthly_salary.toLocaleString() + "원)가 기준소득월액 상한(" + NP_MAX.toLocaleString() + "원)을 초과하여 국민연금은 상한 기준으로 계산됩니다 (국민연금법 제88조).");\n'
+            '  }\n'
+            # FI-8: _formula — 케이스별(하한/상한/정상) 단계 표시
+            '  var np_label = (monthly_salary < NP_MIN ? NP_MIN.toLocaleString() : (monthly_salary > NP_MAX ? NP_MAX.toLocaleString() : monthly_salary.toLocaleString()));\n'
+            f'  out._formula = "국민연금 " + np_label + "원 × {np_pct}% = " + Math.round(national_pension).toLocaleString() + "원 | 건강보험 " + monthly_salary.toLocaleString() + "원 × {hi_pct}% = " + Math.round(health_insurance).toLocaleString() + "원 | 장기요양 건강보험료 × {ltc_pct}% = " + Math.round(long_term_care).toLocaleString() + "원 | 고용보험 " + monthly_salary.toLocaleString() + "원 × {ei_pct}% = " + Math.round(employment_insurance).toLocaleString() + "원";\n'
+            '  return out;\n};\n'
+        )
     if _compute_type(calc) == "date_based":   # 날짜 기반(입사일/퇴사일 → total_days)
         return (
             'window.computeResult = function(inputs){\n'

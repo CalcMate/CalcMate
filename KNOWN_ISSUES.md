@@ -279,3 +279,51 @@ Status: 🟡 Monitoring
   기존 Bootstrap Mode 분기를 Adaptive G5 수식 안에 통합(분기 3개→2개).
 - **검증**: pool 0/1/1(inject 버그)/5/5(inject 버그)/dead-link 6케이스 단위테스트 전부 통과.
   E2E Cold Start부터 pool 0→1→2 연속 발행 확인 (wp_post_id 54→55→56).
+
+---
+
+## 4대보험 계산기 — Phase 1 완료 (Phase 2 대기 중)
+
+> 진단일: 2026-07-19 | Phase 1 완료: 2026-07-19 | Phase 2(콘텐츠) 미수정
+> 상세: `docs/reference_cases/four_insurances_diagnosis.md` | 기준 케이스: `docs/reference_cases/four_insurances_2026.md`
+> 테스트: `tests/test_four_insurances_compute.py` 31케이스 ALL PASS
+
+### FI-1 [Critical] ✅ 해결 — 장기요양보험 구현
+- `health_insurance × 0.1296` 순서 엄수. 급여 직접 곱 방지 테스트 영구 등록.
+
+### FI-2 [Critical] ✅ 해결 — 국민연금 상한/하한 클램프
+- `clamp(salary, 390000, 6170000) × 0.045`. 경계 3점 + 극단값(20만원·1000만원) 테스트 등록.
+
+### FI-3 [Critical] ✅ 해결 — total 4종 합산 + 내부 합계 검증 테스트
+- `total = NP + HI + LTC + EI`. `_assert_total_equals_sum` 8케이스 parametrize로 영구 보호.
+
+### FI-4 [Major] ✅ 해결 — 입력 검증
+- `monthly_salary ≤ 0 → return null`.
+
+### FI-5 [Major] 산재보험 UI 안내 없음 → **Phase 2 이월**
+- "4대보험" 표제에서 산재보험 설명 부재. 콘텐츠 수정 필요.
+
+### FI-6 [Major] faq[2] 건강보험 예시 오류: 106,500원(×) → 106,350원(○) → **Phase 2 이월**
+
+### FI-7 [Major] faq[3] 고용보험 "절반씩" 오류 → **Phase 2 이월**
+- 근로자 0.9% / 사업주 0.9%+(규모별). 콘텐츠 수정 필요.
+
+### FI-8 [Minor] ✅ 해결 — _formula 구현
+- 케이스별(하한/상한/정상) 단계 표시. JS에 생성됨.
+
+### FI-9 [Minor] ✅ 해결 — notices 구현
+- 상한/하한 클램프 적용 시 국민연금법 제88조 인용 안내.
+
+### FI-10 [Minor] ✅ 해결 — legal_basis 외부화
+- `docs/legal_basis.draft.yaml` four-insurances.insurance_rates 섹션 추가.
+- `test_yaml_sync_constants`로 YAML↔Python 상수 동기화 자동 감지.
+
+**2025년 기준표:**
+
+| 보험 | 근로자 요율 | 상한/하한 | 출처 |
+|---|---|---|---|
+| 국민연금 | 4.5% | 기준소득월액 하한 390,000원 / 상한 6,170,000원 (2024.7~2025.6) | 국민연금법 제88조 |
+| 건강보험 | 3.545% (총 7.09%) | 실질 상한 없음 | 국민건강보험법 제69조 |
+| 장기요양보험 | 건강보험료 × 12.96% | — | 노인장기요양보험법 제9조 |
+| 고용보험 | 0.9% | 상한 없음 | 고용보험법 제49조 |
+| 산재보험 | 근로자 0% (사업주 전액) | 업종별 상이 | 산업재해보상보험법 제13조 |

@@ -261,7 +261,16 @@ four-insurances:
     content_caveat: null
   related_slugs: [weekly-holiday-allowance, severance-pay, annual-leave-allowance, unemployment-benefit, 연말정산_환급액_계산기, 육아휴직_급여_계산기]
   # 결정: "관련 법령에 따라"식 단순화는 기각 — legal_basis 도입 취지와 배치, writer_note에 압축 지시 있음.
-  # 코드정합: output은 국민연금/건강/고용 3종+total(산재 없음, 설계상 맞음).
+  # 코드정합: output은 국민연금/건강보험/장기요양/고용보험 4종+total(산재 없음, 설계상 맞음).
+  insurance_rates:
+    # 매년 확인 필요 — 국민연금: 7월 1일 조정 / 건강·장기요양: 1월 1일 조정
+    np_rate:  0.045        # 국민연금 근로자 요율 4.5% (국민연금법 제88조)
+    np_min:   390000       # 기준소득월액 하한 390,000원 (2024.7~2025.6 고시)
+    np_max:   6170000      # 기준소득월액 상한 6,170,000원 (2024.7~2025.6 고시)
+    hi_rate:  0.03545      # 건강보험 근로자 요율 3.545% (2025년, 총 7.09%)
+    ltc_rate: 0.1296       # 장기요양보험 = 건강보험료 × 12.96% (2025년) ← 급여 아닌 건강보험료에 곱
+    ei_rate:  0.009        # 고용보험 근로자 요율 0.9%
+    reference_year: 2025
 
 연말정산_환급액_계산기:
   name: 연말정산 환급액 계산기
