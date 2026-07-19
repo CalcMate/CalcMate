@@ -284,7 +284,7 @@ Status: 🟡 Monitoring
 
 ## 4대보험 계산기 — Phase 1 완료 (Phase 2 대기 중)
 
-> 진단일: 2026-07-19 | Phase 1 완료: 2026-07-19 | Phase 2(콘텐츠) 미수정
+> 진단일: 2026-07-19 | Phase 1 완료: 2026-07-19 | Phase 2 완료: 2026-07-19
 > 상세: `docs/reference_cases/four_insurances_diagnosis.md` | 기준 케이스: `docs/reference_cases/four_insurances_2026.md`
 > 테스트: `tests/test_four_insurances_compute.py` 31케이스 ALL PASS
 
@@ -300,13 +300,14 @@ Status: 🟡 Monitoring
 ### FI-4 [Major] ✅ 해결 — 입력 검증
 - `monthly_salary ≤ 0 → return null`.
 
-### FI-5 [Major] 산재보험 UI 안내 없음 → **Phase 2 이월**
-- "4대보험" 표제에서 산재보험 설명 부재. 콘텐츠 수정 필요.
+### FI-5 [Major] ✅ 해결 — 산재보험 UI 안내 추가
+- article_content 주의사항: "산재보험은 사업주가 전액 부담합니다 — 근로자 급여에서 공제되지 않음 (산업재해보상보험법 제13조)."
 
-### FI-6 [Major] faq[2] 건강보험 예시 오류: 106,500원(×) → 106,350원(○) → **Phase 2 이월**
+### FI-6 [Major] ✅ 해결 — faq[2] 건강보험 예시 교정 + 장기요양보험 신규
+- faq[2]: 106,500원 → 106,350원. 장기요양 1만 3천 783원 예시 추가. total 26만 8천 500원 → 28만 2천 133원.
 
-### FI-7 [Major] faq[3] 고용보험 "절반씩" 오류 → **Phase 2 이월**
-- 근로자 0.9% / 사업주 0.9%+(규모별). 콘텐츠 수정 필요.
+### FI-7 [Major] ✅ 해결 — faq[3] 고용보험 부담 비율 교정
+- "각 보험료 절반씩 부담" → 국민연금·건강보험·장기요양은 절반씩, 고용보험 근로자 0.9%·사업주 0.9%+α, 산재보험 사업주 전액으로 정확히 구분.
 
 ### FI-8 [Minor] ✅ 해결 — _formula 구현
 - 케이스별(하한/상한/정상) 단계 표시. JS에 생성됨.

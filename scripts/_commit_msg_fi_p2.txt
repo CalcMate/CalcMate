@@ -1,0 +1,28 @@
+feat(four-insurances): Phase 2 콘텐츠 정확성 — FI-5/6/7 해결 + 이중 검증
+
+FI-5 [Major]: 산재보험 UI 안내 추가
+  article_content 주의사항: 산재보험은 사업주가 전액 부담(산업재해보상보험법 제13조), 근로자 공제 없음
+
+FI-6 [Major]: faq[2] 건강보험 예시 교정 + 장기요양보험 예시 신규
+  106,500원(x) -> 106,350원 (3,000,000 x 3.545%)
+  장기요양 1만 3천 783원 예시 추가 (건강보험료 x 12.96%)
+  total 26만 8천 500원(x) -> 28만 2천 133원 (4종 합산)
+
+FI-7 [Major]: faq[3] 고용보험 부담 비율 교정
+  각 보험료 절반씩 부담(x) -> 국민연금/건강보험/장기요양 절반 / 고용보험 0.9%:0.9%+ / 산재 사업주 전액
+
+이중 검증 (scripts/fix_fi_phase2.py):
+  (1) 예시 금액 == compute_fi(3,000,000) 결과 인용 (함수 결과 직접 인용)
+  (2) Total(282,133) == NP(135,000)+HI(106,350)+LTC(13,783)+EI(27,000) (개별 합계 일치)
+  구 오류 수치 잔존 0건 확인: 106,500 / 268,500 / 절반씩 부담 전수 검색
+
+article_content 재작성:
+  결과 행에 장기요양보험 추가
+  계산 원리에 장기요양보험 설명 추가
+  총합 갱신 (4종 합산 명시)
+  중복 항목 정리 (fix_fi_phase2_article.py로 완전 재작성)
+
+회귀 테스트: 75케이스 ALL PASS (31 FI + 44 기존)
+Golden snapshot: four-insurances/index.html 업데이트
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
