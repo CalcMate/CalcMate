@@ -331,42 +331,43 @@ Status: 🟡 Monitoring
 
 ---
 
-## 연차수당 계산기 — 진단 완료 (수정 대기 중)
+## 연차수당 계산기 — Phase 1 완료 (Phase 2 대기)
 
-> 진단일: 2026-07-19 | 상세: `docs/reference_cases/annual_leave_allowance_diagnosis.md`
+> 진단일: 2026-07-19 | Phase 1 완료: 2026-07-19
+> 상세: `docs/reference_cases/annual_leave_allowance_diagnosis.md`
 
 ### 설계 범위 규정
 
 이 계산기는 **"미사용 연차수당 금액 계산기"** — `daily_wage × unused_days` 공식.
 사용자가 1일 통상임금과 미사용 연차 일수를 직접 입력. 연차 발생 개수 계산 없음.
 
-### AL-1 [Critical] — 입력 검증 없음
-- `daily_wage ≤ 0`, `unused_days ≤ 0` → null 미반환. 음수 입력 시 음수 결과 표시.
+### AL-1 [Critical] ✅ 해결 — 입력 검증 추가
+- `if (daily_wage <= 0 || unused_days <= 0) return null;` 추가.
 - 재사용 패턴: `weekly-holiday-allowance`, `severance-pay` 동일 구조
 
-### AL-2 [Major] — faq[3] 통상임금 오류
-- 현재: "연차수당은 기본 일급만 기준으로 하므로"
-- 정확: 통상임금 기준 (기본급 + 고정수당). 근로기준법 제2조제1항제5호, 시행령 제6조.
-- 영향: 사용자가 고정수당 제외하고 계산 → 과소 청구 유발
+### AL-2 [Critical급] ✅ 해결 — faq[3]+article_content 통상임금 오류 정정
+- 수정: "기본 일급만 기준" → "통상임금 = 기본급 + 고정수당 (시행령 제6조)"
+- faq[3] + article_content HTML 두 위치 동시 수정. 잔존 0건 확인.
+- 근거: 근로기준법 제2조제1항제5호, 시행령 제6조
 
-### AL-3 [Major] — faq[1] 퇴직 후 미사용 연차 오류
-- 현재: "근로계약이 해지된 후에도 미사용 연차가 있을 경우 지급되지 않을 수 있습니다"
-- 정확: 퇴직 시 미사용 연차수당은 **의무 지급** (근로기준법 제60조제5항). 제61조 촉진제도 적법 시행 시에만 예외.
-- 영향: 사용자 권리 포기 유도
+### AL-3 [Critical급] ✅ 해결 — faq[1]+article_content 지급 의무 오류 정정
+- 수정: "지급되지 않을 수 있다" → "퇴직 시 의무 지급 (제36조 금품 청산). 제61조 촉진제도 시만 예외."
+- faq[1] + article_content HTML 두 위치 동시 수정. 잔존 0건 확인.
+- 근거: 근로기준법 제36조, 제61조
 
-### AL-4 [Major] — 제61조 연차 사용 촉진제도 예외 미언급
-- `legal_basis.draft.yaml` reviewer_expectation 위반. faq/article 모두 없음.
+### AL-4 [Major] — 제61조 연차 사용 촉진제도 예외 미언급 (Phase 2)
+- `legal_basis.draft.yaml` reviewer_expectation 위반. 별도 FAQ 항목 추가 예정.
 
-### AL-5 [Minor] — notices 없음
-- 음수/0 입력, 법적 상한(25일) 초과 입력 경고 없음.
+### AL-5 [Minor] — notices 없음 (Phase 2)
+- 법적 상한(25일) 초과 입력 경고 없음.
 
-### AL-6 [Minor] — _formula 없음
+### AL-6 [Minor] — _formula 없음 (Phase 2)
 - "일급 N원 × M일 = Y원" 계산 과정 미표시.
 
-### AL-7 [Minor] — "일급" 표현
-- 법적 용어는 "통상임금". article_content 전반에 "일급"만 사용.
+### AL-7 [Minor] — "일급" 표현 (Phase 2)
+- 법적 용어는 "통상임금". article_content 전반 개선 예정.
 
-### AL-8 [설계 보완] — 연차 발생 개수 미구현
+### AL-8 [설계 보완] — 연차 발생 개수 미구현 (별도 트랙)
 - 근속연수 → 연차 개수 자동 계산 없음. 사용자가 직접 입력해야 함.
 - 연차 개수 계단 구조: 1년=15일, 3년차부터 2년마다 +1일, 최대 25일 (21년차 이상).
 - 20년→24일, 21년→25일(상한), 22년→25일(유지) 구간이 미래 구현 시 핵심 엣지 케이스.

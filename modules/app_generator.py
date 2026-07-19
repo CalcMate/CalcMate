@@ -349,6 +349,17 @@ def _compute_js(calc) -> str:
             f'  out._formula = "국민연금 " + np_label + "원 × {np_pct}% = " + Math.round(national_pension).toLocaleString() + "원 | 건강보험 " + monthly_salary.toLocaleString() + "원 × {hi_pct}% = " + Math.round(health_insurance).toLocaleString() + "원 | 장기요양 건강보험료 " + Math.round(health_insurance).toLocaleString() + "원 × {ltc_pct}% = " + Math.round(long_term_care).toLocaleString() + "원 | 고용보험 " + monthly_salary.toLocaleString() + "원 × {ei_pct}% = " + Math.round(employment_insurance).toLocaleString() + "원";\n'
             '  return out;\n};\n'
         )
+    if str(calc.get("slug", "")) == "annual-leave-allowance":
+        # AL-1: 입력 검증 — 음수/0 → null (주휴수당 B-2, 퇴직금 SP-4 패턴 재사용)
+        return (
+            'window.computeResult = function(inputs){\n'
+            '  var daily_wage = inputs["daily_wage"] || 0;\n'
+            '  var unused_days = inputs["unused_days"] || 0;\n'
+            '  if (daily_wage <= 0 || unused_days <= 0) { return null; }\n'
+            '  var out = {};\n'
+            '  out["annual_leave_allowance"] = (daily_wage * unused_days);\n'
+            '  return out;\n};\n'
+        )
     if _compute_type(calc) == "date_based":   # 날짜 기반(입사일/퇴사일 → total_days)
         return (
             'window.computeResult = function(inputs){\n'
