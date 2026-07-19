@@ -377,12 +377,12 @@ Status: 🟡 Monitoring
 
 ---
 
-## 육아휴직급여 계산기 — Phase 1·2 완료 / Phase 3 대기
+## 육아휴직급여 계산기 — ✅ VERIFIED (Phase 1·2·3 완료)
 
-> 진단일: 2026-07-19 | Phase 1 완료: 2026-07-19 | Phase 2 완료: 2026-07-19 | 제도 기준일: 2024년 1월 1일 (6+6 특례 시행)
+> 진단일: 2026-07-19 | Phase 1 완료: 2026-07-19 | Phase 2 완료: 2026-07-19 | Phase 3 완료: 2026-07-19 | 제도 기준일: 2024년 1월 1일 (6+6 특례 시행)
 > 상세: `docs/reference_cases/parental_leave_diagnosis.md` | 기준 케이스: `docs/reference_cases/parental_leave_2026.md`
 > 테스트: `tests/test_parental_leave_compute.py` 54케이스 ALL PASS
-> Phase 1 스크립트: `scripts/fix_pl_phase1.py` | Phase 2 스크립트: `scripts/fix_pl_phase2.py`
+> Phase 1 스크립트: `scripts/fix_pl_phase1.py` | Phase 2 스크립트: `scripts/fix_pl_phase2.py` | Phase 3 스크립트: `scripts/fix_pl_phase3.py`
 
 ### 설계 구조 (Phase 2 완료)
 
@@ -412,9 +412,10 @@ Status: 🟡 Monitoring
 - "회사 정책에 따라 다를 수 있습니다" → **법적 권리** 명시
 - 남녀고용평등과 일·가정 양립 지원에 관한 법률 제19조 인용
 
-### PL-6 [Critical — SP-8 재발] 🔵 Phase 3 — FAQ[2] 코드 문자열 노출
-- `avg_monthly_wage`, `government_support_percentage` 등 코드 변수명 4종 FAQ에 노출
-- Phase 2 계산 엔진 교체 후에도 FAQ 텍스트는 별도 수정 필요
+### PL-6 [Critical — SP-8 재발] ✅ Phase 3 해결 — FAQ[2] 코드 문자열 노출
+- `avg_monthly_wage`, `government_support_percentage` 등 코드 변수명 4종 FAQ에 노출됐던 문제
+- Phase 3에서 faq[2].answer 및 article_content FAQ[2]를 자연어 + Phase 2 엔진 실행 결과 예시로 교체
+- 코드 변수명 잔존 0건 확인. C-13 일관성 (faq⟺article) 검증 PASS
 
 ### PL-7 [Major] ✅ Phase 2 해결 — 상한·하한 미구현
 - 일반: 상한 150만원 / 하한 70만원 클램프 구현, 초과·미달 notices 추가
@@ -441,8 +442,16 @@ Status: 🟡 Monitoring
 ### PL-14 [Minor] ✅ Phase 2 해결 — formula 빈 문자열
 - slug 전용 _compute_js 분기에서 _formula 생성 — formula 필드 미사용(의도)
 
-### PL-15 [Minor] 🔵 Phase 3 — FAQ/계산 예시 재생성 (compute_pl() 결과 직접 인용)
+### PL-15 [Minor] ✅ Phase 3 해결 — FAQ/계산 예시 재생성 (compute_pl() 결과 직접 인용)
+- article_content 계산 원리 섹션 및 계산 예시 4케이스를 Phase 2 Python mirror 결과로 교체
+- 수기 계산 금지 원칙 준수. 일반(300만→150만, 180만→144만) / 6+6(1개월 300만→200만, 3개월 250만→250만)
+- 구 공식(14,400,000원) 완전 제거. 구 HTML Form(avg_monthly_wage 4종) 완전 제거
+
+**SP-8 패턴 퇴직금도 동시 해결 (Phase 3)**:
+- 퇴직금 faq[2].answer: `avg_monthly_wage * (total_days / 365)` 코드 표현 → 자연어 + 예시(300만×730일→600만원)
+- 퇴직금 article_content: 구 HTML Form(`id="avg_monthly_wage"`) + 결과 섹션 제거
+- 퇴직금 workspace 재생성. FORBIDDEN 패턴 0건 확인.
 
 **Phase 1 완료 (2026-07-19)**: PL-3/4/5/13 콘텐츠 오류 해결.
 **Phase 2 완료 (2026-07-19)**: PL-1/2/7~12/14 계산 엔진 전면 교체. 54케이스 ALL PASS.
-**Phase 3 대기**: PL-6(FAQ[2] 코드 변수명 노출) / PL-15(계산 예시 재생성)
+**Phase 3 완료 (2026-07-19)**: PL-6(FAQ[2] 코드 변수명) / PL-15(계산 예시 재생성) / 구 HTML Form 제거 / SP-8 퇴직금 동시 해결. 141 회귀 테스트 ALL PASS.

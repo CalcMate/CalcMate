@@ -140,7 +140,7 @@
 | 예외 처리 | ✅ SP-3 해결: 날짜 미입력 → null. SP-4 해결: 음수/0 임금 → null |
 | UI | ✅ SP-7 부분: _formula 반환, 재직일수 _detail 표시. 날짜 레이블 영문(SP-5 미수정) |
 | SEO 정합성 | ✅ 예시(월300만×2년=600만원) 계산기와 일치. 1년 미만 케이스와 모순 없음 |
-| FAQ | ✅ SP-2 해결: 법령 조항 수정 완료. ✅ SP-6 해결: 상여금·초과근무수당 포함 여부 정정. ⚠️ 코드 문자열 노출(SP-8) 잔여 |
+| FAQ | ✅ SP-2 해결: 법령 조항 수정 완료. ✅ SP-6 해결: 상여금·초과근무수당 포함 여부 정정. ✅ SP-8 해결(Phase 3): faq[2] 코드 변수명·article form 제거 |
 | 예시 계산 | ✅ 1건 확인 (2년=600만원) |
 | 반올림 | ✅ _formula에서 Math.round() 적용 |
 | 테스트 케이스 | ✅ 11케이스 영구 등록 (tests/test_severance_compute.py) |
@@ -148,8 +148,8 @@
 설계 범위: **단순 계산기** — 평균월임금 직접 입력, 3개월 정밀 산정 미지원
 
 **퇴직금 계산기 최종 상태 (2026-07-19)**
-Critical 0 / Major 0 / Minor 3건 — SP-5(날짜 레이블 영문), SP-7(미사용), SP-8(코드 문자열 노출)
-Minor 3건은 기능 영향 없음, 공통 UI 개선 단계로 이월.
+Critical 0 / Major 0 / Minor 2건 — SP-5(날짜 레이블 영문), SP-7(미사용)
+SP-8(코드 문자열 노출) Phase 3에서 해결. 잔여 Minor 2건은 기능 영향 없음.
 
 ---
 
@@ -222,11 +222,11 @@ Critical 0 / Major 0 / Minor 0 — AL-1~7 전체 해결. AL-8(연차 발생 개�
 
 ---
 
-## 육아휴직급여 계산기 검증 결과 (2026-07-19, Phase 1·2 완료)
+## 육아휴직급여 계산기 검증 결과 (2026-07-19, Phase 1·2·3 완료) ✅ Verified
 
 > 제도 기준일: 2024년 1월 1일 (6+6 부모 육아휴직 특례 시행)
 > 상세: `docs/reference_cases/parental_leave_diagnosis.md` | 기준 케이스: `docs/reference_cases/parental_leave_2026.md`
-> Phase 1: `scripts/fix_pl_phase1.py` | Phase 2: `scripts/fix_pl_phase2.py`
+> Phase 1: `scripts/fix_pl_phase1.py` | Phase 2: `scripts/fix_pl_phase2.py` | Phase 3: `scripts/fix_pl_phase3.py`
 > 테스트: `tests/test_parental_leave_compute.py` 54케이스 ALL PASS
 
 | 항목 | 결과 |
@@ -237,17 +237,21 @@ Critical 0 / Major 0 / Minor 0 — AL-1~7 전체 해결. AL-8(연차 발생 개�
 | 예외 처리 | ✅ Phase 2: monthly_wage/insured_days/leave_month ≤ 0 → null 반환 (PL-9 해결) |
 | UI | ✅ Phase 2: notices(상한·하한·전환·수급불가) + _formula 구현 (PL-10/11 해결) |
 | 콘텐츠 | ✅ Phase 1: PL-3 자녀 연령. PL-4 피보험단위기간 180일 + C-13. PL-5 법적 권리. PL-13 복귀 의사. |
-| SP-8 재발 | ❌ **PL-6 (Phase 3)**: 코드 변수명 4종 FAQ 노출 (계산 엔진 교체 후 콘텐츠 재생성 필요) |
+| SP-8(PL-6) | ✅ Phase 3: 코드 변수명 4종 FAQ 제거. 자연어 + compute_pl 결과 예시로 교체. 잔존 0건. |
+| article 정리 | ✅ Phase 3: 구 HTML Form 제거. 구 계산 원리(14,400,000원) 제거 → 새 계산 원리+예시 삽입. C-13 일관성 PASS. |
 | 특례 | ✅ Phase 2: 6+6 특례(1~6개월 100%, 단계별 상한), 7개월 이후 자동 일반 전환 (PL-8 해결) |
-| 원칙-예외 (C-13) | ✅ Phase 1: FAQ[1] + article HTML FAQ[1] + article 주의사항 3곳 일관성 PASS |
-| 테스트 케이스 | ✅ Phase 2: 54케이스 (경계/특례/전환/정부기준 ALL PASS) |
+| 원칙-예외 (C-13) | ✅ Phase 1: FAQ[1] + article HTML FAQ[1] + article 주의사항 3곳. Phase 3: FAQ[2] + article FAQ[2] 일관성 추가 PASS |
+| 테스트 케이스 | ✅ Phase 2: 54케이스 (경계/특례/전환/정부기준 ALL PASS). Phase 3: 141 회귀 ALL PASS. |
 
 설계 구조 (Phase 2 완료): 판정-계산 분리 — `determine_leave_mode()` → `calculate_general()` / `calculate_6plus6()`  
 상수 외부화: `legal_basis.draft.yaml` > `parental_leave_benefit` 섹션
 
 **육아휴직 Phase 1 완료 (2026-07-19)**: PL-3/4/5/13 콘텐츠 오류. 87 회귀 테스트 PASS.
 **육아휴직 Phase 2 완료 (2026-07-19)**: PL-1/2/7~12/14 계산 엔진 교체. 141 회귀 테스트 ALL PASS.
-**Phase 3 대기**: PL-6(FAQ[2] 코드 변수명) / PL-15(계산 예시 재생성)
+**육아휴직 Phase 3 완료 (2026-07-19)**: PL-6/PL-15 콘텐츠 정리 + SP-8(퇴직금) 동시 해결. 141 회귀 테스트 ALL PASS.
+
+**육아휴직 최종 상태 (2026-07-19)**
+Critical 0 / Major 0 / Minor 0 — PL-1~15 전체 해결.
 
 ---
 
@@ -260,7 +264,7 @@ Critical 0 / Major 0 / Minor 0 — AL-1~7 전체 해결. AL-8(연차 발생 개�
 | 실업급여 (unemployment-benefit) | ✅ Verified | 2026-07-19 |
 | 4대보험 (four-insurances) | ✅ Verified | 2026-07-19 |
 | 연차수당 (annual-leave-allowance) | ✅ Verified | 2026-07-19 |
-| 육아휴직 (육아휴직_급여_계산기) | 🟡 Phase 1·2 완료 / Phase 3(FAQ 재생성) 대기 | Phase 2: 2026-07-19 |
+| 육아휴직 (육아휴직_급여_계산기) | ✅ Verified | 2026-07-19 |
 | 연말정산 (연말정산_환급액_계산기) | ⏳ 검증 대기 | — |
 
 ---
@@ -271,7 +275,7 @@ Critical 0 / Major 0 / Minor 0 — AL-1~7 전체 해결. AL-8(연차 발생 개�
 2. ~~실업급여 (unemployment-benefit)~~ ✅ Verified (2026-07-19, Phase 1·2·3)
 3. ~~4대보험 (four-insurances)~~ ✅ Verified (2026-07-19, Phase 1·2·3)
 4. 연차수당 (annual-leave-allowance) — 연차 개수 경계값
-5. ~~육아휴직 (육아휴직_급여_계산기)~~ ✅ Phase 1·2 완료 (2026-07-19, Phase 3 FAQ 재생성 이월)
+5. ~~육아휴직 (육아휴직_급여_계산기)~~ ✅ Verified (2026-07-19, Phase 1·2·3 완료)
 6. 연말정산 (연말정산_환급액_계산기) — 간이 근사 계산 명시
 
 완료 후: 4개 계산기(주휴수당/퇴직금/실업급여/4대보험) 최종 회귀 → 공통 Minor 일괄 정리
