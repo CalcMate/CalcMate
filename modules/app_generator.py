@@ -368,6 +368,92 @@ def _compute_js(calc) -> str:
             '  out._formula = "통상임금(일급) " + daily_wage.toLocaleString() + "원 × " + unused_days + "일 = " + Math.round(daily_wage * unused_days).toLocaleString() + "원";\n'
             '  return out;\n};\n'
         )
+    if str(calc.get("slug", "")) == "육아휴직_급여_계산기":
+        # PL-1..15 Phase 2: 판정-계산 분리 구조 (determine_leave_mode / calculate_general / calculate_6plus6)
+        pl_reg  = (_registry().get("육아휴직_급여_계산기") or {})
+        plb     = pl_reg.get("parental_leave_benefit") or {}
+        gen     = plb.get("general")        or {}
+        sp      = plb.get("special_6plus6") or {}
+        MIN_INSURED = int(plb.get("min_insured_days", 180))
+        GEN_RATE    = float(gen.get("rate",    0.80))
+        GEN_CEIL    = int(gen.get("ceiling",   1_500_000))
+        GEN_FLOOR   = int(gen.get("floor",     700_000))
+        SP_RATE     = float(sp.get("rate",     1.00))
+        SP_MAX_MO   = int(sp.get("max_months", 6))
+        SP_CEILS    = list(sp.get("monthly_ceilings") or [2_000_000, 2_500_000, 3_000_000, 3_500_000, 4_000_000, 4_500_000])
+        sp_ceils_js = "[" + ",".join(str(int(c)) for c in SP_CEILS) + "]"
+        gen_rate_pct = f"{GEN_RATE * 100:g}%"
+        sp_rate_pct  = f"{SP_RATE  * 100:g}%"
+        return (
+            'window.computeResult = function(inputs){\n'
+            # ① 입력 검증: 통상임금·피보험단위기간·개월차 모두 양수 필수
+            '  var monthly_wage = inputs["monthly_wage"] || 0;\n'
+            '  var insured_days = inputs["insured_days"] || 0;\n'
+            '  var use_6plus6   = inputs["use_6plus6"]   || 0;\n'
+            '  var leave_month  = inputs["leave_month"]  || 0;\n'
+            '  if (monthly_wage <= 0 || insured_days <= 0 || leave_month <= 0) { return null; }\n'
+            '  var out = {};\n'
+            '  out.notices = [];\n'
+            # ② 수급자격 확인 (피보험단위기간 180일 — 고용보험법 제70조 제1항)
+            f'  var MIN_INSURED = {MIN_INSURED};\n'
+            '  if (insured_days < MIN_INSURED) {\n'
+            '    out["monthly_allowance"] = 0;\n'
+            '    out.notices.push("피보험단위기간이 " + insured_days + "일로 180일 미만이면 육아휴직급여를 받을 수 없습니다(고용보험법 제70조 제1항).");\n'
+            '    out._formula = "피보험단위기간 " + insured_days + "일 — 180일 미만으로 수급 불가";\n'
+            '    return out;\n'
+            '  }\n'
+            # 상수 (legal_basis.draft.yaml parental_leave_benefit 외부화)
+            f'  var GEN_RATE  = {GEN_RATE};\n'
+            f'  var GEN_CEIL  = {GEN_CEIL};\n'
+            f'  var GEN_FLOOR = {GEN_FLOOR};\n'
+            f'  var SP_RATE   = {SP_RATE};\n'
+            f'  var SP_MAX_MO = {SP_MAX_MO};\n'
+            f'  var SP_CEILS  = {sp_ceils_js};\n'
+            # ③ 판정 함수 — 추가 특례 제도 변경 시 이 함수만 수정
+            '  function determine_leave_mode(use_sp, mo) {\n'
+            '    if (use_sp >= 1 && mo >= 1 && mo <= SP_MAX_MO) { return "SPECIAL_6_PLUS_6"; }\n'
+            '    return "GENERAL";\n'
+            '  }\n'
+            # ④ 계산 함수: calculate_general (통상임금 × 80%, 상한/하한 클램프)
+            '  function calculate_general(wage) {\n'
+            '    var raw = wage * GEN_RATE;\n'
+            '    var applied = Math.min(Math.max(raw, GEN_FLOOR), GEN_CEIL);\n'
+            f'    return {{ raw: raw, applied: applied, ceiling: GEN_CEIL, floor: GEN_FLOOR, rate_pct: "{gen_rate_pct}" }};\n'
+            '  }\n'
+            # ④ 계산 함수: calculate_6plus6 (통상임금 × 100%, 월별 상한 클램프)
+            '  function calculate_6plus6(wage, mo) {\n'
+            '    var raw = wage * SP_RATE;\n'
+            '    var ceiling = SP_CEILS[mo - 1];\n'
+            '    var applied = Math.min(Math.max(raw, GEN_FLOOR), ceiling);\n'
+            f'    return {{ raw: raw, applied: applied, ceiling: ceiling, floor: GEN_FLOOR, rate_pct: "{sp_rate_pct}" }};\n'
+            '  }\n'
+            # ③ 판정 실행
+            '  var mode = determine_leave_mode(use_6plus6, leave_month);\n'
+            # 7개월 이후 자동 일반 전환 notice
+            '  if (use_6plus6 >= 1 && leave_month > SP_MAX_MO) {\n'
+            '    out.notices.push("6+6 특례는 1～" + SP_MAX_MO + "개월에만 적용됩니다. " + leave_month + "개월째는 일반 육아휴직급여(통상임금 80%)가 적용됩니다(고용보험법 시행령 제95조의2).");\n'
+            '  }\n'
+            # ④ 계산 실행 / ⑤ 지급률 적용 / ⑥ 상한·하한 클램프
+            '  var cr = (mode === "SPECIAL_6_PLUS_6") ? calculate_6plus6(monthly_wage, leave_month) : calculate_general(monthly_wage);\n'
+            '  out["monthly_allowance"] = cr.applied;\n'
+            # ⑦ notices: 상한·하한 적용 안내
+            '  var _mn = [];\n'
+            '  if (cr.raw > cr.ceiling) {\n'
+            '    _mn.push("통상임금 기준 급여(" + Math.round(cr.raw).toLocaleString() + "원)가 상한액(" + cr.ceiling.toLocaleString() + "원)을 초과하여 상한액이 적용됩니다(고용보험법 시행령 제95조).");\n'
+            '  } else if (cr.raw < cr.floor) {\n'
+            '    _mn.push("통상임금 기준 급여(" + Math.round(cr.raw).toLocaleString() + "원)가 하한액(" + cr.floor.toLocaleString() + "원)보다 낮아 하한액이 적용됩니다(고용보험법 시행령 제95조).");\n'
+            '  }\n'
+            '  out.notices = [].concat(out.notices, _mn);\n'
+            # ⑧ _formula
+            '  var ml = (mode === "SPECIAL_6_PLUS_6") ? ("6+6 특례 " + leave_month + "개월차") : "일반";\n'
+            '  var fs = ml + " — 통상임금 " + monthly_wage.toLocaleString() + "원 × " + cr.rate_pct + " = " + Math.round(cr.raw).toLocaleString() + "원";\n'
+            '  if (cr.raw > cr.ceiling) { fs += " → 상한 적용(" + cr.ceiling.toLocaleString() + "원) → " + Math.round(cr.applied).toLocaleString() + "원"; }\n'
+            '  else if (cr.raw < cr.floor) { fs += " → 하한 적용(" + cr.floor.toLocaleString() + "원) → " + Math.round(cr.applied).toLocaleString() + "원"; }\n'
+            '  out._formula = fs;\n'
+            # ⑨ 반환
+            '  return out;\n'
+            '};\n'
+        )
     if _compute_type(calc) == "date_based":   # 날짜 기반(입사일/퇴사일 → total_days)
         return (
             'window.computeResult = function(inputs){\n'

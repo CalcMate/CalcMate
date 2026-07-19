@@ -360,4 +360,28 @@ four-insurances:
     update_cycle: null
     content_caveat: null
   related_slugs: [weekly-holiday-allowance, severance-pay, annual-leave-allowance, unemployment-benefit, four-insurances, 연말정산_환급액_계산기]
-  # 코드정합: input(avg_monthly_wage, leave_months, government_support_%, company_%) — %기반, 특정연도 금액 미하드코딩.
+  # 코드정합: input(monthly_wage, insured_days, use_6plus6, leave_month) / output(monthly_allowance)
+  # slug 전용 _compute_js 분기 사용 — formula 필드 미사용.
+  parental_leave_benefit:
+    # 법적 근거: 고용보험법 제70조(수급 요건) / 시행령 제95조(일반) / 시행령 제95조의2(6+6 특례)
+    # 6+6 부모 육아휴직 특례 시행일: 2024-01-01
+    # 갱신 주기: 연 1회 (시행령 개정 시 monthly_ceilings 및 general ceiling/floor 우선 확인)
+    reference_date: "2024-01-01"
+    min_insured_days: 180       # 피보험단위기간 최소 (고용보험법 제70조 제1항)
+    general:
+      rate: 0.80                # 통상임금 × 80% (고용보험법 시행령 제95조)
+      ceiling: 1500000          # 상한 150만원/월
+      floor: 700000             # 하한 70만원/월
+    special_6plus6:
+      rate: 1.00                # 통상임금 × 100% (고용보험법 시행령 제95조의2)
+      max_months: 6             # 특례 최대 6개월 (7개월부터 일반 전환)
+      monthly_ceilings:         # 월별 상한 1~6개월 (고용보험법 시행령 제95조의2)
+        - 2000000               # 1개월: 200만원
+        - 2500000               # 2개월: 250만원
+        - 3000000               # 3개월: 300만원
+        - 3500000               # 4개월: 350만원
+        - 4000000               # 5개월: 400만원
+        - 4500000               # 6개월: 450만원
+
+
+

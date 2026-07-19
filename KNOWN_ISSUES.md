@@ -377,25 +377,28 @@ Status: 🟡 Monitoring
 
 ---
 
-## 육아휴직급여 계산기 — Phase 1 완료 / Phase 2 대기
+## 육아휴직급여 계산기 — Phase 1·2 완료 / Phase 3 대기
 
-> 진단일: 2026-07-19 | Phase 1 완료: 2026-07-19 | 제도 기준일: 2024년 1월 1일 (6+6 특례 시행)
-> 상세: `docs/reference_cases/parental_leave_diagnosis.md`
-> Phase 1 스크립트: `scripts/fix_pl_phase1.py`
+> 진단일: 2026-07-19 | Phase 1 완료: 2026-07-19 | Phase 2 완료: 2026-07-19 | 제도 기준일: 2024년 1월 1일 (6+6 특례 시행)
+> 상세: `docs/reference_cases/parental_leave_diagnosis.md` | 기준 케이스: `docs/reference_cases/parental_leave_2026.md`
+> 테스트: `tests/test_parental_leave_compute.py` 54케이스 ALL PASS
+> Phase 1 스크립트: `scripts/fix_pl_phase1.py` | Phase 2 스크립트: `scripts/fix_pl_phase2.py`
 
-### 설계 범위 규정
+### 설계 구조 (Phase 2 완료)
 
-현재 계산기는 **계산식 구조 자체가 법령과 무관** — 전면 재설계 필요(Phase 2).
-올바른 설계: **예상 월 육아휴직급여 계산기** — 통상임금 입력, 일반(80%)/6+6 특례 분기.
+판정-계산 분리: `determine_leave_mode()` → GENERAL | SPECIAL_6_PLUS_6  
+`calculate_general()`: 통상임금 × 80%, 상한 150만 / 하한 70만  
+`calculate_6plus6()`: 통상임금 × 100%, 월별 상한(1~6개월: 200~450만)  
+입력: `monthly_wage`, `insured_days`, `use_6plus6`, `leave_month` | 출력: `monthly_allowance`  
+상수: `legal_basis.draft.yaml` > `parental_leave_benefit` 외부화
 
-### PL-1 [Critical — 설계] 🔵 Phase 2 — 계산식 근본 오류
-- 현재: `avg_monthly_wage × leave_months × (gov_pct + company_pct) / 100`
-- 올바른: 통상임금 × 80% (하한 70만, 상한 150만) / 6+6 특례 100% (단계적 상한)
-- 사용자가 "정부 지원 비율"을 직접 입력하는 구조 자체가 오류
+### PL-1 [Critical — 설계] ✅ Phase 2 해결 — 계산식 근본 오류
+- 구 계산식(`avg_monthly_wage × leave_months × (gov_pct + company_pct) / 100`) 삭제
+- 신 계산식: 통상임금 × 80%(일반) / 100%(6+6 특례) + 상한·하한 클램프
 
-### PL-2 [Critical — 설계] 🔵 Phase 2 — 입력 구조 오류
-- `government_support_percentage`, `company_policy_support_percentage`는 법령 고정값
-- 사용자 입력이 아닌 코드에서 결정해야 함
+### PL-2 [Critical — 설계] ✅ Phase 2 해결 — 입력 구조 오류
+- 구: `government_support_percentage`, `company_policy_support_percentage` (사용자 직접 입력)
+- 신: `use_6plus6`(특례 여부 1/0), `leave_month`(개월차) — 법령 고정값 코드 내장
 
 ### PL-3 [Critical] ✅ Phase 1 해결 — FAQ[0] 자녀 연령 오류
 - "출산 후 1년 이내" → **만 8세 이하(초등학교 2학년 이하)**
@@ -409,32 +412,37 @@ Status: 🟡 Monitoring
 - "회사 정책에 따라 다를 수 있습니다" → **법적 권리** 명시
 - 남녀고용평등과 일·가정 양립 지원에 관한 법률 제19조 인용
 
-### PL-6 [Critical — SP-8 재발] 🔵 Phase 2 — FAQ[2] 코드 문자열 노출
+### PL-6 [Critical — SP-8 재발] 🔵 Phase 3 — FAQ[2] 코드 문자열 노출
 - `avg_monthly_wage`, `government_support_percentage` 등 코드 변수명 4종 FAQ에 노출
+- Phase 2 계산 엔진 교체 후에도 FAQ 텍스트는 별도 수정 필요
 
-### PL-7 [Major] 🔵 Phase 2 — 상한·하한 미구현
-- 일반 급여: 상한 150만원, 하한 70만원 없음
+### PL-7 [Major] ✅ Phase 2 해결 — 상한·하한 미구현
+- 일반: 상한 150만원 / 하한 70만원 클램프 구현, 초과·미달 notices 추가
 
-### PL-8 [Major] 🔵 Phase 2 — 6+6 부모 육아휴직 특례 미구현 (2024년 1월 시행)
-- 부모 모두 육아휴직 시 1~6개월 100%, 단계별 상한(200만~450만) 없음
+### PL-8 [Major] ✅ Phase 2 해결 — 6+6 부모 육아휴직 특례 미구현
+- 1~6개월 100%, 단계별 상한(200만~450만), 7개월 이후 자동 일반 전환 notice 구현
 
-### PL-9 [Major] 🔵 Phase 2 — 입력 검증 없음
-- null 반환, 음수/0 처리 없음 (AL-1 패턴 미적용)
+### PL-9 [Major] ✅ Phase 2 해결 — 입력 검증 없음
+- monthly_wage/insured_days/leave_month ≤ 0 → null 반환 (AL-1 패턴 적용)
 
-### PL-10 [Major] 🔵 Phase 2 — notices 없음
+### PL-10 [Major] ✅ Phase 2 해결 — notices 없음
+- 상한·하한 적용 notice, 전환 notice, 180일 미만 수급불가 notice 구현
 
-### PL-11 [Major] 🔵 Phase 2 — _formula 미반환
-- computeResult에서 `out._formula` 미설정
+### PL-11 [Major] ✅ Phase 2 해결 — _formula 미반환
+- "일반 — 통상임금 N원 × 80% = M원 → 상한 적용..." 형식 구현
 
-### PL-12 [Major] 🔵 Phase 2 — 피보험단위기간 180일 경계 처리 없음
-- 180일 미만 → 0 + notice 미구현 (UB-3 패턴)
+### PL-12 [Major] ✅ Phase 2 해결 — 피보험단위기간 180일 경계 처리 없음
+- insured_days < 180 → monthly_allowance=0 + notice (고용보험법 제70조 제1항)
 
 ### PL-13 [Major] ✅ Phase 1 해결 — FAQ[7] 복귀 의사 사전 표명 오류
 - "복귀 의사를 사전에 밝혀야 합니다" → **법적 수급 요건 아님** 명시
 - 실제 수급 요건(피보험단위기간 180일 + 30일 이상 육아휴직) 서술로 교체
 
-### PL-14 [Minor] 🔵 Phase 2 — formula_engine 빈 문자열
-### PL-15 [Minor] 🔵 Phase 2 — C-13 원칙-예외 전체 적용 (계산 재설계 후)
+### PL-14 [Minor] ✅ Phase 2 해결 — formula 빈 문자열
+- slug 전용 _compute_js 분기에서 _formula 생성 — formula 필드 미사용(의도)
 
-**Phase 1 완료 (2026-07-19)**: PL-3/4/5/13 콘텐츠 오류 해결. 오류 문구 0건, 3곳 C-13 일관성 PASS, 법령 역할 분리 검증 PASS, 87 회귀 테스트 PASS.
-**Phase 2 대기**: Critical 2건(PL-1/2 계산식) / Major 5건(PL-6~12) / Minor 2건(PL-14/15) — 계산 엔진 전면 재설계 필요
+### PL-15 [Minor] 🔵 Phase 3 — FAQ/계산 예시 재생성 (compute_pl() 결과 직접 인용)
+
+**Phase 1 완료 (2026-07-19)**: PL-3/4/5/13 콘텐츠 오류 해결.
+**Phase 2 완료 (2026-07-19)**: PL-1/2/7~12/14 계산 엔진 전면 교체. 54케이스 ALL PASS.
+**Phase 3 대기**: PL-6(FAQ[2] 코드 변수명 노출) / PL-15(계산 예시 재생성)

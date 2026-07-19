@@ -222,31 +222,32 @@ Critical 0 / Major 0 / Minor 0 — AL-1~7 전체 해결. AL-8(연차 발생 개�
 
 ---
 
-## 육아휴직급여 계산기 검증 결과 (2026-07-19, Phase 1 완료)
+## 육아휴직급여 계산기 검증 결과 (2026-07-19, Phase 1·2 완료)
 
 > 제도 기준일: 2024년 1월 1일 (6+6 부모 육아휴직 특례 시행)
-> 상세: `docs/reference_cases/parental_leave_diagnosis.md`
-> Phase 1 스크립트: `scripts/fix_pl_phase1.py`
+> 상세: `docs/reference_cases/parental_leave_diagnosis.md` | 기준 케이스: `docs/reference_cases/parental_leave_2026.md`
+> Phase 1: `scripts/fix_pl_phase1.py` | Phase 2: `scripts/fix_pl_phase2.py`
+> 테스트: `tests/test_parental_leave_compute.py` 54케이스 ALL PASS
 
 | 항목 | 결과 |
 |------|------|
-| 계산식 | ❌ **PL-1 Critical (Phase 2)**: `gov_pct + company_pct` 구조 — 법령 무관, 전면 재설계 필요 |
-| 법령 | ✅ Phase 1: 남녀고용평등법 제19조(사용 권리) / 고용보험법 제70조(급여 요건) 역할 분리 적용. 오인용 0건 확인. |
-| 경계값 | ❌ **PL-12 (Phase 2)**: 피보험단위기간 180일 처리 없음. 상한/하한 경계 없음 |
-| 예외 처리 | ❌ **PL-9 (Phase 2)**: 음수/0 → null 미처리 |
-| UI | ❌ **PL-10/11 (Phase 2)**: notices 없음, _formula 미설정 |
-| 콘텐츠 | ✅ Phase 1: PL-3 자녀 연령 "만 8세 이하" 교정. PL-4 피보험단위기간 180일 명시 + C-13 원칙-예외. PL-5 육아휴직 법적 권리 명시. PL-13 복귀 의사 법적 요건 아님 정정. 오류 문구 0건 확인. |
-| SP-8 재발 | ❌ **PL-6 (Phase 2)**: 코드 변수명 4종 FAQ 노출 |
-| 특례 | ❌ **PL-8 (Phase 2)**: 6+6 부모 육아휴직 특례(2024년 1월 시행) 미구현 |
+| 계산식 | ✅ Phase 2: 통상임금 × 80%(일반) / 100%(6+6 특례), 상한·하한 클램프 (PL-1/2 해결) |
+| 법령 | ✅ Phase 1: 남녀고용평등법 제19조(사용 권리) / 고용보험법 제70조(급여 요건) 역할 분리. 오인용 0건. |
+| 경계값 | ✅ Phase 2: 피보험단위기간 179/180/181일 경계, 상한·하한 경계, 6→7개월 전환 경계 (PL-12 해결) |
+| 예외 처리 | ✅ Phase 2: monthly_wage/insured_days/leave_month ≤ 0 → null 반환 (PL-9 해결) |
+| UI | ✅ Phase 2: notices(상한·하한·전환·수급불가) + _formula 구현 (PL-10/11 해결) |
+| 콘텐츠 | ✅ Phase 1: PL-3 자녀 연령. PL-4 피보험단위기간 180일 + C-13. PL-5 법적 권리. PL-13 복귀 의사. |
+| SP-8 재발 | ❌ **PL-6 (Phase 3)**: 코드 변수명 4종 FAQ 노출 (계산 엔진 교체 후 콘텐츠 재생성 필요) |
+| 특례 | ✅ Phase 2: 6+6 특례(1~6개월 100%, 단계별 상한), 7개월 이후 자동 일반 전환 (PL-8 해결) |
 | 원칙-예외 (C-13) | ✅ Phase 1: FAQ[1] + article HTML FAQ[1] + article 주의사항 3곳 일관성 PASS |
-| 테스트 케이스 | ❌ Phase 2에서 신규 작성 예정 |
+| 테스트 케이스 | ✅ Phase 2: 54케이스 (경계/특례/전환/정부기준 ALL PASS) |
 
-설계 범위: **재설계 필요 (Phase 2)** — 현재 입력 구조(`gov_pct`, `company_pct`) 자체가 법령과 무관.
-권고 설계: 통상임금 입력 → 일반(80%, 상한150만, 하한70만) / 6+6 특례(100%, 월별 상한) 분기.
+설계 구조 (Phase 2 완료): 판정-계산 분리 — `determine_leave_mode()` → `calculate_general()` / `calculate_6plus6()`  
+상수 외부화: `legal_basis.draft.yaml` > `parental_leave_benefit` 섹션
 
-**육아휴직 Phase 1 완료 (2026-07-19)**
-Phase 1 해결: PL-3/4/5/13 콘텐츠 오류. 87 회귀 테스트 PASS.
-Phase 2 대기: Critical 2건(PL-1/2 계산식) / Major 5건(PL-6~12) / Minor 2건(PL-14/15) — 계산 엔진 전면 재설계
+**육아휴직 Phase 1 완료 (2026-07-19)**: PL-3/4/5/13 콘텐츠 오류. 87 회귀 테스트 PASS.
+**육아휴직 Phase 2 완료 (2026-07-19)**: PL-1/2/7~12/14 계산 엔진 교체. 141 회귀 테스트 ALL PASS.
+**Phase 3 대기**: PL-6(FAQ[2] 코드 변수명) / PL-15(계산 예시 재생성)
 
 ---
 
@@ -259,7 +260,7 @@ Phase 2 대기: Critical 2건(PL-1/2 계산식) / Major 5건(PL-6~12) / Minor 2�
 | 실업급여 (unemployment-benefit) | ✅ Verified | 2026-07-19 |
 | 4대보험 (four-insurances) | ✅ Verified | 2026-07-19 |
 | 연차수당 (annual-leave-allowance) | ✅ Verified | 2026-07-19 |
-| 육아휴직 (육아휴직_급여_계산기) | 🟡 Phase 1 완료 / Phase 2(계산 엔진) 대기 | Phase 1: 2026-07-19 |
+| 육아휴직 (육아휴직_급여_계산기) | 🟡 Phase 1·2 완료 / Phase 3(FAQ 재생성) 대기 | Phase 2: 2026-07-19 |
 | 연말정산 (연말정산_환급액_계산기) | ⏳ 검증 대기 | — |
 
 ---
@@ -270,7 +271,7 @@ Phase 2 대기: Critical 2건(PL-1/2 계산식) / Major 5건(PL-6~12) / Minor 2�
 2. ~~실업급여 (unemployment-benefit)~~ ✅ Verified (2026-07-19, Phase 1·2·3)
 3. ~~4대보험 (four-insurances)~~ ✅ Verified (2026-07-19, Phase 1·2·3)
 4. 연차수당 (annual-leave-allowance) — 연차 개수 경계값
-5. 육아휴직 (육아휴직_급여_계산기) — 상한/하한 고용노동부 고시 의존
+5. ~~육아휴직 (육아휴직_급여_계산기)~~ ✅ Phase 1·2 완료 (2026-07-19, Phase 3 FAQ 재생성 이월)
 6. 연말정산 (연말정산_환급액_계산기) — 간이 근사 계산 명시
 
 완료 후: 4개 계산기(주휴수당/퇴직금/실업급여/4대보험) 최종 회귀 → 공통 Minor 일괄 정리
