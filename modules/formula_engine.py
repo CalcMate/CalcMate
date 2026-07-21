@@ -142,7 +142,15 @@ def load_formula(cfg: dict, calculator_id: str) -> dict:
             return json.loads(v) if v else default
         except Exception:
             return default
-
+    
+    if calculator_id == "육아휴직_급여_계산기":
+        # 육아휴직 계산기는 커스텀 로직을 직접 호출하므로, formula 필드를 특별 처리
+        return {
+            "calculator_id": calculator_id,
+            "inputs": _pj(calc.get("input_schema"), {}),
+            "output_schema": _pj(calc.get("output_schema"), {}),
+            "formula": "modules.parental_leave_calculator.calculate_parental_leave_allowance", # 함수 경로 저장
+        }
     return {
         "calculator_id": calculator_id,
         "inputs": _pj(calc.get("input_schema"), {}),

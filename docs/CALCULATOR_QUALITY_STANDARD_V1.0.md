@@ -1,5 +1,6 @@
 # 계산기 품질 표준 v1.0
 > 작성: 2026-07-18 | 기준 모델: 주휴수당 계산기 (weekly-holiday-allowance)
+> 갱신: 2026-07-22 (Phase B) — 설계 범위·Invariant·Phase 게이트·Verified Audit·UI Independence 항목 추가
 > 목적: 7개 계산기 공통 검증 체크리스트. 신규 계산기 추가 시도 동일 기준 적용.
 
 ---
@@ -89,6 +90,60 @@
 - [ ] FAQ / article_content HTML / article_content 본문 **세 위치**에서 동일한 구조로 서술되는가
   - 한 곳에만 원칙이 있고 다른 곳은 예외만 있거나, 표현이 서로 다른 경우 NG
 - [ ] SP-2·AL-3 재발 방지: 위치별 불일치 전수 검색 완료 여부 확인
+
+### □ 14. 설계 범위 명시 (v1/v1.1 구분 기준)
+- [ ] 계산기 설계 범위가 한 문장으로 명확히 정의되어 있는가 — "v1: [포함 범위]. [제외 범위] 미지원."
+- [ ] v1에서 제외된 항목(v1.1 이월)이 article_content 또는 FAQ에 명시되어 있는가
+  - 예: "자녀세액공제·특별세액공제는 이 계산기에서 다루지 않습니다"
+- [ ] v1 제외 항목이 계산기 결과에 영향을 미칠 수 있는 경우 notice로 안내하는가
+- [ ] 설계 범위가 `docs/CALCULATOR_QUALITY_STANDARD_V1.0.md` 해당 계산기 검증 결과 섹션에 기록되어 있는가
+
+> **왜 필요한가**: 초기 연말정산 계산기가 `crude_estimate`로 시작했는데, 설계 범위 불명확으로 인해 사용자가 완전한 결과로 오해할 위험이 있었다. 명시적 범위 선언이 이를 방지한다.
+
+### □ 15. fixtures / reference_cases
+- [ ] `docs/reference_cases/[slug].md` 또는 `docs/reference_cases/[slug]_diagnosis.md` 가 존재하는가
+- [ ] reference_case에 정부 공식 기준 비교 결과가 표 형식으로 기록되어 있는가
+- [ ] 법령 직접 계산 vs 프로그램 결과 오차 0원이 기록되어 있는가
+
+### □ 16. 불변식(Invariant) 테스트
+- [ ] 계산기의 핵심 단조성 불변식이 파라미터화 테스트로 구현되어 있는가
+  - 예: "input↑ → output↓ 금지 (단조 증가 보존)"
+- [ ] 수학적 항등식 불변식이 검증되는가 — 예: total == sum(parts), 과세표준 ≥ 0
+- [ ] 경계 조건 불변식이 검증되는가 — 예: output ≥ 0, 0 이하 입력 → null
+- [ ] 불변식 테스트는 `tests/test_invariants.py`에 INV-N 형식으로 등록되어 있는가
+
+> **왜 필요한가**: 연말정산 float→int 오차 수정 과정에서 "단조 불변식이 깨진 채 배포될 뻔한" 상황을 경험했다. 계산 결과가 정확한지는 단위 테스트로 확인하지만, 방향이 올바른지(입력 증가 → 출력 감소 금지)는 불변식 테스트가 별도로 보장한다.
+
+### □ 17. Phase 1→2→3 게이트 순서 준수
+- [ ] **Phase 1**: 법령 확정 게이트 통과 후 Phase 2 착수 (법령 오류를 구현 전에 잡음)
+  - law.go.kr 원문 확인 + confidence 기록 + forbidden_articles 목록화
+- [ ] **Phase 2**: 계산 엔진 구현 + 정부 기준 3케이스 오차 0원 확인
+  - Python mirror + JS 분기 + 단위 테스트 + 불변식 테스트
+- [ ] **Phase 3**: SP-8 감사 + 콘텐츠 품질 최종 점검
+  - article_content + FAQ 변수명 grep 0건 + C-13 원칙-예외 확인
+
+> **왜 순서가 중요한가**: 퇴직금(SP-2)에서 "근로기준법 제34조" 오류를 Phase 1에서 발견하지 못하고 Phase 2 구현 후에 발견했다. 법령 게이트를 먼저 통과해야 구현 재작업 비용을 줄인다.
+
+### □ 18. Verified Audit 최종 판정 기준
+Verified 승인 조건 (모두 충족 필수):
+- [ ] Critical 이슈 0건
+- [ ] Major 이슈 0건
+- [ ] 계산 테스트 ALL PASS (개별 suite + 전체 회귀)
+- [ ] 불변식 테스트 ALL PASS (test_invariants.py)
+- [ ] SP-8 감사 0건 (article_content + FAQ)
+- [ ] 정부 기준 3케이스 오차 0원
+- [ ] `legal_basis.draft.yaml` confidence: high
+- [ ] `docs/CALCULATOR_CHANGELOG.md` 이력 추가
+
+> Minor 이슈는 Verified 차단 사유 아님. 단, 권리·의무 안내 오류는 Minor여도 Critical 준용.
+
+### □ 19. UI Independence (계산 테스트 독립성)
+- [ ] `_detail` / `_formula` / `notices` 반환 구조 테스트가 HTML/CSS 변경과 무관하게 통과하는가
+- [ ] Phase C(UI 개선) 후에도 `tests/test_*_compute.py`와 `tests/test_invariants.py`가 ALL PASS하는가
+- [ ] 스냅샷 테스트(`snapshot_calculators.py`)는 UI 변경 시 의도적 갱신으로만 변경되는가
+- [ ] `_formula` / `notices` 문구 변경은 사용자 승인 후 테스트 갱신 순서로 진행하는가
+
+> 참고: `docs/UI_INDEPENDENCE.md`
 
 ---
 

@@ -43,7 +43,8 @@ REWRITE면 재생성(최대 MAX_TOTAL_RETRY), 한도 초과 시 품질보류.
 | 대시보드 📝 Content ▸ 발행 목록 | 발행완료/검수대기/수정됨/품질보류 상태, quality_score |
 | 마스터_DB(articles 시트) | quality_* 필드, history(publish/quality_hold 등) |
 | 대시보드 📡 Logs | 오류·실시간 로그·헬스체크 |
-| Telegram | Critical 반복실패 HOLD 알림(이벤트 ON 시) |
+| Telegram | 발행 성공 · 슬롯 내 모든 후보 HOLD · 후보 소진 알림(이벤트 ON 시) |
+| 대시보드 📅 Schedule | 슬롯별 실행 결과 이력 (자동 새로고침 불안정 — 수동 F5 권장) |
 
 **품질보류(HOLD)가 뜨면**: legal 미검증(신규 계산기 legal 미입력)인지, 아니면 Score 반복 실패인지 구분.
 - legal 미검증 → 2)번 legal 입력

@@ -23,6 +23,7 @@ TYPES = ["text", "number", "currency", "date", "select", "radio", "checkbox"]
 _LIB_HINT = {
     "퇴직": "retirement", "연차": "annual_leave", "주휴": "weekly_allowance",
     "실업": "unemployment", "4대보험": "insurance", "보험": "insurance",
+    "육아휴직": "parental_leave",
 }
 
 

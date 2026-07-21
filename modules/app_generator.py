@@ -235,6 +235,28 @@ def _ub_days_table_js(rows: list) -> str:
     return "[" + ",".join(parts) + "]"
 
 
+# ── JS computeResult 공통 헬퍼 ──────────────────────────────────────────────
+
+def _js_open() -> str:
+    """모든 계산기 JS의 공통 시작 줄."""
+    return "window.computeResult = function(inputs){\n"
+
+
+def _js_close() -> str:
+    """모든 계산기 JS의 공통 종료 줄 (return out은 각 분기에서 처리)."""
+    return "};\n"
+
+
+def _js_read(field: str, default: int = 0) -> str:
+    """inputs에서 단일 필드를 읽는 JS 변수 선언."""
+    return f'  var {field} = inputs["{field}"] || {default};\n'
+
+
+def _js_init_out() -> str:
+    """out 객체 + notices 배열 초기화."""
+    return "  var out = {};\n  out.notices = [];\n"
+
+
 def _compute_js(calc) -> str:
     """계산기별 computeResult(inputs) 생성. 기존 formula/퇴직금 date분기 로직 유지.
     registry의 compute_rules가 있으면 입력 검증(양수/최솟값/최저임금) 코드를 자동 주입한다."""
@@ -248,13 +270,13 @@ def _compute_js(calc) -> str:
         u50_js = _ub_days_table_js(bdt.get("under_50") or [])
         a50_js = _ub_days_table_js(bdt.get("age_50_plus") or [])
         return (
-            'window.computeResult = function(inputs){\n'
-            '  var avg_daily_wage = inputs["avg_daily_wage"] || 0;\n'
-            '  var age = inputs["age"] || 0;\n'
-            '  var employment_months = inputs["employment_months"] || 0;\n'
-            '  if (avg_daily_wage <= 0 || age <= 0 || employment_months <= 0) { return null; }\n'
-            '  var out = {};\n'
-            '  out.notices = [];\n'
+            _js_open()
+            + _js_read("avg_daily_wage")
+            + _js_read("age")
+            + _js_read("employment_months")
+            + '  if (avg_daily_wage <= 0 || age <= 0 || employment_months <= 0) { return null; }\n'
+            + _js_init_out()
+            + (
             # UB-3: 피보험단위기간 6개월(약 180일) 미만 → 수급 불가 (고용보험법 제40조)
             '  if (employment_months < 6) {\n'
             '    out["daily_benefit"] = 0;\n'
@@ -298,6 +320,7 @@ def _compute_js(calc) -> str:
             '  }\n'
             '  out._formula = _ub_formula;\n'
             '  return out;\n};\n'
+            )
         )
     if str(calc.get("slug", "")) == "four-insurances":
         fi_reg = (_registry().get("four-insurances") or {})
@@ -313,10 +336,10 @@ def _compute_js(calc) -> str:
         ltc_pct  = f"{LTC_RATE * 100:g}"
         ei_pct   = f"{EI_RATE  * 100:g}"
         return (
-            'window.computeResult = function(inputs){\n'
-            '  var monthly_salary = inputs["monthly_salary"] || 0;\n'
-            '  if (monthly_salary <= 0) { return null; }\n'
-            '  var out = {};\n'
+            _js_open()
+            + _js_read("monthly_salary")
+            + '  if (monthly_salary <= 0) { return null; }\n'
+            + '  var out = {};\n'
             # FI-2: 국민연금 기준소득월액 상한/하한 클램프 (국민연금법 제88조)
             f'  var NP_MIN = {NP_MIN};\n'
             f'  var NP_MAX = {NP_MAX};\n'
@@ -354,19 +377,20 @@ def _compute_js(calc) -> str:
         # AL-5: notices — 법정 상한(25일) 초과 경고
         # AL-6: _formula — "통상임금(일급) N원 × M일 = Y원"
         return (
-            'window.computeResult = function(inputs){\n'
-            '  var daily_wage = inputs["daily_wage"] || 0;\n'
-            '  var unused_days = inputs["unused_days"] || 0;\n'
-            '  if (daily_wage <= 0 || unused_days <= 0) { return null; }\n'
-            '  var out = {};\n'
-            '  out["annual_leave_allowance"] = (daily_wage * unused_days);\n'
-            '  var notices = [];\n'
-            '  if (unused_days > 25) {\n'
-            '    notices.push("입력하신 미사용 연차(" + unused_days + "일)가 법정 상한(25일)을 초과합니다. 사용자가 추가로 부여한 약정 연차가 있는 경우 25일을 초과할 수 있습니다(근로기준법 제60조제4항).");\n'
-            '  }\n'
-            '  out.notices = notices;\n'
-            '  out._formula = "통상임금(일급) " + daily_wage.toLocaleString() + "원 × " + unused_days + "일 = " + Math.round(daily_wage * unused_days).toLocaleString() + "원";\n'
-            '  return out;\n};\n'
+            _js_open()
+            + _js_read("daily_wage")
+            + _js_read("unused_days")
+            + '  if (daily_wage <= 0 || unused_days <= 0) { return null; }\n'
+            + '  var out = {};\n'
+            + '  out["annual_leave_allowance"] = (daily_wage * unused_days);\n'
+            + '  var notices = [];\n'
+            + '  if (unused_days > 25) {\n'
+            + '    notices.push("입력하신 미사용 연차(" + unused_days + "일)가 법정 상한(25일)을 초과합니다. 사용자가 추가로 부여한 약정 연차가 있는 경우 25일을 초과할 수 있습니다(근로기준법 제60조제4항).");\n'
+            + '  }\n'
+            + '  out.notices = notices;\n'
+            + '  out._formula = "통상임금(일급) " + daily_wage.toLocaleString() + "원 × " + unused_days + "일 = " + Math.round(daily_wage * unused_days).toLocaleString() + "원";\n'
+            + '  return out;\n'
+            + _js_close()
         )
     if str(calc.get("slug", "")) == "육아휴직_급여_계산기":
         # PL-1..15 Phase 2: 판정-계산 분리 구조 (determine_leave_mode / calculate_general / calculate_6plus6)
@@ -385,15 +409,15 @@ def _compute_js(calc) -> str:
         gen_rate_pct = f"{GEN_RATE * 100:g}%"
         sp_rate_pct  = f"{SP_RATE  * 100:g}%"
         return (
-            'window.computeResult = function(inputs){\n'
+            _js_open()
             # ① 입력 검증: 통상임금·피보험단위기간·개월차 모두 양수 필수
-            '  var monthly_wage = inputs["monthly_wage"] || 0;\n'
-            '  var insured_days = inputs["insured_days"] || 0;\n'
-            '  var use_6plus6   = inputs["use_6plus6"]   || 0;\n'
-            '  var leave_month  = inputs["leave_month"]  || 0;\n'
-            '  if (monthly_wage <= 0 || insured_days <= 0 || leave_month <= 0) { return null; }\n'
-            '  var out = {};\n'
-            '  out.notices = [];\n'
+            + _js_read("monthly_wage")
+            + _js_read("insured_days")
+            + '  var use_6plus6   = inputs["use_6plus6"]   || 0;\n'
+            + _js_read("leave_month")
+            + '  if (monthly_wage <= 0 || insured_days <= 0 || leave_month <= 0) { return null; }\n'
+            + _js_init_out()
+            + (
             # ② 수급자격 확인 (피보험단위기간 180일 — 고용보험법 제70조 제1항)
             f'  var MIN_INSURED = {MIN_INSURED};\n'
             '  if (insured_days < MIN_INSURED) {\n'
@@ -453,6 +477,7 @@ def _compute_js(calc) -> str:
             # ⑨ 반환
             '  return out;\n'
             '};\n'
+            )
         )
     if str(calc.get("slug", "")) == "연말정산_환급액_계산기":
         yt_reg = (_registry().get("연말정산_환급액_계산기") or {})
@@ -539,14 +564,14 @@ def _compute_js(calc) -> str:
             )
         tcl_js = "[" + ",".join(tcl_js_rows) + "]"
         return (
-            'window.computeResult = function(inputs){\n'
-            '  var total_salary  = inputs["total_salary"]  || 0;\n'
-            '  var family_count  = inputs["family_count"]  || 1;\n'
-            '  var paid_tax      = inputs["paid_tax"]      || 0;\n'
-            '  if (total_salary <= 0) { return null; }\n'
-            '  family_count = Math.max(1, Math.round(family_count));\n'
-            '  var out = {};\n'
-            '  out.notices = [];\n'
+            _js_open()
+            + _js_read("total_salary")
+            + '  var family_count  = inputs["family_count"]  || 1;\n'
+            + _js_read("paid_tax")
+            + '  if (total_salary <= 0) { return null; }\n'
+            + '  family_count = Math.max(1, Math.round(family_count));\n'
+            + _js_init_out()
+            + (
             # 4대보험 요율 상수
             f'  var NP_RATE={NP_RATE}; var NP_MIN={NP_MIN}; var NP_MAX={NP_MAX};\n'
             f'  var HI_RATE={HI_RATE}; var LTC_RATE={LTC_RATE}; var EI_RATE={EI_RATE};\n'
@@ -648,19 +673,20 @@ def _compute_js(calc) -> str:
             '"원 → 산출세액 "+gross_tax.toLocaleString()+"원 → 결정세액 "+determined.toLocaleString()+'
             '"원 → "+(refund>=0?"환급 "+refund.toLocaleString()+"원":"추가납부 "+(-refund).toLocaleString()+"원");\n'
             '  return out;\n};\n'
+            )
         )
     if _compute_type(calc) == "date_based":   # 날짜 기반(입사일/퇴사일 → total_days)
         return (
-            'window.computeResult = function(inputs){\n'
-            '  var s = new Date(inputs["start_date"]); var e = new Date(inputs["end_date"]);\n'
+            _js_open()
+            + '  var s = new Date(inputs["start_date"]); var e = new Date(inputs["end_date"]);\n'
             # SP-3: 날짜 미입력/Invalid Date → null (입력 오류)
-            '  if (isNaN(s.getTime()) || isNaN(e.getTime())) { return null; }\n'
-            '  var total_days = Math.floor((e - s) / (1000*60*60*24));\n'
-            '  var avg_monthly_wage = inputs["avg_monthly_wage"] || 0;\n'
+            + '  if (isNaN(s.getTime()) || isNaN(e.getTime())) { return null; }\n'
+            + '  var total_days = Math.floor((e - s) / (1000*60*60*24));\n'
+            + _js_read("avg_monthly_wage")
             # SP-4: 평균임금 0 이하 → null (입력 오류)
-            '  if (avg_monthly_wage <= 0) { return null; }\n'
-            '  var out = {};\n'
-            '  out.notices = [];\n'
+            + '  if (avg_monthly_wage <= 0) { return null; }\n'
+            + _js_init_out()
+            + (
             # SP-1: 재직 1년(365일) 미만 → 0원 + notice (근로자퇴직급여보장법 제8조)
             '  if (total_days < 365) {\n'
             '    out["severance_pay"] = 0;\n'
@@ -673,6 +699,7 @@ def _compute_js(calc) -> str:
             '  out._detail = [{label:"재직일수", value:total_days + "일"}];\n'
             '  out._formula = avg_monthly_wage.toLocaleString() + "원 × (" + total_days + "÷365) = " + Math.round(avg_monthly_wage * (total_days / 365)).toLocaleString() + "원";\n'
             '  return out;\n};\n'
+            )
         )
     ins = _pj(calc.get("input_schema"), {})
     outs = _pj(calc.get("output_schema"), {})
