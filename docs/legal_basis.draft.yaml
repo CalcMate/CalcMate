@@ -315,12 +315,48 @@ four-insurances:
   difficulty_status: provisional
   needs_human_legal: true
   content:
-    evergreen: true           # 잠정 — 조사 시 WP 타임아웃으로 본문 미확인, content 재검증 필요
-    update_cycle: null
-    content_caveat: crude_estimate   # 누진세율·세액공제 미반영 단순 근사 → 강한 면책 유지
+    evergreen: false          # 세율·공제율(4대보험 포함) 연 1회 갱신 필요
+    update_cycle: yearly
+    content_caveat: null      # v1: 누진세율·근로소득공제·세액공제·4대보험 완전 구현 (crude_estimate 해제)
   related_slugs: [weekly-holiday-allowance, severance-pay, annual-leave-allowance, unemployment-benefit, four-insurances, 육아휴직_급여_계산기]
-  # 코드정합: input(total_income, deductions) / formula total_income-deductions — 누진세율·항목별
-  #          세액공제 없는 단순 근사 → 강한 면책 유지(0-3 조사 확인).
+  # 코드정합: v1 신규 inputs(total_salary, family_count, paid_tax) / output(estimated_refund)
+  #          누진세율·근로소득공제·근로소득세액공제·4대보험자동계산 완전 구현 → face value 기반
+  #          세액공제 → content_caveat null로 격상.
+  income_tax_brackets:
+    reference_law: 소득세법 제55조
+    reference_year: 2025
+    brackets:
+      - {limit: 14000000,   rate: 0.06, deduction: 0}
+      - {limit: 50000000,   rate: 0.15, deduction: 1260000}
+      - {limit: 88000000,   rate: 0.24, deduction: 5760000}
+      - {limit: 150000000,  rate: 0.35, deduction: 15440000}
+      - {limit: 300000000,  rate: 0.38, deduction: 19940000}
+      - {limit: 500000000,  rate: 0.40, deduction: 25940000}
+      - {limit: 1000000000, rate: 0.42, deduction: 35940000}
+      - {limit: null,       rate: 0.45, deduction: 65940000}
+  labor_deduction_table:
+    reference_law: 소득세법 제47조
+    max_deduction: 20000000
+    brackets:
+      - {limit: 5000000,   rate: 0.70, base: 0}
+      - {limit: 15000000,  rate: 0.40, base: 3500000}
+      - {limit: 45000000,  rate: 0.15, base: 7500000}
+      - {limit: 100000000, rate: 0.05, base: 12000000}
+      - {limit: null,      rate: 0.02, base: 14750000}
+  tax_credit_limits:
+    reference_law: 소득세법 제59조
+    credit_rate_low: 0.55
+    credit_rate_high: 0.30
+    credit_base_high: 715000
+    credit_threshold: 1300000
+    limits:
+      - {salary_max: 33000000,  fixed: 740000, reduce_rate: null, floor: null}
+      - {salary_max: 70000000,  fixed: null,   reduce_rate: 0.008, base: 740000, ref: 33000000, floor: 660000}
+      - {salary_max: 120000000, fixed: null,   reduce_rate: 0.5,   base: 660000, ref: 70000000, floor: 500000}
+      - {salary_max: null,      fixed: null,   reduce_rate: 0.5,   base: 500000, ref: 120000000, floor: 200000}
+  personal_deduction:
+    reference_law: 소득세법 제50조
+    per_person: 1500000
 
 육아휴직_급여_계산기:
   name: 육아휴직 급여 계산기

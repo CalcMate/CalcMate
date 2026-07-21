@@ -454,6 +454,201 @@ def _compute_js(calc) -> str:
             '  return out;\n'
             '};\n'
         )
+    if str(calc.get("slug", "")) == "연말정산_환급액_계산기":
+        yt_reg = (_registry().get("연말정산_환급액_계산기") or {})
+        fi_reg = (_registry().get("four-insurances") or {})
+        ir     = fi_reg.get("insurance_rates") or {}
+        # 4대보험 요율
+        NP_RATE  = float(ir.get("np_rate",  0.045))
+        NP_MIN   = int(ir.get("np_min",   390_000))
+        NP_MAX   = int(ir.get("np_max",   6_170_000))
+        HI_RATE  = float(ir.get("hi_rate",  0.03545))
+        LTC_RATE = float(ir.get("ltc_rate", 0.1296))
+        EI_RATE  = float(ir.get("ei_rate",  0.009))
+        # 근로소득공제 구간
+        ldt  = yt_reg.get("labor_deduction_table") or {}
+        ld_brackets = ldt.get("brackets") or [
+            {"limit": 5_000_000,   "rate": 0.70, "base": 0},
+            {"limit": 15_000_000,  "rate": 0.40, "base": 3_500_000},
+            {"limit": 45_000_000,  "rate": 0.15, "base": 7_500_000},
+            {"limit": 100_000_000, "rate": 0.05, "base": 12_000_000},
+            {"limit": None,        "rate": 0.02, "base": 14_750_000},
+        ]
+        LD_MAX = int(ldt.get("max_deduction", 20_000_000))
+        # 세율 구간
+        itb = yt_reg.get("income_tax_brackets") or {}
+        tax_brackets = itb.get("brackets") or [
+            {"limit": 14_000_000,    "rate": 0.06, "deduction": 0},
+            {"limit": 50_000_000,    "rate": 0.15, "deduction": 1_260_000},
+            {"limit": 88_000_000,    "rate": 0.24, "deduction": 5_760_000},
+            {"limit": 150_000_000,   "rate": 0.35, "deduction": 15_440_000},
+            {"limit": 300_000_000,   "rate": 0.38, "deduction": 19_940_000},
+            {"limit": 500_000_000,   "rate": 0.40, "deduction": 25_940_000},
+            {"limit": 1_000_000_000, "rate": 0.42, "deduction": 35_940_000},
+            {"limit": None,          "rate": 0.45, "deduction": 65_940_000},
+        ]
+        # 세액공제 한도
+        tcl = yt_reg.get("tax_credit_limits") or {}
+        CREDIT_THRESHOLD = int(tcl.get("credit_threshold", 1_300_000))
+        CREDIT_RATE_LOW  = float(tcl.get("credit_rate_low",  0.55))
+        CREDIT_RATE_HIGH = float(tcl.get("credit_rate_high", 0.30))
+        CREDIT_BASE_HIGH = int(tcl.get("credit_base_high", 715_000))
+        # 인적공제
+        PER_PERSON = int((yt_reg.get("personal_deduction") or {}).get("per_person", 1_500_000))
+        # JS embed: 근로소득공제 구간 배열
+        ld_js_rows = []
+        prev = 0
+        for b in ld_brackets:
+            lim = b.get("limit")
+            ld_js_rows.append(
+                f'{{lim:{lim if lim is not None else "Infinity"},rate:{b["rate"]},base:{b["base"]},prev:{prev}}}'
+            )
+            if lim is not None:
+                prev = lim
+        ld_js = "[" + ",".join(ld_js_rows) + "]"
+        # JS embed: 세율 구간 배열
+        tb_js_rows = []
+        for b in tax_brackets:
+            lim = b.get("limit")
+            tb_js_rows.append(
+                f'{{lim:{lim if lim is not None else "Infinity"},rate:{b["rate"]},ded:{b["deduction"]}}}'
+            )
+        tb_js = "[" + ",".join(tb_js_rows) + "]"
+        # 세액공제 한도 구간
+        tcl_limits = tcl.get("limits") or [
+            {"salary_max": 33_000_000,  "fixed": 740_000,  "reduce_rate": None,  "base": None,    "ref": None,         "floor": None},
+            {"salary_max": 70_000_000,  "fixed": None,      "reduce_rate": 0.008, "base": 740_000, "ref": 33_000_000,   "floor": 660_000},
+            {"salary_max": 120_000_000, "fixed": None,      "reduce_rate": 0.5,   "base": 660_000, "ref": 70_000_000,   "floor": 500_000},
+            {"salary_max": None,        "fixed": None,      "reduce_rate": 0.5,   "base": 500_000, "ref": 120_000_000,  "floor": 200_000},
+        ]
+        tcl_js_rows = []
+        for seg in tcl_limits:
+            sm = seg.get("salary_max")
+            fx = seg.get("fixed")
+            rr = seg.get("reduce_rate")
+            ba = seg.get("base")
+            rf = seg.get("ref")
+            fl = seg.get("floor")
+            tcl_js_rows.append(
+                f'{{sm:{sm if sm is not None else "Infinity"},'
+                f'fx:{fx if fx is not None else "null"},'
+                f'rr:{rr if rr is not None else "null"},'
+                f'ba:{ba if ba is not None else "null"},'
+                f'rf:{rf if rf is not None else "null"},'
+                f'fl:{fl if fl is not None else "null"}}}'
+            )
+        tcl_js = "[" + ",".join(tcl_js_rows) + "]"
+        return (
+            'window.computeResult = function(inputs){\n'
+            '  var total_salary  = inputs["total_salary"]  || 0;\n'
+            '  var family_count  = inputs["family_count"]  || 1;\n'
+            '  var paid_tax      = inputs["paid_tax"]      || 0;\n'
+            '  if (total_salary <= 0) { return null; }\n'
+            '  family_count = Math.max(1, Math.round(family_count));\n'
+            '  var out = {};\n'
+            '  out.notices = [];\n'
+            # 4대보험 요율 상수
+            f'  var NP_RATE={NP_RATE}; var NP_MIN={NP_MIN}; var NP_MAX={NP_MAX};\n'
+            f'  var HI_RATE={HI_RATE}; var LTC_RATE={LTC_RATE}; var EI_RATE={EI_RATE};\n'
+            f'  var LD_MAX={LD_MAX}; var PER_PERSON={PER_PERSON};\n'
+            f'  var CREDIT_THRESHOLD={CREDIT_THRESHOLD};\n'
+            f'  var CREDIT_RATE_LOW={CREDIT_RATE_LOW}; var CREDIT_RATE_HIGH={CREDIT_RATE_HIGH};\n'
+            f'  var CREDIT_BASE_HIGH={CREDIT_BASE_HIGH};\n'
+            # ②근로소득공제 계산 함수
+            f'  var LD_TBL={ld_js};\n'
+            '  function laborDeduction(s) {\n'
+            '    for (var i=0;i<LD_TBL.length;i++) {\n'
+            '      if (s <= LD_TBL[i].lim) {\n'
+            '        return Math.min(LD_TBL[i].base + (s - LD_TBL[i].prev) * LD_TBL[i].rate, LD_MAX);\n'
+            '      }\n'
+            '    }\n'
+            '    return LD_MAX;\n'
+            '  }\n'
+            # ⑦산출세액 계산 함수
+            f'  var TAX_TBL={tb_js};\n'
+            '  function incomeTax(t) {\n'
+            '    if (t <= 0) { return 0; }\n'
+            '    for (var i=0;i<TAX_TBL.length;i++) {\n'
+            '      if (t <= TAX_TBL[i].lim) {\n'
+            '        return Math.max(0, Math.round(t * TAX_TBL[i].rate - TAX_TBL[i].ded));\n'
+            '      }\n'
+            '    }\n'
+            '    return Math.max(0, Math.round(t * 0.45 - 65940000));\n'
+            '  }\n'
+            # ⑧근로소득세액공제 한도 계산 함수
+            f'  var TCL_TBL={tcl_js};\n'
+            '  function creditLimit(s) {\n'
+            '    for (var i=0;i<TCL_TBL.length;i++) {\n'
+            '      if (s <= TCL_TBL[i].sm) {\n'
+            '        if (TCL_TBL[i].fx !== null) { return TCL_TBL[i].fx; }\n'
+            '        return Math.max(TCL_TBL[i].ba - (s - TCL_TBL[i].rf) * TCL_TBL[i].rr, TCL_TBL[i].fl);\n'
+            '      }\n'
+            '    }\n'
+            '    return 200000;\n'
+            '  }\n'
+            '  function earnedCredit(gt) {\n'
+            '    if (gt <= CREDIT_THRESHOLD) { return Math.round(gt * CREDIT_RATE_LOW); }\n'
+            '    return Math.round(CREDIT_BASE_HIGH + (gt - CREDIT_THRESHOLD) * CREDIT_RATE_HIGH);\n'
+            '  }\n'
+            # ① 총급여
+            '  var gross = total_salary;\n'
+            # ② 근로소득공제
+            '  var labor_ded = Math.round(laborDeduction(gross));\n'
+            # ③ 근로소득금액
+            '  var labor_income = gross - labor_ded;\n'
+            # ④ 인적공제
+            '  var personal_ded = Math.min(family_count * PER_PERSON, labor_income);\n'
+            # ⑤ 4대보험공제
+            '  var monthly = gross / 12;\n'
+            '  var np_base = Math.min(Math.max(monthly, NP_MIN), NP_MAX);\n'
+            '  var np_m  = np_base  * NP_RATE;\n'
+            '  var hi_m  = monthly  * HI_RATE;\n'
+            '  var ltc_m = hi_m     * LTC_RATE;\n'
+            '  var ei_m  = monthly  * EI_RATE;\n'
+            '  var ins_ded = Math.round((np_m + hi_m + ltc_m + ei_m) * 12);\n'
+            # ⑥ 과세표준
+            '  var taxable = Math.max(0, labor_income - personal_ded - ins_ded);\n'
+            # ⑦ 산출세액
+            '  var gross_tax = incomeTax(Math.round(taxable));\n'
+            # ⑧ 세액공제
+            '  var raw_credit = earnedCredit(gross_tax);\n'
+            '  var cl = Math.round(creditLimit(gross));\n'
+            '  var tax_credit = Math.min(raw_credit, cl);\n'
+            # ⑨ 결정세액
+            '  var determined = Math.max(0, gross_tax - tax_credit);\n'
+            # ⑩ 지방소득세
+            '  var local_tax = Math.round(determined * 0.10);\n'
+            # ⑪ 환급/추가납부
+            '  var refund = Math.round(paid_tax) - determined;\n'
+            '  out["estimated_refund"] = refund;\n'
+            # _detail 11단계
+            '  out._detail = [\n'
+            '    {label:"①총급여",                value:gross.toLocaleString()+"원"},\n'
+            '    {label:"②근로소득공제",           value:labor_ded.toLocaleString()+"원 차감"},\n'
+            '    {label:"③근로소득금액",           value:labor_income.toLocaleString()+"원"},\n'
+            '    {label:"④인적공제",              value:(-personal_ded).toLocaleString()+"원 ("+family_count+"명)"},\n'
+            '    {label:"⑤4대보험공제(연간)",      value:(-ins_ded).toLocaleString()+"원"},\n'
+            '    {label:"⑥과세표준",              value:Math.round(taxable).toLocaleString()+"원"},\n'
+            '    {label:"⑦산출세액",              value:gross_tax.toLocaleString()+"원"},\n'
+            '    {label:"⑧근로소득세액공제",       value:(-tax_credit).toLocaleString()+"원"},\n'
+            '    {label:"⑨결정세액",              value:determined.toLocaleString()+"원"},\n'
+            '    {label:"⑩지방소득세(10%)",       value:local_tax.toLocaleString()+"원"},\n'
+            '    {label:"⑪기납부세액",            value:Math.round(paid_tax).toLocaleString()+"원"},\n'
+            '  ];\n'
+            # notices
+            '  out.notices.push("4대보험료는 현재 기준 요율로 자동 계산한 예상값이며 실제 원천징수영수증과 차이가 있을 수 있습니다.");\n'
+            '  out.notices.push("본 계산 결과는 참고용 예상치이며, 실제 연말정산 결과는 국세청 홈택스 및 회사 정산 결과와 다를 수 있습니다.");\n'
+            '  if (refund >= 0) {\n'
+            '    out.notices.push("환급 예상: 기납부세액이 결정세액보다 " + refund.toLocaleString() + "원 많아 환급될 것으로 보입니다.");\n'
+            '  } else {\n'
+            '    out.notices.push("추가납부 예상: 결정세액이 기납부세액보다 " + (-refund).toLocaleString() + "원 많아 추가 납부가 필요할 것으로 보입니다.");\n'
+            '  }\n'
+            # _formula (1줄 요약)
+            '  out._formula = "총급여 "+gross.toLocaleString()+"원 → 과세표준 "+Math.round(taxable).toLocaleString()+'
+            '"원 → 산출세액 "+gross_tax.toLocaleString()+"원 → 결정세액 "+determined.toLocaleString()+'
+            '"원 → "+(refund>=0?"환급 "+refund.toLocaleString()+"원":"추가납부 "+(-refund).toLocaleString()+"원");\n'
+            '  return out;\n};\n'
+        )
     if _compute_type(calc) == "date_based":   # 날짜 기반(입사일/퇴사일 → total_days)
         return (
             'window.computeResult = function(inputs){\n'
