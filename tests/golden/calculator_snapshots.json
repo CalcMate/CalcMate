@@ -15,10 +15,10 @@
   },
   "severance-pay": {
     "compute": "c403ec3cc2891e7b9189454308f2d6d5f6fbd78014052bab24118a0b83b4e96b",
-    "index.html": "9a224f500955efc840fd93440240b7482f71d261b6c042144ce294885496e187",
+    "index.html": "6706ec8cfeedeac37dad0ccc333b46fb",
     "related": "1b53b1706367fd4d46023737449a8c97c068e4cc023954871bde2d18ee3d6571",
-    "script.js": "6f34fbb2e2d9e6aa3ca4d8f2dcd44ebb00cdbf4520f11d7418ce4b6c5e1a5ef2",
-    "style.css": "9434a4ab2f0890ac312c7d28b4b80f01f4df57b0c87f6d6a659351f72276d9c2"
+    "script.js": "5028ed4d7acf61a7e435005a42a5d16d",
+    "style.css": "ce96edde54d6b26cdcf0124e8fd00de3"
   },
   "unemployment-benefit": {
     "compute": "669341b1ac48fb40dc545a9a86bc500665c7b9dc707075d77486e9d600bc4dbe",
@@ -29,7 +29,7 @@
   },
   "weekly-holiday-allowance": {
     "compute": "0c8fbde2b184d339411a21795dd8d966d6a5175bf173e429c4068ce46a20b158",
-    "index.html": "d5a4fe77cb11255c9c06db2acdb99d80",
+    "index.html": "1acdeddee6d2b0f77d7e1c1efabae707",
     "related": "04f45e3ae021aad5646274711259c7729d0b553fab0616b866ce61b41ad41fd1",
     "script.js": "ef1151000a6707a3863bb4f58c0bd114",
     "style.css": "ce96edde54d6b26cdcf0124e8fd00de3"

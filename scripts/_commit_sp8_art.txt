@@ -1,0 +1,14 @@
+fix(sp8-audit): 주휴수당/퇴직금 article_content embed FAQ 공식 자연어 교체
+
+SP-8 전수 감사 추가 수정:
+- 주휴수당 article_content 내 embed FAQ HTML: "공식은 '시급 x (주간 근무시간 / 40 x 8)'"
+  → 자연어 교체 (÷40 비율 × 8시간 설명 + 예시)
+- 퇴직금 article_content 내 embed FAQ HTML: "공식은 '평균 월급 × (총 근무일 ÷ 365)'"
+  → 자연어 + 예시(300만×730일=600만원) 교체
+
+검증:
+- _check_art_formula.py: 6개 계산기 article_content 코드 공식 0건 ALL PASS
+- 141 회귀 테스트 ALL PASS
+- golden 해시 갱신 (주휴수당·퇴직금 index.html)
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
