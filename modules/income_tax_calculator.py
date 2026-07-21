@@ -146,11 +146,11 @@ def compute_year_end_settlement(
     # ④인적공제
     n = max(1, int(family_count))
     personal_deduction = min(n * per_person, labor_income)
-    # ⑤4대보험공제
+    # ⑤4대보험공제 — int() 먼저 확정 후 ⑥ 계산 (float 누적 오차 방지)
     ins = compute_insurance_deduction(gross)
-    insurance_deduction = ins["annual_total"]
+    insurance_deduction = int(ins["annual_total"])
     # ⑥과세표준
-    taxable_income = max(0.0, labor_income - personal_deduction - insurance_deduction)
+    taxable_income = max(0, labor_income - int(personal_deduction) - insurance_deduction)
     # ⑦산출세액
     gross_tax = compute_income_tax(int(taxable_income))
     # ⑧세액공제
