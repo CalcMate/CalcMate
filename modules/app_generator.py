@@ -12,11 +12,17 @@ calculators 메타데이터로 index.html / style.css / script.js 생성(GitHub 
 """
 import html as _html
 import json
+import logging
 import re
 from datetime import datetime
 from pathlib import Path
 
+import yaml
+
 from .formula_engine import validate_formula
+
+_log = logging.getLogger(__name__)
+_DOCS_DIR = Path(__file__).resolve().parent.parent / "docs"
 
 _TPL = Path(__file__).resolve().parent.parent / "templates" / "calculators" / "calculator_v1.html"
 
@@ -33,6 +39,77 @@ _LABELS = {
 }
 _JS_FUNCS = {"min": "Math.min", "max": "Math.max", "round": "Math.round",
              "abs": "Math.abs", "int": "Math.trunc", "float": "Number"}
+
+# Phase C: 입력폼 예시값 (placeholder)
+_PLACEHOLDERS = {
+    "hourly_wage": "10030", "weekly_hours": "40",
+    "daily_wage": "67000",  "unused_days": "5",
+    "avg_monthly_wage": "3000000", "avg_daily_wage": "100000",
+    "monthly_salary": "3000000", "monthly_wage": "3000000",
+    "age": "35", "employment_months": "24",
+    "total_salary": "40000000", "family_count": "1", "paid_tax": "1000000",
+    "insured_days": "365", "leave_month": "1", "use_6plus6": "0",
+}
+
+# Phase C: 계산기별 관련 글 데이터 (정적, 계산기 지원용 블로그 Set)
+_RELATED_POSTS = {
+    "weekly-holiday-allowance": [
+        {"tag": "노무", "title": "주휴수당 완벽 가이드 — 지급 조건부터 계산법까지",
+         "desc": "주 15시간 이상 근무 시 주휴수당 발생 조건과 계산법을 상세히 설명합니다.",
+         "href": "/blog/weekly-holiday-allowance-guide/"},
+        {"tag": "노무", "title": "최저시급으로 주휴수당 계산하는 방법 (2026년)",
+         "desc": "2026년 최저임금 기준 주휴수당 계산 예시와 실수령액을 정리합니다.",
+         "href": "/blog/minimum-wage-weekly-holiday/"},
+    ],
+    "severance-pay": [
+        {"tag": "퇴직", "title": "퇴직금 계산법 완벽 정리 — 평균임금 산정부터 지급까지",
+         "desc": "근로자퇴직급여 보장법 제8조 기준 퇴직금 계산 방법을 상세히 설명합니다.",
+         "href": "/blog/severance-pay-guide/"},
+        {"tag": "퇴직", "title": "퇴직금 받고 실업급여 신청하는 방법 — 연계 절차",
+         "desc": "퇴직금 수령 후 실업급여 신청까지 필요한 서류와 절차를 안내합니다.",
+         "href": "/blog/severance-unemployment-benefit/"},
+    ],
+    "annual-leave-allowance": [
+        {"tag": "연차", "title": "연차수당 계산법과 사용 촉진 제도 — 수당 면제 조건",
+         "desc": "미사용 연차수당 계산과 사용촉진제도에 따른 수당 면제 조건을 설명합니다.",
+         "href": "/blog/annual-leave-allowance-guide/"},
+        {"tag": "연차", "title": "연차 25일 상한 제도 — 초과 연차의 법적 처리 방법",
+         "desc": "법정 최대 연차 25일을 초과하는 경우 처리 방법과 수당 계산을 안내합니다.",
+         "href": "/blog/annual-leave-limit-25days/"},
+    ],
+    "unemployment-benefit": [
+        {"tag": "실업급여", "title": "실업급여 신청 조건과 절차 완벽 가이드",
+         "desc": "고용보험법 제40조 기준 구직급여 수급 자격과 신청 방법을 안내합니다.",
+         "href": "/blog/unemployment-benefit-guide/"},
+        {"tag": "실업급여", "title": "자발적 퇴사 후 실업급여 받는 방법 — 예외 조건",
+         "desc": "자발적 퇴사 시 실업급여 수급 가능한 예외 케이스와 필요 서류를 설명합니다.",
+         "href": "/blog/voluntary-resign-unemployment-benefit/"},
+    ],
+    "four-insurances": [
+        {"tag": "4대보험", "title": "4대보험 요율 완벽 정리 — 2025년 국민연금·건강·고용·산재",
+         "desc": "2025년 기준 4대보험 각 요율과 근로자·사업주 부담 비율을 상세히 설명합니다.",
+         "href": "/blog/four-insurance-rates-2025/"},
+        {"tag": "4대보험", "title": "4대보험 가입 의무와 미가입 시 불이익 — 법적 안내",
+         "desc": "4대보험 가입 의무와 미가입 시 사업주에게 부과되는 과태료를 안내합니다.",
+         "href": "/blog/four-insurance-obligation/"},
+    ],
+    "연말정산_환급액_계산기": [
+        {"tag": "연말정산", "title": "연말정산 환급액 최대화 전략 — 공제 항목 총정리",
+         "desc": "소득세법 제137조 기준 연말정산에서 환급액을 최대화할 수 있는 공제 항목을 설명합니다.",
+         "href": "/blog/yearend-tax-refund-maximize/"},
+        {"tag": "연말정산", "title": "연말정산 간소화서비스 사용법과 서류 준비 체크리스트",
+         "desc": "국세청 홈택스 연말정산 간소화서비스 활용법과 필요 서류 목록을 안내합니다.",
+         "href": "/blog/yearend-tax-simplified-service/"},
+    ],
+    "육아휴직_급여_계산기": [
+        {"tag": "육아휴직", "title": "6+6 부모 육아휴직 특례 — 신청 조건과 급여 계산",
+         "desc": "2024년 시행된 6+6 부모 육아휴직 특례의 조건과 월별 급여 계산 방법을 안내합니다.",
+         "href": "/blog/6plus6-parental-leave-guide/"},
+        {"tag": "육아휴직", "title": "육아휴직 급여 신청 절차 — 서류부터 지급까지",
+         "desc": "육아휴직 급여 신청에 필요한 서류, 신청 기한, 지급 일정을 단계별로 설명합니다.",
+         "href": "/blog/parental-leave-benefit-apply/"},
+    ],
+}
 
 
 def _pj(v, default):
@@ -101,14 +178,21 @@ def _form_fields_v2(ins, labels=None) -> str:
         label, unit = _split_label(k, labels)
         if "date" in str(spec).lower():
             rows.append(
-                f'<div class="sm-field"><label class="sm-label" for="in_{k}">{_html.escape(label)}</label>'
-                f'<div class="sm-input-wrap"><input class="sm-input" type="date" id="in_{k}"></div></div>')
+                f'<div class="sm-field">'
+                f'<label class="sm-label" for="in_{k}">{_html.escape(label)}</label>'
+                f'<div class="sm-input-wrap">'
+                f'<input class="sm-input" type="date" id="in_{k}" name="in_{k}">'
+                f'</div></div>')
         else:
             u = f'<span class="sm-unit">{_html.escape(unit)}</span>' if unit else ""
+            ph = _PLACEHOLDERS.get(k, "0")
             rows.append(
-                f'<div class="sm-field"><label class="sm-label" for="in_{k}">{_html.escape(label)}</label>'
-                f'<div class="sm-input-wrap"><input class="sm-input" type="text" inputmode="numeric" '
-                f'data-comma id="in_{k}" placeholder="0">{u}</div></div>')
+                f'<div class="sm-field">'
+                f'<label class="sm-label" for="in_{k}">{_html.escape(label)}</label>'
+                f'<div class="sm-input-wrap">'
+                f'<input class="sm-input" type="text" inputmode="numeric" '
+                f'data-comma id="in_{k}" name="in_{k}" placeholder="예) {ph}">'
+                f'{u}</div></div>')
     return "\n".join(rows)
 
 
@@ -152,7 +236,7 @@ def _related_items_v2(calc) -> str:
              f'<span class="sm-related-emoji">{emoji}</span>'
              f'<span class="sm-related-name">{_html.escape(nm)}</span></a>'
              for slug, emoji, nm in _related_triples(cur)]
-    return "\n".join(items[:4])
+    return "\n".join(items)
 
 
 def _show_flags(cfg) -> dict:
@@ -798,9 +882,17 @@ def _effective_form(calc: dict, cfg: dict = None):
 
 # ── JS (design v2: 공통 컴포넌트 모듈 + 계산기별 computeResult) ────
 def generate_js(calc: dict, cfg: dict = None) -> str:
-    """script.js = 공통 컴포넌트 모듈 전체 + 계산기별 computeResult().
-    calculate()/renderResult()는 공통(불변). 수식/퇴직금 date분기만 계산기별."""
-    return _read_assets_js() + "\n\n" + _compute_js(calc)
+    """script.js = 공통 컴포넌트 모듈 + 계산기별 computeResult() + Phase D 동적 설정."""
+    parts = [_read_assets_js(), "\n\n", _compute_js(calc)]
+    # Phase D-3: CTA Rule Engine 설정
+    cta_js = _cta_rules_js(calc)
+    if cta_js:
+        parts.append("\n" + cta_js)
+    # Phase D-4: Dynamic FAQ 설정
+    faq_js = _dynamic_faq_js(calc)
+    if faq_js:
+        parts.append(faq_js)
+    return "".join(parts)
 
 
 # ── CSS (공개 계산기용 라이트 테마) ───────────────────────────────
@@ -879,13 +971,184 @@ def render_adsense_slot(cfg: dict = None) -> str:
             '  <div class="sm-adsense"><!-- 애드센스 승인 후 활성화 --></div>')
 
 
+# ── Phase D: Placeholder Engine ───────────────────────────────────────────────
+_PH_SCHEMA_CACHE: dict = {}
+_CTA_RULES_CACHE: dict = {}
+
+
+def _load_yaml_cached(path: Path, cache: dict) -> dict:
+    key = str(path)
+    if key not in cache:
+        try:
+            cache[key] = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        except Exception:
+            cache[key] = {}
+    return cache[key]
+
+
+def _placeholder_schema(slug: str) -> dict:
+    """계산기별 플레이스홀더 화이트리스트 반환 (expose/formatter/fallback)."""
+    all_schemas = _load_yaml_cached(_DOCS_DIR / "placeholder_schemas.yaml", _PH_SCHEMA_CACHE)
+    return all_schemas.get(str(slug)) or {}
+
+
+def _cta_rules(slug: str) -> dict:
+    """계산기별 CTA 규칙 반환 (default + rules 리스트)."""
+    all_rules = _load_yaml_cached(_DOCS_DIR / "cta_rules.yaml", _CTA_RULES_CACHE)
+    return all_rules.get(str(slug)) or {}
+
+
+def _apply_article_placeholders(article_html: str, slug: str) -> str:
+    """article_content 내 {variable} 패턴을 <span data-ph> 로 변환.
+
+    3분기 규칙:
+      - 변수 존재 + expose:true  → <span data-ph="var" data-fmt="fmt">fallback</span>
+      - 변수 expose:false        → 빌드 오류 로그 + PLACEHOLDER_SECURITY 마킹
+      - 변수 미정의(스키마 없음) → 빌드 오류 로그 + PLACEHOLDER_ERROR 마킹
+    """
+    schema = _placeholder_schema(slug)
+    errors = []
+
+    def _replace(m):
+        var = m.group(1)
+        if var not in schema:
+            msg = f"[SP-8] PLACEHOLDER_ERROR: '{{{var}}}' not in schema for '{slug}'"
+            _log.error(msg)
+            errors.append(msg)
+            return f'<span class="sm-ph-error">[PLACEHOLDER_ERROR:{var}]</span>'
+        spec = schema[var]
+        if not spec.get("expose", True):
+            msg = f"[SP-8] PLACEHOLDER_SECURITY: '{{{var}}}' expose=false blocked in '{slug}'"
+            _log.error(msg)
+            errors.append(msg)
+            return f'<span class="sm-ph-error">[PLACEHOLDER_SECURITY:{var}]</span>'
+        fmt = str(spec.get("formatter", "text"))
+        fallback = _html.escape(str(spec.get("fallback", var)))
+        return (f'<span data-ph="{_html.escape(var)}" '
+                f'data-fmt="{_html.escape(fmt)}">{fallback}</span>')
+
+    result = re.sub(r'\{([A-Za-z_][A-Za-z0-9_]*)\}', _replace, article_html)
+    if errors:
+        _log.error("[Phase D] %d placeholder error(s) in '%s': %s", len(errors), slug, errors)
+    return result
+
+
+def _cta_rules_js(calc: dict) -> str:
+    """window.SM_CTA_RULES — 계산기별 CTA 룰 JS 객체 생성 (D-3 Rule Engine)."""
+    slug = str(calc.get("slug", ""))
+    rules_data = _cta_rules(slug)
+    if not rules_data:
+        return ""
+    return f"window.SM_CTA_RULES = {json.dumps(rules_data, ensure_ascii=False)};\n"
+
+
+def _dynamic_faq_js(calc: dict) -> str:
+    """window.SM_DYNAMIC_FAQ — 계산기별 조건부 FAQ 항목 JS 객체 생성 (D-4).
+
+    우선순위 (여러 조건 겹칠 때):
+      1 = 법적 예외 (수급불가 케이스)
+      2 = 상한/하한 적용
+      3 = 결과 관련 (환급/추가납부/발생/미발생)
+      4 = 일반 (정적 FAQ — JS 불필요, HTML에 이미 있음)
+    """
+    slug = str(calc.get("slug", ""))
+    faq_map = {
+        "weekly-holiday-allowance": [
+            {"priority": 1, "condition": "outputs.weekly_holiday_pay === 0 && (outputs.notices||[]).length > 0",
+             "q": "주 15시간 미만인데 주휴수당이 0원인 이유는?",
+             "a": "주휴수당은 1주 소정 근로시간이 15시간 이상인 근로자에게만 발생합니다 (근로기준법 제18조제3항). "
+                  "주 15시간 미만 근로자는 주휴수당 지급 의무가 없습니다."},
+            {"priority": 3, "condition": "outputs.weekly_holiday_pay > 0",
+             "q": "계산된 주휴수당이 실제 지급액과 다를 수 있나요?",
+             "a": "본 계산기는 법정 기준으로 산출한 예상치입니다. 실제 지급액은 근로계약서 내용 및 사업장 규정에 따라 달라질 수 있습니다."},
+        ],
+        "severance-pay": [
+            {"priority": 1, "condition": "outputs.severance_pay === 0 && (outputs.notices||[]).length > 0",
+             "q": "1년 미만 근무라서 퇴직금이 0원인 이유는?",
+             "a": "근로자퇴직급여보장법 제8조에 따라 계속근로기간이 1년 미만인 경우 퇴직금 지급 의무가 없습니다. "
+                  "1년 이상 근무 후 퇴직 시 퇴직금이 발생합니다."},
+            {"priority": 3, "condition": "outputs.severance_pay > 0",
+             "q": "퇴직금 수령 후 실업급여도 받을 수 있나요?",
+             "a": "퇴직금과 실업급여는 별개입니다. 퇴직금을 수령한 후에도 고용보험 수급 자격을 충족하면 실업급여를 신청할 수 있습니다."},
+        ],
+        "annual-leave-allowance": [
+            {"priority": 2, "condition": "inputs.unused_days > 25",
+             "q": "미사용 연차가 25일을 초과한 경우 수당은 어떻게 계산하나요?",
+             "a": "근로기준법 제60조 제4항에 따라 법정 연차는 최대 25일까지 인정됩니다. "
+                  "25일 초과분은 취업규칙이나 단체협약에 따른 약정 연차이므로 별도 규정을 확인하세요."},
+            {"priority": 3, "condition": "outputs.annual_leave_allowance > 0",
+             "q": "연차수당을 받을 때 세금이 공제되나요?",
+             "a": "연차수당은 근로소득에 해당하므로 소득세와 4대보험이 공제됩니다. 실수령액은 세후 금액으로 계산하세요."},
+        ],
+        "unemployment-benefit": [
+            {"priority": 1, "condition": "outputs.total_benefit === 0 && (outputs.notices||[]).length > 0",
+             "q": "피보험단위기간 6개월 미만이라 실업급여를 받을 수 없나요?",
+             "a": "고용보험법 제40조에 따라 이직 전 18개월 이내에 피보험단위기간이 합산 180일(약 6개월) 이상이어야 구직급여를 수급할 수 있습니다. "
+                  "복수의 직장에서 근무한 기간을 합산할 수 있습니다."},
+            {"priority": 2, "condition": "(outputs.notices||[]).some(function(n){return n.indexOf('상한')>=0 || n.indexOf('하한')>=0;})",
+             "q": "구직급여 상한액/하한액이 적용됐는데 왜 그런가요?",
+             "a": "구직급여는 1일 상한액(66,000원)과 하한액(최저임금의 80%)이 법으로 정해져 있습니다(고용보험법 제46조). "
+                  "실제 임금과 무관하게 이 범위 내에서 지급됩니다."},
+            {"priority": 3, "condition": "outputs.total_benefit > 0",
+             "q": "실업급여는 언제부터 받을 수 있나요?",
+             "a": "퇴직 후 고용센터에 수급자격 신청(워크넷 구직 등록 후)을 하면 약 7~14일의 처리 기간 이후 지급이 시작됩니다. "
+                  "자발적 퇴사는 원칙적으로 실업급여 수급이 불가합니다."},
+        ],
+        "four-insurances": [
+            {"priority": 2, "condition": "(outputs.notices||[]).some(function(n){return n.indexOf('상한')>=0 || n.indexOf('하한')>=0;})",
+             "q": "국민연금 기준소득월액 상한/하한이 적용됐는데 왜 그런가요?",
+             "a": "국민연금은 기준소득월액에 상한(6,170,000원)과 하한(390,000원)이 있습니다(국민연금법 제88조). "
+                  "실제 월급과 무관하게 이 범위 내에서 보험료가 산정됩니다."},
+            {"priority": 3, "condition": "outputs.total > 0",
+             "q": "사업주가 부담하는 4대보험료는 얼마인가요?",
+             "a": "사업주는 근로자와 동일하게 국민연금·건강보험·고용보험을 분담합니다. "
+                  "산재보험은 사업주가 100% 부담하며 근로자 공제 없습니다."},
+        ],
+        "연말정산_환급액_계산기": [
+            {"priority": 2, "condition": "(outputs.notices||[]).some(function(n){return n.indexOf('상한')>=0 || n.indexOf('하한')>=0;})",
+             "q": "4대보험료가 상한/하한으로 조정된 이유는?",
+             "a": "국민연금은 기준소득월액 상한(6,170,000원)/하한(390,000원) 범위에서 계산됩니다. "
+                  "건강보험·고용보험은 실제 월급 기준이며 상한이 없습니다."},
+            {"priority": 3, "condition": "outputs.estimated_refund > 0",
+             "q": "환급금은 언제 받을 수 있나요?",
+             "a": "2월 말 연말정산 완료 후 3월 급여일에 환급금이 지급되는 것이 일반적입니다. "
+                  "회사마다 지급 시기가 다를 수 있으며, 직접 신고한 경우 5월 종합소득세 신고 후 환급됩니다."},
+            {"priority": 3, "condition": "outputs.estimated_refund < 0",
+             "q": "추가납부액을 줄이려면 어떻게 해야 하나요?",
+             "a": "연금저축·IRP·의료비·교육비·기부금 등 세액공제 항목을 최대한 활용하면 결정세액을 낮출 수 있습니다. "
+                  "연간 계획적인 공제 항목 관리가 중요합니다."},
+        ],
+        "육아휴직_급여_계산기": [
+            {"priority": 1, "condition": "outputs.monthly_allowance === 0 && (outputs.notices||[]).length > 0",
+             "q": "피보험단위기간 180일 미만이라 육아휴직 급여를 받을 수 없나요?",
+             "a": "고용보험법 제70조 제1항에 따라 육아휴직 개시일 이전 피보험단위기간이 합산 180일 이상이어야 합니다. "
+                  "복수 사업장 근무 기간을 합산할 수 있습니다."},
+            {"priority": 2, "condition": "(outputs.notices||[]).some(function(n){return n.indexOf('상한')>=0;})",
+             "q": "통상임금이 높은데 상한액이 적용된 이유는?",
+             "a": "일반 육아휴직급여는 월 최대 150만원(고용보험법 시행령 제95조), "
+                  "6+6 특례는 1~6개월차별로 200만~450만원의 상한이 적용됩니다."},
+            {"priority": 3, "condition": "outputs.monthly_allowance > 0",
+             "q": "6+6 부모 육아휴직 특례란 무엇인가요?",
+             "a": "2024년 1월 시행된 제도로 부모가 함께 육아휴직을 사용할 때 최대 6개월간 급여를 높게 지급하는 특례입니다. "
+                  "배우자도 육아휴직 중이어야 하며, 순서는 무관합니다(고용보험법 시행령 제95조의2)."},
+        ],
+    }
+    items = faq_map.get(slug, [])
+    if not items:
+        return ""
+    return f"window.SM_DYNAMIC_FAQ = {json.dumps(items, ensure_ascii=False)};\n"
+
+
 def render_article(calc: dict, cfg: dict = None) -> str:
     if not _show_flags(cfg)["show_article"]:
         return ""
     name = calc.get("name", "계산기")
     desc = calc.get("seo_description") or calc.get("seo_desc") or f"{name} 자동 계산"
+    slug = str(calc.get("slug", ""))
     article = str(calc.get("article_content", "") or "") \
         or f"<h2>{_html.escape(name)}</h2><p>{_html.escape(desc)}</p>"
+    # Phase D-1/D-2: {variable} → <span data-ph> 변환 (빌드 시 유효성 검증 포함)
+    article = _apply_article_placeholders(article, slug)
     return ('  <!-- ⑧ 본문 -->\n'
             '  <section class="sm-card sm-article">\n'
             f'    {article}\n'
@@ -899,12 +1162,106 @@ def render_cpa_slot(cfg: dict = None) -> str:
             '  <div class="sm-cpa"><!-- 수익화 단계 2 이후 활성화 --></div>')
 
 
+# ── Phase C: 추가 섹션 렌더 함수 ──────────────────────────────────
+def render_result_cta(calc: dict, cfg: dict = None) -> str:
+    """결과 카드 내 CTA (Phase D: JS Rule Engine 구동, 정적 default 폴백 내장).
+    SM_CTA_RULES 없으면 slug 기반 기본값으로 폴백 (Progressive Enhancement)."""
+    slug = str(calc.get("slug", ""))
+    category = calc.get("category", "")
+    # default 폴백 (JS 없는 환경 + SM_CTA_RULES 미적용 케이스)
+    if "세금" in category or "연말정산" in slug:
+        text, links = "절세 방법이 궁금하다면", [("연말정산 공제 가이드", "/blog/yearend-tax-refund-maximize/"), ("전체 계산기 보기", "/")]
+    elif "육아" in slug or "parental" in slug:
+        text, links = "육아휴직 관련 정보", [("6+6 특례 자세히 보기", "/blog/6plus6-parental-leave-guide/"), ("전체 계산기 보기", "/")]
+    elif "실업" in slug or "unemployment" in slug:
+        text, links = "실업급여 더 알아보기", [("신청 가이드 보기", "/blog/unemployment-benefit-guide/"), ("전체 계산기 보기", "/")]
+    elif "퇴직" in slug or "severance" in slug:
+        text, links = "퇴직 관련 계산기", [("실업급여도 계산해 보기", "../unemployment-benefit/"), ("전체 계산기 보기", "/")]
+    else:
+        text, links = "더 알아보기", [("전체 계산기 보기", "/"), ("SalaryMate 홈", "/")]
+    link_html = "".join(
+        f'<a class="sm-result-cta-link" href="{_html.escape(href)}">{_html.escape(label)}</a>'
+        for label, href in links
+    )
+    # Phase D: id="sm-result-cta" → JS가 계산 후 SM_CTA_RULES로 동적 교체
+    # data-default는 JS 없는 환경의 정적 폴백
+    return (
+        '    <div id="sm-result-cta" class="sm-result-cta">\n'
+        f'      <p class="sm-result-cta-text">{_html.escape(text)}</p>\n'
+        f'      <div class="sm-result-cta-links">{link_html}</div>\n'
+        '    </div>'
+    )
+
+
+def render_inline_cta(calc: dict, cfg: dict = None) -> str:
+    """본문 중간 CTA (Article 섹션 직후)."""
+    if not _show_flags(cfg).get("show_article", True):
+        return ""
+    name = calc.get("name", "계산기")
+    short = name.replace(" 계산기", "").replace("계산기", "").strip() or name
+    return (
+        '  <!-- Phase C: 본문 중간 CTA -->\n'
+        '  <div class="sm-inline-cta">\n'
+        f'    <p class="sm-inline-cta-title">지금 바로 {_html.escape(short)} 계산해 보세요</p>\n'
+        '    <p class="sm-inline-cta-sub">무료 · 회원가입 불필요 · 결과 즉시 확인</p>\n'
+        '    <a class="sm-inline-cta-btn" href="#" '
+        'onclick="window.scrollTo({top:0,behavior:\'smooth\'});return false;">'
+        '계산 바로 하기 ↑</a>\n'
+        '  </div>'
+    )
+
+
+def render_related_posts(calc: dict, cfg: dict = None) -> str:
+    """관련 글 카드 섹션 (계산기 지원용 블로그 연결, 정부정책 Set 1 제외)."""
+    slug = str(calc.get("slug", ""))
+    posts = _RELATED_POSTS.get(slug, [])
+    if not posts:
+        return ""
+    items = "".join(
+        f'      <a class="sm-post-card" href="{_html.escape(p["href"])}">\n'
+        f'        <span class="sm-post-tag">{_html.escape(p["tag"])}</span>\n'
+        f'        <p class="sm-post-title">{_html.escape(p["title"])}</p>\n'
+        f'        <p class="sm-post-desc">{_html.escape(p["desc"])}</p>\n'
+        f'      </a>\n'
+        for p in posts
+    )
+    return (
+        '  <!-- Phase C: 관련 글 -->\n'
+        '  <section class="sm-card" id="related-posts-card">\n'
+        '    <h2 class="sm-card-title">관련 글</h2>\n'
+        '    <div class="sm-posts-grid">\n'
+        f'{items}'
+        '    </div>\n'
+        '  </section>'
+    )
+
+
+def render_footer_cta(calc: dict, cfg: dict = None) -> str:
+    """페이지 하단 CTA (전체 계산기 목록 및 주요 링크)."""
+    name = calc.get("name", "계산기")
+    return (
+        '  <!-- Phase C: 페이지 하단 CTA -->\n'
+        '  <div class="sm-footer-cta">\n'
+        f'    <p class="sm-footer-cta-title">SalaryMate — 급여·노무 계산기 모음</p>\n'
+        '    <p class="sm-footer-cta-sub">퇴직금·주휴수당·실업급여·4대보험·연말정산·육아휴직까지</p>\n'
+        '    <div class="sm-footer-cta-links">\n'
+        '      <a class="sm-footer-cta-link" href="/">전체 계산기</a>\n'
+        '      <a class="sm-footer-cta-link" href="/blog/">블로그</a>\n'
+        '      <a class="sm-footer-cta-link" href="../">다른 계산기 보기</a>\n'
+        '    </div>\n'
+        '  </div>'
+    )
+
+
 def render_faq(calc: dict, cfg: dict = None) -> str:
     if not _show_flags(cfg)["show_faq"]:
         return ""
+    # Phase D-4: #sm-dynamic-faq 컨테이너를 정적 FAQ 앞에 삽입
+    # JS가 SM_DYNAMIC_FAQ 룰을 평가해 우선순위(1법적예외→2상한하한→3결과관련) 순으로 조건부 주입
     return ('  <!-- ⑨ FAQ -->\n'
             '  <section class="sm-card" id="faq-card">\n'
             '    <h2 class="sm-card-title">자주 묻는 질문</h2>\n'
+            '    <div id="sm-dynamic-faq"></div>\n'
             f'    {_faq_items_v2(calc)}\n'
             '  </section>')
 
@@ -951,6 +1308,11 @@ def generate_html(calc: dict, cfg: dict = None) -> str:
         "CPA_SLOT": render_cpa_slot(cfg),
         "FAQ_SECTION": render_faq(calc, cfg),
         "RELATED_SECTION": render_related(calc, cfg),
+        # Phase C 추가 섹션
+        "RESULT_CTA": render_result_cta(calc, cfg),
+        "INLINE_CTA": render_inline_cta(calc, cfg),
+        "RELATED_POSTS_SECTION": render_related_posts(calc, cfg),
+        "FOOTER_CTA": render_footer_cta(calc, cfg),
         "SM_CONFIG": json.dumps(_sm_config(calc, cfg), ensure_ascii=False),
     }
     if _TPL_V2.exists():

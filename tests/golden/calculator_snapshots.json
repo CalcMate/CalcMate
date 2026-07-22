@@ -1,53 +1,51 @@
 {
   "annual-leave-allowance": {
-    "compute": "d2f59920a29750ba5421ae0b0cc82243765dfaec0fb500746b0278e34edcc77f",
-    "index.html": "bd4c9221383eb00341256e6bd56cca7d",
-    "related": "c4ecb1a585787a1f3d08901371a951038df22d65e6390c873826d2b2d50948d8",
-    "script.js": "04ae65c5e2174d0b58e0f954cf8caa3e",
-    "style.css": "ce96edde54d6b26cdcf0124e8fd00de3"
+    "compute": "8ada766dda137214baaf46ae18f3378c963c2f516aaf6ca184ddd8b68450e300",
+    "index.html": "1d3d6fc6d17b440daf3b481399192178f2f7a9e32880b4019cf5f72fb0c859ed",
+    "related": "863aefb472939249565c4a1b399ff0b0b5e6ea8054d2ddae71ff0440f0a44dc3",
+    "script.js": "1ba1600977e8bf0917ce772430bf38ce09d3842bdf6418b213770c1c08239cb8",
+    "style.css": "422fb32357b056202a28a2364b6e89a9fbb09f25cca32eb5f0e025e539464741"
   },
   "four-insurances": {
-    "compute": "55392ee3710f78d8b93f8df2c3892d1f12389eec7c2b6bb4f1b2d09a26f05ec5",
-    "index.html": "e476250d8710c382be200eb38ca1c154",
-    "related": "aaa3e03c14d35db98408b234c361562222f7ac815ebe8a6eb60a9f891be158d8",
-    "script.js": "92e603bdbb4efd31692365180474d466",
-    "style.css": "ce96edde54d6b26cdcf0124e8fd00de3"
+    "compute": "7874f77fd77bc7eb3d394a61e80131b9badea0150aea1a491b86843572b4ce1e",
+    "index.html": "0277bb0dd31daa96310557714767b314caaa59c8d244e2755c270b385da20fc9",
+    "related": "8b69e2c8d41a50fc501badb05d6905edc9bff181f639ecfba305f49c42ec725a",
+    "script.js": "a8d23da0ea9f13336be394dcc724b897fee3c15d8f0bb81a8c91b8749c1fecfe",
+    "style.css": "422fb32357b056202a28a2364b6e89a9fbb09f25cca32eb5f0e025e539464741"
   },
   "severance-pay": {
     "compute": "c403ec3cc2891e7b9189454308f2d6d5f6fbd78014052bab24118a0b83b4e96b",
-    "index.html": "6706ec8cfeedeac37dad0ccc333b46fb",
-    "related": "1b53b1706367fd4d46023737449a8c97c068e4cc023954871bde2d18ee3d6571",
-    "script.js": "5028ed4d7acf61a7e435005a42a5d16d",
-    "style.css": "ce96edde54d6b26cdcf0124e8fd00de3"
+    "index.html": "f4534be245d4a531a76fc500e40505a20cff61aa69a10f4ce73a7daa6d9deca1",
+    "related": "7490e5c01d9ee0553af1544deeda6d0375680e8707b6c85d81373ce588bddf6e",
+    "script.js": "3258f4fd2f9eb07336b26fedb82c10b9a3e265c5e838fd26eab0d4a16ab11e8d",
+    "style.css": "422fb32357b056202a28a2364b6e89a9fbb09f25cca32eb5f0e025e539464741"
   },
   "unemployment-benefit": {
-    "compute": "669341b1ac48fb40dc545a9a86bc500665c7b9dc707075d77486e9d600bc4dbe",
-    "index.html": "28b09818b9994826dc6cfaddb6407462",
-    "related": "ddf8ffb6117158ccd93e26d2e8a031987d10c62b5a5252af152d34567c85815a",
-    "script.js": "ded506306be02b4f84d5ef21f213a44e",
-    "style.css": "ce96edde54d6b26cdcf0124e8fd00de3"
+    "compute": "24f8b4b1a5ca74064e256e9b0112c33440750e092e42642b39fdab8867601712",
+    "index.html": "73b254f36715e014768aec80264aef614476f817aa581cee69f0a34016cff0c9",
+    "related": "eb43ec38b3f8f34f6855d93afc86c77aa52e410fe630b279dbf3ed263f16f1df",
+    "script.js": "1c476b98e9ab5e7737665f9fab3b1b41a23ae73c617e07dcff828969f3d51c74",
+    "style.css": "422fb32357b056202a28a2364b6e89a9fbb09f25cca32eb5f0e025e539464741"
   },
   "weekly-holiday-allowance": {
     "compute": "0c8fbde2b184d339411a21795dd8d966d6a5175bf173e429c4068ce46a20b158",
-    "index.html": "1acdeddee6d2b0f77d7e1c1efabae707",
-    "related": "04f45e3ae021aad5646274711259c7729d0b553fab0616b866ce61b41ad41fd1",
-    "script.js": "ef1151000a6707a3863bb4f58c0bd114",
-    "style.css": "ce96edde54d6b26cdcf0124e8fd00de3"
+    "index.html": "ca2d36655ecf4f42ee4942b2072b967b9543017b2a5012821f4dba788fb370e6",
+    "related": "1307cb502e049e7a322164b821b7e27d04e5ed7f8a0d34675075a5e094f925cd",
+    "script.js": "97b67d5817cb2c69d9b8b011f9f2a3877e3da1a7d8c8071c95f4623689e9befc",
+    "style.css": "422fb32357b056202a28a2364b6e89a9fbb09f25cca32eb5f0e025e539464741"
   },
   "연말정산_환급액_계산기": {
-    "compute": "8eb19bdcff20af6ff407a725306c45784bef7a5c4df7508ed5c5cc71a5b12e33",
-    "index.html": "db36b0ab85c0f97a9bd5d94ba65eaabb",
-    "related": "aaa3e03c14d35db98408b234c361562222f7ac815ebe8a6eb60a9f891be158d8",
-    "script.js": "f9a8fe7ecedcff0a62396fb245a43b11",
-    "style.css": "ce96edde54d6b26cdcf0124e8fd00de3"
+    "compute": "2b309f438239025ff330a956d6a06a005e524b15c9824b9961c202a5aa8c6ee3",
+    "index.html": "f9e688d952c25b3c201947068917350db531271289c8f991f63158e567195bf7",
+    "related": "5b43fa3805e49ffa0f007ba066bfe48a0068d5ee60f7b30757760707fff02eff",
+    "script.js": "48b14fe8f05bc7e750754ec756fb78247f11bb4e1463a9373ebc500dcc082d69",
+    "style.css": "422fb32357b056202a28a2364b6e89a9fbb09f25cca32eb5f0e025e539464741"
   },
   "육아휴직_급여_계산기": {
-    "compute": "96d33c67056930dc1f053454f70d76548f267962fd20a1051a308b2f1aa8e6a7",
-    "index.html": "b66b2edac579d1d98199efea26c8a6d5e4bc4df21eae76215bdef561680ecaba",
-    "related": "aaa3e03c14d35db98408b234c361562222f7ac815ebe8a6eb60a9f891be158d8",
-    "script.js": "02a839de5220149521a13ae0774005bd31ad7d40a1b1c13e289089d651716568",
-    "style.css": "9434a4ab2f0890ac312c7d28b4b80f01f4df57b0c87f6d6a659351f72276d9c2"
-  },
-  "four-insurances/index.html": "1b61d7ec50f5708d005c405c561364244cf91b8cbe2789b40bd98a4c93fefb98",
-  "four-insurances/script.js": "4485674c30d7d1dd3388c7a4e89d3cb155df6ea558a41bb5124252e40c6c6bb8"
+    "compute": "f35e1452bcdaee9d01a7f3fcaa28c945649d682cd81fa3062a085ca6fa59534e",
+    "index.html": "1facf48d565a767b6359ef7baa4fc987c890947fac7da36dbcf927694fdad240",
+    "related": "1971b92a858028283e88668bee71ecff97a571db29587a4a89bbad88c4d64960",
+    "script.js": "bac11b61e7e1872fdbe9d2261d40e019e490483f7a7b91309f9277b7857eead0",
+    "style.css": "422fb32357b056202a28a2364b6e89a9fbb09f25cca32eb5f0e025e539464741"
+  }
 }

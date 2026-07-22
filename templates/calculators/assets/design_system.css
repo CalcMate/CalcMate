@@ -108,3 +108,146 @@ body{font-family:-apple-system,'Apple SD Gothic Neo','Pretendard','Noto Sans KR'
 
 /* ── Site Mode: 광고/CPA 기본 숨김 (대시보드 show_* 설정으로만 노출) ── */
 .sm-adsense, .sm-cpa { display: none; }
+
+/* ══════════════════════════════════════════════════════════════
+   Phase C — UI/UX V2 추가 컴포넌트 (계산 로직 무관, Design Token 확장)
+   기존 토큰 변경 금지 — 새 토큰만 추가
+   ══════════════════════════════════════════════════════════════ */
+
+/* Phase C Design Token: #2C5AA0 딥블루 보조 팔레트 */
+:root {
+  --c-deep:     #2C5AA0;
+  --c-deep-dk:  #1E3F74;
+  --c-deep-bg:  #EBF1F9;
+  --c-step-bg:  #F0F5FF;
+}
+
+/* ── Phase C: 결과 카드 내 notices ── */
+.sm-notices { margin-top: var(--sp-2); display: none; }
+.sm-notices.show { display: block; }
+.sm-notice-item {
+  background: #FFFBEB; border: 1px solid #FDE68A;
+  border-radius: var(--r-input); padding: 10px var(--sp-2);
+  display: flex; gap: 10px; font-size: 13px; color: #92400E;
+  margin-bottom: 6px; align-items: flex-start;
+}
+.sm-notice-item:last-child { margin-bottom: 0; }
+.sm-notice-item-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+
+/* ── Phase C: 결과 하단 CTA (결과 카드 내부) ── */
+.sm-result-cta {
+  margin-top: var(--sp-2); padding-top: var(--sp-2);
+  border-top: 1px solid rgba(255,255,255,.15);
+}
+.sm-result-cta-text { font-size: 12px; opacity: .75; margin-bottom: 6px; }
+.sm-result-cta-links { display: flex; gap: 8px; flex-wrap: wrap; }
+.sm-result-cta-link {
+  display: inline-block; padding: 7px 14px;
+  background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.35);
+  border-radius: 10px; color: #fff; font-size: 12px; font-weight: 600;
+  text-decoration: none; transition: background .15s;
+}
+.sm-result-cta-link:hover { background: rgba(255,255,255,.28); }
+
+/* ── Phase C: 본문 중간 CTA ── */
+.sm-inline-cta {
+  background: var(--c-deep-bg); border: 1.5px solid var(--c-deep);
+  border-radius: var(--r-card); padding: var(--sp-3);
+  margin-bottom: var(--sp-2); text-align: center;
+}
+.sm-inline-cta-title { font-size: 15px; font-weight: 700; color: var(--c-deep); margin-bottom: 6px; }
+.sm-inline-cta-sub { font-size: 13px; color: var(--c-text-sub); margin-bottom: var(--sp-2); }
+.sm-inline-cta-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 11px 22px; background: var(--c-deep); color: #fff;
+  border-radius: var(--r-btn); font-size: 14px; font-weight: 700;
+  text-decoration: none; transition: background .15s;
+}
+.sm-inline-cta-btn:hover { background: var(--c-deep-dk); }
+
+/* ── Phase C: 페이지 하단 CTA ── */
+.sm-footer-cta {
+  background: linear-gradient(135deg, var(--c-deep) 0%, var(--c-deep-dk) 100%);
+  border-radius: var(--r-card); padding: var(--sp-3);
+  margin-bottom: var(--sp-2); color: #fff; text-align: center;
+}
+.sm-footer-cta-title { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+.sm-footer-cta-sub { font-size: 13px; opacity: .8; margin-bottom: var(--sp-2); }
+.sm-footer-cta-links { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.sm-footer-cta-link {
+  padding: 10px 18px; background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.35); border-radius: 12px;
+  color: #fff; font-size: 13px; font-weight: 600;
+  text-decoration: none; transition: background .15s;
+}
+.sm-footer-cta-link:hover { background: rgba(255,255,255,.28); }
+
+/* ── Phase C: 관련 글 카드 ── */
+.sm-posts-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-1);
+}
+.sm-post-card {
+  background: var(--c-bg); border: 1.5px solid var(--c-border);
+  border-radius: var(--r-input); padding: var(--sp-2);
+  text-decoration: none; display: block;
+  transition: border-color .15s, background .15s;
+}
+.sm-post-card:hover { border-color: var(--c-primary); background: var(--c-primary-bg); }
+.sm-post-tag {
+  display: inline-block; font-size: 11px; font-weight: 600;
+  color: var(--c-primary); background: var(--c-primary-bg);
+  padding: 2px 8px; border-radius: var(--r-badge); margin-bottom: 6px;
+}
+.sm-post-title { font-size: 13px; font-weight: 600; color: var(--c-text); line-height: 1.5; }
+.sm-post-desc { font-size: 12px; color: var(--c-text-sub); margin-top: 4px; line-height: 1.5; }
+@media(max-width: 480px) { .sm-posts-grid { grid-template-columns: 1fr; } }
+
+/* ── Phase C: 계산 과정 보기 (Step Accordion) ── */
+.sm-steps-item { border-bottom: 1px solid var(--c-border); }
+.sm-steps-item:last-child { border-bottom: none; }
+.sm-steps-q {
+  width: 100%; background: none; border: none;
+  padding: 14px 0; display: flex; justify-content: space-between;
+  align-items: center; font-size: 14px; font-weight: 600;
+  font-family: inherit; color: var(--c-text); cursor: pointer;
+  text-align: left; gap: var(--sp-1); min-height: 44px;
+}
+.sm-steps-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; background: var(--c-primary-bg);
+  color: var(--c-primary); font-size: 11px; font-weight: 700;
+  border-radius: 50%; flex-shrink: 0;
+}
+.sm-steps-label { flex: 1; }
+.sm-steps-value {
+  font-size: 12px; color: var(--c-text-sub); font-weight: 500;
+  max-width: 130px; text-align: right; word-break: break-all;
+}
+.sm-steps-icon { font-size: 18px; color: var(--c-text-sub); transition: transform .2s; flex-shrink: 0; }
+.sm-steps-item.open .sm-steps-icon { transform: rotate(45deg); }
+.sm-steps-a {
+  padding: 0 0 14px 30px; font-size: 13px;
+  color: var(--c-text-sub); line-height: 1.7;
+  background: var(--c-step-bg); border-radius: 8px;
+  margin-bottom: 4px;
+}
+/* JS로 hidden 속성 제어, display 직접 조작하지 않음 */
+.sm-steps-a[hidden] { display: none; }
+.sm-steps-formula {
+  padding: var(--sp-1) var(--sp-2); font-size: 12px;
+  color: var(--c-text-sub); background: #F3F4F6;
+  border-radius: 8px; margin-top: 6px; word-break: break-all;
+}
+
+/* ── Phase C: Accessibility ── */
+.sm-btn:focus-visible { outline: 3px solid var(--c-primary); outline-offset: 2px; }
+.sm-action-btn:focus-visible { outline: 3px solid var(--c-primary); outline-offset: 2px; }
+.sm-faq-q:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; border-radius: 4px; }
+.sm-steps-q:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; border-radius: 4px; }
+.sm-related-item:focus-visible { outline: 3px solid var(--c-primary); outline-offset: 2px; }
+.sm-post-card:focus-visible { outline: 3px solid var(--c-primary); outline-offset: 2px; }
+.sm-inline-cta-btn:focus-visible { outline: 3px solid var(--c-primary); outline-offset: 2px; }
+.sm-footer-cta-link:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
+/* 모바일 관련 계산기 1열 (작은 화면) */
+@media(max-width: 400px) { .sm-related-grid { grid-template-columns: 1fr; } }

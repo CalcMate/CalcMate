@@ -1,5 +1,5 @@
-/* components.js — SalaryMate 공통 컴포넌트 (모든 계산기 공통, 변경 최소)
-   설계: calculate()는 입력 수집→computeResult()(계산기별) 호출→renderResult()(공통 UI).
+/* components.js — SalaryMate 공통 컴포넌트 (Phase C: notices / step accordion)
+   계산 로직 없음. calculate()→computeResult()(계산기별)→renderResult()(공통 UI).
    계산기가 늘어나도 calculate()/renderResult()는 수정하지 않는다. */
 (function (w, d) {
   "use strict";
@@ -7,6 +7,12 @@
 
   function num(v) { return (typeof v === "number") ? v : (parseFloat(String(v).replace(/,/g, "")) || 0); }
   function comma(n) { return (Math.round(n)).toLocaleString(); }
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
 
   // 입력 수집: number → 숫자(콤마제거), date → 문자열
   function collectInputs() {
@@ -31,6 +37,80 @@
     })(performance.now());
   }
 
+  // Phase C: notices 렌더 (계산 결과의 안내 메시지 목록)
+  function renderNotices(notices) {
+    var host = d.getElementById("notices-container");
+    if (!host) return;
+    if (!notices || !notices.length) {
+      host.classList.remove("show");
+      return;
+    }
+    host.innerHTML = notices.map(function (n) {
+      return '<div class="sm-notice-item">'
+        + '<span class="sm-notice-item-icon" aria-hidden="true">ℹ️</span>'
+        + '<span>' + esc(n) + '</span>'
+        + '</div>';
+    }).join("");
+    host.classList.add("show");
+  }
+
+  // Phase C: 계산 과정 step accordion 렌더
+  // 항목이 2개 이상일 때 아코디언, 그 미만은 기존 detail-row 형태
+  function renderSteps(detail, formula) {
+    var host = d.getElementById("steps-list");
+    var card = d.getElementById("steps-card");
+    if (!host || !card) return;
+    if (!detail || !detail.length) { card.style.display = "none"; return; }
+
+    if (detail.length >= 3) {
+      // 아코디언 형태 (연말정산 11단계 등)
+      var idx = 0;
+      host.innerHTML = detail.map(function (r) {
+        var bid = "step-btn-" + (idx);
+        var aid = "step-ans-" + (idx);
+        idx++;
+        var labelText = esc(r.label || "");
+        var valueText = esc(r.value || "");
+        var formulaHtml = formula
+          ? '<div class="sm-steps-formula">' + esc(formula) + '</div>'
+          : "";
+        return '<div class="sm-steps-item">'
+          + '<button class="sm-steps-q" id="' + bid + '" '
+          + 'aria-expanded="false" aria-controls="' + aid + '" type="button" '
+          + 'onclick="smToggleStep(this)">'
+          + '<span class="sm-steps-label">' + labelText + '</span>'
+          + '<span class="sm-steps-value">' + valueText + '</span>'
+          + '<span class="sm-steps-icon" aria-hidden="true">+</span>'
+          + '</button>'
+          + '<div class="sm-steps-a" id="' + aid + '" hidden>'
+          + '<strong>' + labelText + '</strong>: ' + valueText
+          + formulaHtml
+          + '</div>'
+          + '</div>';
+      }).join("");
+      card.style.display = "block";
+    } else {
+      // 단순 목록 형태 (항목 수 적은 계산기)
+      host.innerHTML = detail.map(function (r) {
+        return '<div class="sm-detail-row">'
+          + '<span class="sm-detail-label">' + esc(r.label) + '</span>'
+          + '<span class="sm-detail-value">' + esc(r.value) + '</span>'
+          + '</div>';
+      }).join("");
+      card.style.display = "block";
+    }
+  }
+
+  // Phase C: step accordion 토글 (공통)
+  w.smToggleStep = function (btn) {
+    var item = btn && btn.parentElement;
+    if (!item) return;
+    var isOpen = item.classList.toggle("open");
+    btn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    var ans = item.querySelector(".sm-steps-a");
+    if (ans) ans.hidden = !isOpen;
+  };
+
   // 결과 UI 렌더 (계산 로직 없음 — 표시만)
   function renderResult(inputs, outputs) {
     outputs = outputs || {};
@@ -47,31 +127,122 @@
     var actions = d.getElementById("result-actions");
     if (actions) actions.classList.add("show");
 
-    // 계산 상세: 입력값 + 출력값 + (계산기별 _detail) 자동 나열
-    var rows = [];
-    (CFG.inputs || []).forEach(function (f) {
-      var v = inputs[f.name];
-      var disp = (f.type === "date") ? (v || "-") : (comma(num(v)) + (f.unit || ""));
-      rows.push([f.label || f.name, disp]);
-    });
-    (outputs._detail || []).forEach(function (r) { rows.push([r.label, r.value]); });
-    (CFG.outputs || []).forEach(function (o) {
-      rows.push([o.label || o.key, comma(num(outputs[o.key])) + (o.unit || "")]);
-    });
-    if (CFG.show_detail !== false) {
-      var host = d.getElementById("detail-rows");
-      if (host) {
-        host.innerHTML = rows.map(function (r) {
-          return '<div class="sm-detail-row"><span class="sm-detail-label">' + esc(r[0]) +
-            '</span><span class="sm-detail-value">' + esc(r[1]) + "</span></div>";
-        }).join("");
-        var dc = d.getElementById("detail-card"); if (dc) dc.style.display = "block";
+    // Phase C: notices 표시
+    renderNotices(outputs.notices);
+
+    // Phase C: 계산 과정 step accordion
+    renderSteps(outputs._detail || [], outputs._formula || "");
+
+    // Phase D-1: article_content placeholder 치환
+    updateArticlePlaceholders(inputs, outputs);
+    // Phase D-3: 조건 기반 CTA 업데이트
+    renderDynamicCta(inputs, outputs);
+    // Phase D-4: 동적 FAQ 삽입
+    renderDynamicFaq(inputs, outputs);
+
+    // 기존 계산 상세 (detail-card) — steps-card와 중복 방지: steps-card 있으면 detail-card 숨김
+    if (!d.getElementById("steps-card")) {
+      var rows = [];
+      (CFG.inputs || []).forEach(function (f) {
+        var v = inputs[f.name];
+        var disp = (f.type === "date") ? (v || "-") : (comma(num(v)) + (f.unit || ""));
+        rows.push([f.label || f.name, disp]);
+      });
+      (outputs._detail || []).forEach(function (r) { rows.push([r.label, r.value]); });
+      (CFG.outputs || []).forEach(function (o) {
+        rows.push([o.label || o.key, comma(num(outputs[o.key])) + (o.unit || "")]);
+      });
+      if (CFG.show_detail !== false) {
+        var host = d.getElementById("detail-rows");
+        if (host) {
+          host.innerHTML = rows.map(function (r) {
+            return '<div class="sm-detail-row"><span class="sm-detail-label">' + esc(r[0]) +
+              '</span><span class="sm-detail-value">' + esc(r[1]) + "</span></div>";
+          }).join("");
+          var dc = d.getElementById("detail-card"); if (dc) dc.style.display = "block";
+        }
       }
     }
   }
 
-  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
-    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  // Phase D-1: article_content 내 <span data-ph> 를 계산 결과로 치환
+  function updateArticlePlaceholders(inputs, outputs) {
+    d.querySelectorAll("[data-ph]").forEach(function (el) {
+      var key = el.getAttribute("data-ph");
+      var fmt = el.getAttribute("data-fmt") || "text";
+      // inputs 우선, 없으면 outputs 에서 읽기
+      var raw = (outputs && outputs[key] != null) ? outputs[key]
+              : (inputs  && inputs[key]  != null) ? inputs[key]
+              : null;
+      if (raw == null || raw === "" || raw === 0 && key !== "family_count") return;
+      var display;
+      if (fmt === "currency") {
+        display = Math.round(num(raw)).toLocaleString() + "원";
+      } else if (fmt === "currency_signed") {
+        var n = Math.round(num(raw));
+        display = (n >= 0 ? "+" : "") + n.toLocaleString() + "원";
+      } else if (fmt === "number") {
+        display = num(raw).toLocaleString();
+      } else {
+        display = String(raw);
+      }
+      el.textContent = display;
+    });
+  }
+
+  // Phase D-3: SM_CTA_RULES 조건 평가 → #sm-result-cta 동적 업데이트
+  function renderDynamicCta(inputs, outputs) {
+    var host = d.getElementById("sm-result-cta");
+    var rules = w.SM_CTA_RULES;
+    if (!host || !rules) return;
+    var matched = null;
+    var ruleList = rules.rules || [];
+    for (var i = 0; i < ruleList.length; i++) {
+      try {
+        var ok = (new Function("inputs", "outputs", "return !!(" + ruleList[i].condition + ");"))(inputs, outputs);
+        if (ok) { matched = ruleList[i]; break; }
+      } catch (e) { /* 조건 평가 실패 시 다음 룰 */ }
+    }
+    var rule = matched || rules.default;
+    if (!rule) return;
+    var linksHtml = (rule.links || []).map(function (l) {
+      return '<a class="sm-result-cta-link" href="' + esc(l.href) + '">' + esc(l.label) + '</a>';
+    }).join("");
+    host.innerHTML =
+      '<p class="sm-result-cta-text">' + esc(rule.text || "") + '</p>' +
+      '<div class="sm-result-cta-links">' + linksHtml + '</div>';
+    // Analytics 훅 (Phase E에서 실제 연동)
+    if (rule.analytics && w.smTrack) { w.smTrack(rule.analytics, {inputs: inputs, outputs: outputs}); }
+  }
+
+  // Phase D-4: SM_DYNAMIC_FAQ 조건 평가 → #sm-dynamic-faq 에 우선순위 순으로 삽입
+  function renderDynamicFaq(inputs, outputs) {
+    var host = d.getElementById("sm-dynamic-faq");
+    var items = w.SM_DYNAMIC_FAQ;
+    if (!host || !items || !items.length) return;
+    // 우선순위(1→4) 정렬 후 조건 평가
+    var sorted = items.slice().sort(function (a, b) { return (a.priority || 4) - (b.priority || 4); });
+    var matched = [];
+    sorted.forEach(function (item) {
+      try {
+        var ok = (new Function("inputs", "outputs", "return !!(" + item.condition + ");"))(inputs, outputs);
+        if (ok) matched.push(item);
+      } catch (e) { /* skip */ }
+    });
+    if (!matched.length) return;
+    var idx = 9000; // dynamic FAQ id prefix (정적 FAQ와 겹치지 않게)
+    host.innerHTML = matched.map(function (item) {
+      var bid = "faq-dyn-btn-" + idx;
+      var aid = "faq-dyn-ans-" + (idx++);
+      return '<div class="sm-faq-item sm-faq-dynamic">' +
+        '<button class="sm-faq-q" id="' + bid + '" type="button" ' +
+        'aria-expanded="false" aria-controls="' + aid + '" onclick="toggleFaq(this)">' +
+        esc(item.q || "") +
+        '<span class="sm-faq-icon" aria-hidden="true">+</span></button>' +
+        '<div class="sm-faq-a" id="' + aid + '" hidden>' + esc(item.a || "") + '</div>' +
+        '</div>';
+    }).join("");
+  }
 
   // 공통 계산 진입점 — 계산기별 computeResult(inputs)만 교체하면 재사용
   function calculate() {
@@ -81,22 +252,29 @@
       outputs = (typeof w.computeResult === "function") ? w.computeResult(inputs) : null;
     } catch (e) { console.error(e); outputs = null; }
     if (!outputs || !isFinite(num(outputs[CFG.primaryOutput]))) {
-      alert("입력값을 확인해주세요.");
+      var errEl = d.getElementById("calc-error");
+      if (!errEl) {
+        errEl = d.createElement("p");
+        errEl.id = "calc-error";
+        errEl.style.cssText = "color:#DC2626;font-size:14px;margin-top:8px;font-weight:600;";
+        var btn = d.querySelector(".sm-btn");
+        if (btn && btn.parentNode) btn.parentNode.insertBefore(errEl, btn.nextSibling);
+      }
+      errEl.textContent = "입력값을 확인해주세요.";
       return;
     }
+    var errEl2 = d.getElementById("calc-error");
+    if (errEl2) errEl2.textContent = "";
     renderResult(inputs, outputs);
   }
 
   // 초기화: show_* 플래그 반영 + 기능 모듈 init
   function init() {
-    // 광고/CPA: 설정 시에만 노출(기본 숨김) — SM_CONFIG(대시보드/ SITE_MODE) 값으로만 제어
     if (CFG.show_adsense) toggleAll(".sm-adsense", true);
     if (CFG.show_cpa) toggleAll(".sm-cpa", true);
-    // 결과 액션 버튼: 플래그로 개별 노출
     hideActionIf("result_save", CFG.show_result_save === false);
     hideActionIf("share", CFG.show_share === false);
     hideActionIf("pwa", CFG.show_pwa === false);
-    // 섹션 노출 제어(FAQ/안내문/관련계산기) — 기본 노출, 설정 false면 숨김
     if (CFG.show_faq === false) hideEl("#faq-card");
     if (CFG.show_notice === false) hideEl(".sm-notice");
     if (CFG.show_related === false) hideEl("#related-card");
@@ -104,6 +282,7 @@
     if (w.smInitNumberInputs) w.smInitNumberInputs();
     if (w.smInitPwa) w.smInitPwa();
   }
+
   function hideEl(sel) { var el = d.querySelector(sel); if (el) el.style.display = "none"; }
   function toggleAll(sel, on) { d.querySelectorAll(sel).forEach(function (el) { el.style.display = on ? "block" : "none"; }); }
   function hideActionIf(action, hide) {

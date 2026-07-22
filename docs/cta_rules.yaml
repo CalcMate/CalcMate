@@ -1,0 +1,179 @@
+# cta_rules.yaml — 계산기별 동적 CTA 규칙 (Phase D)
+# 조건 기반 Rule Engine: 연봉 구간 하드코딩이 아닌 결과 상태(환급/추가납부/수급불가 등) 기반
+# condition: JS 표현식 (inputs/outputs 객체 참조 가능)
+# rules: 위에서 순서대로 평가, 첫 번째 매칭 룰 적용
+# default: 어떤 룰도 매칭 안 될 때 사용 (필수)
+# analytics: Phase E에서 실제 연동할 이벤트명 (이번 Phase는 훅 삽입만)
+
+weekly-holiday-allowance:
+  default:
+    text: "주휴수당 더 알아보기"
+    links:
+      - label: "주휴수당 완벽 가이드"
+        href: "/blog/weekly-holiday-allowance-guide/"
+      - label: "전체 계산기"
+        href: "/"
+    analytics: "cta_wha_default"
+  rules:
+    - condition: "outputs.weekly_holiday_pay > 0"
+      text: "주휴수당이 발생합니다!"
+      links:
+        - label: "주휴수당 가이드 보기"
+          href: "/blog/weekly-holiday-allowance-guide/"
+        - label: "퇴직금도 계산해 보기"
+          href: "../severance-pay/"
+      analytics: "cta_wha_eligible"
+    - condition: "outputs.weekly_holiday_pay === 0"
+      text: "주 15시간 이상 근무 시 주휴수당이 발생합니다"
+      links:
+        - label: "조건 자세히 보기"
+          href: "/blog/weekly-holiday-allowance-guide/"
+        - label: "전체 계산기"
+          href: "/"
+      analytics: "cta_wha_ineligible"
+
+severance-pay:
+  default:
+    text: "퇴직 관련 계산기"
+    links:
+      - label: "실업급여도 계산해 보기"
+        href: "../unemployment-benefit/"
+      - label: "전체 계산기"
+        href: "/"
+    analytics: "cta_sp_default"
+  rules:
+    - condition: "outputs.severance_pay > 0"
+      text: "퇴직금을 받을 수 있습니다"
+      links:
+        - label: "실업급여도 신청해 보세요"
+          href: "../unemployment-benefit/"
+        - label: "4대보험 확인하기"
+          href: "../four-insurances/"
+      analytics: "cta_sp_eligible"
+    - condition: "outputs.severance_pay === 0"
+      text: "1년 이상 근무 시 퇴직금이 발생합니다"
+      links:
+        - label: "퇴직금 계산법 가이드"
+          href: "/blog/severance-pay-guide/"
+        - label: "전체 계산기"
+          href: "/"
+      analytics: "cta_sp_ineligible"
+
+annual-leave-allowance:
+  default:
+    text: "연차수당 더 알아보기"
+    links:
+      - label: "연차수당 가이드"
+        href: "/blog/annual-leave-allowance-guide/"
+      - label: "전체 계산기"
+        href: "/"
+    analytics: "cta_al_default"
+  rules:
+    - condition: "outputs.annual_leave_allowance > 0"
+      text: "연차수당을 계산했습니다"
+      links:
+        - label: "연차수당 가이드"
+          href: "/blog/annual-leave-allowance-guide/"
+        - label: "주휴수당도 확인하기"
+          href: "../weekly-holiday-allowance/"
+      analytics: "cta_al_result"
+
+unemployment-benefit:
+  default:
+    text: "실업급여 더 알아보기"
+    links:
+      - label: "신청 가이드 보기"
+        href: "/blog/unemployment-benefit-guide/"
+      - label: "전체 계산기"
+        href: "/"
+    analytics: "cta_ub_default"
+  rules:
+    - condition: "outputs.total_benefit > 0"
+      text: "실업급여를 받을 수 있습니다"
+      links:
+        - label: "신청 절차 안내"
+          href: "/blog/unemployment-benefit-guide/"
+        - label: "퇴직금도 확인하기"
+          href: "../severance-pay/"
+      analytics: "cta_ub_eligible"
+    - condition: "outputs.total_benefit === 0"
+      text: "피보험단위기간 6개월 이상이어야 합니다"
+      links:
+        - label: "수급 조건 자세히 보기"
+          href: "/blog/unemployment-benefit-guide/"
+        - label: "전체 계산기"
+          href: "/"
+      analytics: "cta_ub_ineligible"
+
+four-insurances:
+  default:
+    text: "4대보험 더 알아보기"
+    links:
+      - label: "4대보험 요율 가이드"
+        href: "/blog/four-insurance-rates-2025/"
+      - label: "전체 계산기"
+        href: "/"
+    analytics: "cta_fi_default"
+  rules:
+    - condition: "outputs.total > 0"
+      text: "4대보험료를 계산했습니다"
+      links:
+        - label: "연말정산도 계산해 보기"
+          href: "../연말정산_환급액_계산기/"
+        - label: "4대보험 가이드"
+          href: "/blog/four-insurance-rates-2025/"
+      analytics: "cta_fi_result"
+
+연말정산_환급액_계산기:
+  default:
+    text: "절세 방법이 궁금하다면"
+    links:
+      - label: "연말정산 공제 가이드"
+        href: "/blog/yearend-tax-refund-maximize/"
+      - label: "전체 계산기"
+        href: "/"
+    analytics: "cta_yt_default"
+  rules:
+    - condition: "outputs.estimated_refund > 0"
+      text: "환급금이 예상됩니다! 공제 항목을 더 챙겨 보세요"
+      links:
+        - label: "환급 극대화 전략"
+          href: "/blog/yearend-tax-refund-maximize/"
+        - label: "간소화서비스 이용법"
+          href: "/blog/yearend-tax-simplified-service/"
+      analytics: "cta_yt_refund"
+    - condition: "outputs.estimated_refund < 0"
+      text: "추가납부가 예상됩니다. 공제 항목을 확인하세요"
+      links:
+        - label: "공제 항목 총정리"
+          href: "/blog/yearend-tax-refund-maximize/"
+        - label: "전체 계산기"
+          href: "/"
+      analytics: "cta_yt_additional"
+
+육아휴직_급여_계산기:
+  default:
+    text: "육아휴직 관련 정보"
+    links:
+      - label: "6+6 특례 자세히 보기"
+        href: "/blog/6plus6-parental-leave-guide/"
+      - label: "전체 계산기"
+        href: "/"
+    analytics: "cta_pl_default"
+  rules:
+    - condition: "outputs.monthly_allowance > 0"
+      text: "육아휴직 급여를 받을 수 있습니다"
+      links:
+        - label: "신청 절차 안내"
+          href: "/blog/parental-leave-benefit-apply/"
+        - label: "6+6 특례 알아보기"
+          href: "/blog/6plus6-parental-leave-guide/"
+      analytics: "cta_pl_eligible"
+    - condition: "outputs.monthly_allowance === 0"
+      text: "피보험단위기간 180일 이상이어야 합니다"
+      links:
+        - label: "수급 조건 자세히 보기"
+          href: "/blog/parental-leave-benefit-apply/"
+        - label: "전체 계산기"
+          href: "/"
+      analytics: "cta_pl_ineligible"

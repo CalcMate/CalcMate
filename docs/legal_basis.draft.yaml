@@ -41,7 +41,7 @@ weekly-holiday-allowance:
   field_labels: {}
   difficulty: simple
   difficulty_status: provisional
-  needs_human_legal: true
+  needs_human_legal: false
   content:
     evergreen: true
     update_cycle: null
@@ -100,7 +100,7 @@ severance-pay:
   field_labels: {}
   difficulty: date_based
   difficulty_status: provisional
-  needs_human_legal: true
+  needs_human_legal: false
   content:
     evergreen: true
     update_cycle: null
@@ -138,7 +138,7 @@ annual-leave-allowance:
   field_labels: {}
   difficulty: simple
   difficulty_status: provisional
-  needs_human_legal: true
+  needs_human_legal: false
   content:
     evergreen: true
     update_cycle: null
@@ -188,7 +188,7 @@ unemployment-benefit:
   field_labels: {}
   difficulty: complex
   difficulty_status: provisional
-  needs_human_legal: true
+  needs_human_legal: false
   content:
     evergreen: true
     update_cycle: null
@@ -254,7 +254,7 @@ four-insurances:
   field_labels: {}
   difficulty: multi_output
   difficulty_status: provisional
-  needs_human_legal: true
+  needs_human_legal: false
   content:
     evergreen: false          # 요율(국민연금 4.5%/건강 3.545%/고용 0.9%)이 formula에 하드코딩 → 연 1회 갱신 필요
     update_cycle: yearly
@@ -313,7 +313,7 @@ four-insurances:
   field_labels: {}
   difficulty: simple
   difficulty_status: provisional
-  needs_human_legal: true
+  needs_human_legal: false
   content:
     evergreen: false          # 세율·공제율(4대보험 포함) 연 1회 갱신 필요
     update_cycle: yearly
@@ -390,7 +390,7 @@ four-insurances:
   field_labels: {}
   difficulty: simple
   difficulty_status: provisional
-  needs_human_legal: true
+  needs_human_legal: false
   content:
     evergreen: true           # %기반이라 특정연도 금액 미하드코딩 — 상한·하한만 시행령 연동(본문에서 금액 미언급)
     update_cycle: null

@@ -19,44 +19,55 @@
   </header>
 
   <!-- ② 계산 입력 -->
-  <section class="sm-card">
+  <section class="sm-card" aria-label="계산 입력">
     <h2 class="sm-card-title">계산 입력</h2>
     {{FORM_FIELDS}}
-    <button class="sm-btn" onclick="calculate()">{{CALC_BTN}}</button>
+    <button class="sm-btn" type="button" onclick="calculate()">{{CALC_BTN}}</button>
   </section>
 
-  <!-- ④ 결과 카드 -->
-  <div class="sm-result-card" id="result-card">
+  <!-- ③ 결과 카드 -->
+  <div class="sm-result-card" id="result-card" role="region" aria-label="계산 결과" aria-live="polite">
     <div class="sm-result-label">{{RESULT_LABEL}}</div>
     <div>
       <span class="sm-result-value" id="out_{{PRIMARY_OUT}}">-</span>
       <span class="sm-result-unit">{{RESULT_UNIT}}</span>
     </div>
     <div class="sm-result-sub" id="result-formula"></div>
+    <!-- ③-CTA: 결과 하단 CTA (정적, Phase D에서 개인화) -->
+    {{RESULT_CTA}}
   </div>
 
-  <!-- ⑤ 결과 액션 버튼 (계산 후에만 표시) -->
+  <!-- ④ 결과 액션 버튼 (계산 후에만 표시) -->
   <div class="sm-result-actions" id="result-actions">
-    <button class="sm-action-btn" data-action="result_save" onclick="saveResultPng()">
-      <span class="sm-action-icon">📄</span>결과 저장
+    <button class="sm-action-btn" type="button" data-action="result_save" onclick="saveResultPng()">
+      <span class="sm-action-icon" aria-hidden="true">📄</span>결과 저장
     </button>
-    <button class="sm-action-btn" data-action="share" onclick="kakaoShare()">
-      <span class="sm-action-icon">💬</span>카카오 공유
+    <button class="sm-action-btn" type="button" data-action="share" onclick="kakaoShare()">
+      <span class="sm-action-icon" aria-hidden="true">💬</span>카카오 공유
     </button>
-    <button class="sm-action-btn" data-action="pwa" id="pwa-btn" onclick="pwaInstall()">
-      <span class="sm-action-icon">📱</span>홈 화면 추가
+    <button class="sm-action-btn" type="button" data-action="pwa" id="pwa-btn" onclick="pwaInstall()">
+      <span class="sm-action-icon" aria-hidden="true">📱</span>홈 화면 추가
     </button>
   </div>
 
-  <!-- ⑥ 계산 상세 (결과 항목 수만큼 자동 생성) -->
-  <section class="sm-card" id="detail-card" style="display:none">
+  <!-- ⑤ Notices: 계산 결과 안내 메시지 (JS가 동적으로 채움) -->
+  <div class="sm-notices" id="notices-container" role="status" aria-label="계산 결과 안내"></div>
+
+  <!-- ⑥ 계산 과정 보기 (Phase C: step accordion, JS가 채움) -->
+  <section class="sm-card" id="steps-card" style="display:none" aria-label="계산 과정">
+    <h2 class="sm-card-title">계산 과정 보기</h2>
+    <div id="steps-list"></div>
+  </section>
+
+  <!-- ⑦ 기존 계산 상세 (steps-card 없는 계산기 폴백) -->
+  <section class="sm-card" id="detail-card" style="display:none" aria-label="계산 상세">
     <h2 class="sm-card-title">계산 상세</h2>
     <div id="detail-rows"></div>
   </section>
 
-  <!-- ⑦ 안내사항 -->
-  <div class="sm-notice">
-    <span class="sm-notice-icon">⚠️</span>
+  <!-- ⑧ 안내사항 -->
+  <div class="sm-notice" role="note">
+    <span class="sm-notice-icon" aria-hidden="true">⚠️</span>
     <span>{{NOTICE}}</span>
   </div>
 
@@ -64,13 +75,19 @@
 
 {{ARTICLE_SECTION}}
 
+{{INLINE_CTA}}
+
 {{CPA_SLOT}}
 
 {{FAQ_SECTION}}
 
 {{RELATED_SECTION}}
 
-  <!-- ⑪ Footer -->
+{{RELATED_POSTS_SECTION}}
+
+{{FOOTER_CTA}}
+
+  <!-- ⑫ Footer -->
   <footer class="sm-foot">
     본 계산기는 참고용이며 실제 지급액과 다를 수 있습니다.<br>
     Powered by SalaryMate
@@ -80,7 +97,7 @@
 
 <!-- Mobile Fixed CTA -->
 <div class="sm-mobile-cta">
-  <button class="sm-btn" onclick="calculate();setTimeout(function(){var c=document.getElementById('result-card');if(c)c.scrollIntoView({behavior:'smooth',block:'center'});},100)">
+  <button class="sm-btn" type="button" onclick="calculate();setTimeout(function(){var c=document.getElementById('result-card');if(c)c.scrollIntoView({behavior:'smooth',block:'center'});},100)">
     지금 계산하기
   </button>
 </div>

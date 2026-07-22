@@ -1,0 +1,126 @@
+# placeholder_schemas.yaml — 계산기별 article_content 플레이스홀더 화이트리스트
+# 구조: {slug}.{variable}: {expose, formatter, fallback}
+# expose: true = 사용자 화면 노출 허용 / false = 민감정보, 절대 노출 금지
+# formatter: currency | number | date | text
+# fallback: 값 미입력(초기 화면) 시 표시할 예시 문구
+#
+# 빌드 규칙 (3분기):
+#   변수 존재 + 값 있음 → 값 치환
+#   변수 존재 + 값 없음 → fallback 표시
+#   변수 미정의(스키마 없음) → 빌드 오류 로그 + PLACEHOLDER_ERROR 마킹
+#   변수 expose:false → 빌드 오류 (민감정보 노출 차단)
+
+weekly-holiday-allowance:
+  hourly_wage:
+    expose: true
+    formatter: currency
+    fallback: "시급"
+  weekly_hours:
+    expose: true
+    formatter: number
+    fallback: "주당 근로시간"
+  weekly_holiday_pay:
+    expose: true
+    formatter: currency
+    fallback: "예상 주휴수당"
+
+severance-pay:
+  avg_monthly_wage:
+    expose: true
+    formatter: currency
+    fallback: "평균 월임금"
+  severance_pay:
+    expose: true
+    formatter: currency
+    fallback: "예상 퇴직금"
+
+annual-leave-allowance:
+  daily_wage:
+    expose: true
+    formatter: currency
+    fallback: "일급"
+  unused_days:
+    expose: true
+    formatter: number
+    fallback: "미사용 연차"
+  annual_leave_allowance:
+    expose: true
+    formatter: currency
+    fallback: "예상 연차수당"
+
+unemployment-benefit:
+  avg_daily_wage:
+    expose: true
+    formatter: currency
+    fallback: "평균 일임금"
+  employment_months:
+    expose: true
+    formatter: number
+    fallback: "고용 개월수"
+  daily_benefit:
+    expose: true
+    formatter: currency
+    fallback: "1일 구직급여"
+  total_benefit:
+    expose: true
+    formatter: currency
+    fallback: "예상 총 구직급여"
+
+four-insurances:
+  monthly_salary:
+    expose: true
+    formatter: currency
+    fallback: "월급여"
+  total:
+    expose: true
+    formatter: currency
+    fallback: "예상 4대보험 합계"
+  national_pension:
+    expose: true
+    formatter: currency
+    fallback: "국민연금"
+  health_insurance:
+    expose: true
+    formatter: currency
+    fallback: "건강보험"
+  employment_insurance:
+    expose: true
+    formatter: currency
+    fallback: "고용보험"
+
+연말정산_환급액_계산기:
+  total_salary:
+    expose: true
+    formatter: currency
+    fallback: "총급여"
+  family_count:
+    expose: true
+    formatter: number
+    fallback: "부양가족 수"
+  paid_tax:
+    expose: true
+    formatter: currency
+    fallback: "기납부세액"
+  estimated_refund:
+    expose: true
+    formatter: currency_signed
+    fallback: "예상 환급액"
+  # 민감정보 예시 — expose: false
+  resident_id:
+    expose: false
+    formatter: text
+    fallback: ""
+
+육아휴직_급여_계산기:
+  monthly_wage:
+    expose: true
+    formatter: currency
+    fallback: "통상임금"
+  leave_month:
+    expose: true
+    formatter: number
+    fallback: "육아휴직 개월차"
+  monthly_allowance:
+    expose: true
+    formatter: currency
+    fallback: "예상 육아휴직 급여"
