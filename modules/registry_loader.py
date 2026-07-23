@@ -1,20 +1,20 @@
 # -*- coding: utf-8 -*-
-"""modules/registry_loader.py — calculator_registry 통합 로더 (작업지시서 E §1)
+"""modules/registry_loader.py — calculator_registry 통합 로더 (RMS G-1)
 
 두 소스를 merge해서 slug→entry dict 반환:
-  - docs/legal_basis.draft.yaml : 사람 큐레이션(검증된 legal). 코드가 쓰지 않음(읽기 전용). **우선**.
-  - docs/registry_auto.yaml      : App Factory(save_app)가 자동생성. 사람이 직접 편집하지 않음.
+  - docs/legal_basis.master.yaml : RMS 승인 완료(계산기가 실제로 읽는 파일). **우선**.
+  - docs/registry_auto.yaml       : App Factory(save_app)가 자동생성. 사람이 직접 편집하지 않음.
 
-동일 slug가 양쪽에 있으면 **큐레이션(legal_basis.draft.yaml)이 항상 우선**.
-→ 사람이 자동엔트리를 정식 검증해 legal_basis.draft.yaml로 "승격"하면 그게 최종본이 되고,
-   registry_auto.yaml의 임시 엔트리는 자동으로 무시됨.
+동일 slug가 양쪽에 있으면 **master(legal_basis.master.yaml)가 항상 우선**.
+→ 법령 변경은 반드시 rms_promote.py 워크플로(DETECTED→DRAFT→APPROVED→PROMOTED)를 통해서만
+  master.yaml에 반영됨. draft.yaml을 직접 수정해도 계산기에 반영되지 않음.
 
 app_generator / calculator_pipeline / publish_quality 세 로더가 이 함수에 위임(단일 소스).
 """
 from pathlib import Path
 
 _BASE = Path(__file__).resolve().parent.parent
-_CURATED_PATH = _BASE / "docs" / "legal_basis.draft.yaml"
+_CURATED_PATH = _BASE / "docs" / "legal_basis.master.yaml"
 _AUTO_PATH = _BASE / "docs" / "registry_auto.yaml"
 
 _cache = None
@@ -119,12 +119,12 @@ def calculator_name(slug: str) -> str:
 
 
 _AUTO_HEADER = (
-    "# registry_auto.yaml — App Factory 자동생성 계산기 registry (작업지시서 E §1)\n"
+    "# registry_auto.yaml — App Factory 자동생성 계산기 registry (RMS G-1)\n"
     "#\n"
     "# ⚠️ 이 파일은 App Factory(modules/app_factory.save_app)가 자동으로 씁니다. 사람이 직접 편집하지 마세요.\n"
     "# 자동생성 엔트리는 legal(law/article/authority 등) 전부 null + needs_human_legal: true 입니다.\n"
-    "# 정식 legal 검증이 끝나면 해당 slug를 docs/legal_basis.draft.yaml 로 '승격'해서 옮겨 적으세요\n"
-    "# (동일 slug는 legal_basis.draft.yaml 이 우선하므로, 승격 후 이 파일의 항목은 자동으로 무시됩니다).\n"
+    "# 정식 legal 검증이 끝나면 rms_promote.py 워크플로를 통해 docs/legal_basis.master.yaml 에 승격하세요\n"
+    "# (동일 slug는 master.yaml 이 우선하므로, 승격 후 이 파일의 항목은 자동으로 무시됩니다).\n"
 )
 
 
