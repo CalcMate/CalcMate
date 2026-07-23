@@ -140,7 +140,7 @@ _BASE_DIR = Path(__file__).resolve().parent.parent
 _TPL_V2 = _BASE_DIR / "templates" / "calculators" / "calculator_v2.html"
 _ASSETS = _BASE_DIR / "templates" / "calculators" / "assets"
 # components.js는 init을 실행하므로 마지막(다른 모듈 정의 후)
-_JS_ORDER = ["number_input.js", "result_save.js", "share.js", "pwa.js",
+_JS_ORDER = ["analytics.js", "number_input.js", "result_save.js", "share.js", "pwa.js",
              "faq.js", "related.js", "components.js"]
 # ── calculator_registry (legal_basis.draft.yaml + registry_auto.yaml, schema_version 2) ────
 # Phase D: registry가 유일 소스(관련계산기/compute 분기의 하드코딩 폴백은 제거됨).
@@ -278,7 +278,8 @@ def _sm_config(calc, cfg) -> dict:
     flags = _show_flags(cfg)
     return {
         # 기능(계산/렌더용)
-        "name": calc.get("name", "계산기"), "primaryOutput": primary,
+        "name": calc.get("name", "계산기"), "slug": str(calc.get("slug", "")),
+        "primaryOutput": primary,
         "resultUnit": (outputs[0]["unit"] if outputs else "원"),
         "inputs": inputs, "outputs": outputs,
         # 노출 플래그(flat, 대시보드 설정 연동) — _show_flags 단일 소스
@@ -298,6 +299,7 @@ def _sm_config(calc, cfg) -> dict:
         "kakao_js_key": str(c.get("KAKAO_JS_KEY", "")),
         "calculator_version": str(c.get("CALCULATOR_VERSION", "2.0.0")),
         "law_version": str(c.get("LAW_VERSION", "2026-07")),
+        "ga4_id": str(c.get("GA4_MEASUREMENT_ID", "")),
     }
 
 
@@ -1139,6 +1141,176 @@ def _dynamic_faq_js(calc: dict) -> str:
     return f"window.SM_DYNAMIC_FAQ = {json.dumps(items, ensure_ascii=False)};\n"
 
 
+# ── Phase E: SEO · Analytics · 수익화 ────────────────────────────────────────
+
+# E-1/E-4 내부링크: 계산기 키워드 → (상대 href, 앵커 텍스트 변형 리스트)
+_INTERNAL_LINK_MAP = {
+    "weekly-holiday-allowance": (
+        "../weekly-holiday-allowance/",
+        ["주휴수당 계산기", "주휴수당 계산", "주휴수당 자동 계산"],
+    ),
+    "severance-pay": (
+        "../severance-pay/",
+        ["퇴직금 계산기", "퇴직금 계산", "퇴직금 자동 산정"],
+    ),
+    "annual-leave-allowance": (
+        "../annual-leave-allowance/",
+        ["연차수당 계산기", "연차수당 계산", "연차수당 자동 산정"],
+    ),
+    "unemployment-benefit": (
+        "../unemployment-benefit/",
+        ["실업급여 계산기", "구직급여 계산", "실업급여 자동 계산"],
+    ),
+    "four-insurances": (
+        "../four-insurances/",
+        ["4대보험 계산기", "4대보험료 계산", "4대보험 자동 계산"],
+    ),
+    "연말정산_환급액_계산기": (
+        "../연말정산_환급액_계산기/",
+        ["연말정산 계산기", "연말정산 환급액 계산", "연말정산 시뮬레이션"],
+    ),
+    "육아휴직_급여_계산기": (
+        "../육아휴직_급여_계산기/",
+        ["육아휴직 급여 계산기", "육아휴직 급여 계산", "육아휴직 급여 시뮬레이션"],
+    ),
+}
+
+# 키워드 → slug 매핑 (길이 내림차순: 긴 키워드 우선 매칭)
+_KW_SLUG = [
+    ("주휴수당", "weekly-holiday-allowance"),
+    ("연차수당", "annual-leave-allowance"),
+    ("실업급여", "unemployment-benefit"),
+    ("구직급여", "unemployment-benefit"),
+    ("4대보험", "four-insurances"),
+    ("연말정산", "연말정산_환급액_계산기"),
+    ("육아휴직", "육아휴직_급여_계산기"),
+    ("퇴직금", "severance-pay"),
+]
+
+# 앵커 텍스트 다양화: 소스 계산기 인덱스 기반 회전
+_SLUG_ORDER = [k for k in _INTERNAL_LINK_MAP]
+
+
+def _auto_internal_links(html: str, cur_slug: str) -> str:
+    """article_content HTML에서 자매 계산기 첫 출현 키워드를 내부링크로 변환.
+
+    규칙:
+      - 현재 계산기 자기 자신 제외
+      - 각 타겟 계산기는 첫 출현만 링크 (중복 방지)
+      - 기존 <a>…</a> 내부 텍스트는 건드리지 않음
+      - 앵커 텍스트는 소스 슬러그 인덱스 기반으로 다양화
+    """
+    src_idx = _SLUG_ORDER.index(cur_slug) if cur_slug in _SLUG_ORDER else 0
+    linked: set = set()
+    in_anchor = 0
+
+    tokens = re.split(r'(<[^>]+>)', html)
+    result = []
+    for token in tokens:
+        if token.startswith('<'):
+            tag_lower = token.lower().lstrip('<').split()[0] if token.lstrip('<') else ''
+            if tag_lower == 'a':
+                in_anchor += 1
+            elif tag_lower == '/a':
+                in_anchor = max(0, in_anchor - 1)
+            result.append(token)
+        elif in_anchor > 0:
+            result.append(token)
+        else:
+            for kw, slug in _KW_SLUG:
+                if slug == cur_slug or slug in linked or kw not in token:
+                    continue
+                href, variants = _INTERNAL_LINK_MAP[slug]
+                anchor = _html.escape(variants[src_idx % len(variants)])
+                linked.add(slug)
+                token = token.replace(
+                    kw,
+                    f'<a href="{_html.escape(href)}" class="sm-internal-link">{anchor}</a>',
+                    1,
+                )
+            result.append(token)
+    return "".join(result)
+
+
+def _render_ga4_script(cfg: dict = None) -> str:
+    """E-1: GA4 gtag.js 스크립트 블록. GA4_MEASUREMENT_ID 미설정 시 빈 문자열."""
+    ga4_id = str((cfg or {}).get("GA4_MEASUREMENT_ID", ""))
+    if not ga4_id:
+        return ""
+    return (
+        f'<script async src="https://www.googletagmanager.com/gtag/js?id={_html.escape(ga4_id)}"></script>\n'
+        f'<script>window.dataLayer=window.dataLayer||[];'
+        f'function gtag(){{dataLayer.push(arguments);}}'
+        f'gtag("js",new Date());gtag("config","{_html.escape(ga4_id)}");</script>'
+    )
+
+
+def render_json_ld(calc: dict, cfg: dict = None) -> str:
+    """E-3: JSON-LD 구조화 데이터 (FAQPage + Organization + BreadcrumbList).
+    Rich Results Test 통과 기준으로 생성."""
+    site_url = str((cfg or {}).get("SITE_URL", "https://salarymate.github.io"))
+    slug = str(calc.get("slug", ""))
+    name = calc.get("name", "계산기")
+    category = calc.get("category", "계산기")
+    faq = _pj(calc.get("faq"), [])
+
+    schemas = []
+
+    # ① FAQPage (FAQ 항목이 있을 때만)
+    if isinstance(faq, list) and faq:
+        entities = []
+        for f in faq:
+            if not isinstance(f, dict):
+                continue
+            q = str(f.get("question", f.get("q", "")))
+            a = str(f.get("answer",   f.get("a", "")))
+            if q and a:
+                entities.append({"@type": "Question", "name": q,
+                                  "acceptedAnswer": {"@type": "Answer", "text": a}})
+        if entities:
+            schemas.append({"@context": "https://schema.org", "@type": "FAQPage",
+                             "mainEntity": entities})
+
+    # ② Organization
+    schemas.append({
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "SalaryMate",
+        "url": site_url,
+        "description": "급여·노무 계산기 모음 — 퇴직금·주휴수당·실업급여·4대보험·연말정산·육아휴직",
+    })
+
+    # ③ BreadcrumbList
+    calc_url = f"{site_url.rstrip('/')}/{slug}/"
+    schemas.append({
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {"@type": "ListItem", "position": 1, "name": "SalaryMate", "item": site_url},
+            {"@type": "ListItem", "position": 2, "name": category,
+             "item": f"{site_url}/#calculators"},
+            {"@type": "ListItem", "position": 3, "name": name, "item": calc_url},
+        ],
+    })
+
+    blocks = []
+    for schema in schemas:
+        blocks.append(
+            '<script type="application/ld+json">\n'
+            + json.dumps(schema, ensure_ascii=False, indent=2)
+            + '\n</script>'
+        )
+    return "\n".join(blocks)
+
+
+def render_adsense_slot_2(cfg: dict = None) -> str:
+    """E-6: 2번째 AdSense 슬롯 — 관련글/관련계산기 이후(페이지 하단). CLS 방지 min-height 확보."""
+    if not _show_flags(cfg)["show_adsense"]:
+        return ""
+    return ('  <!-- [광고 슬롯 2 — 페이지 하단, E-6 배치 최적화] -->\n'
+            '  <div class="sm-adsense sm-adsense-2"><!-- 애드센스 승인 후 활성화 --></div>')
+
+
 def render_article(calc: dict, cfg: dict = None) -> str:
     if not _show_flags(cfg)["show_article"]:
         return ""
@@ -1149,6 +1321,8 @@ def render_article(calc: dict, cfg: dict = None) -> str:
         or f"<h2>{_html.escape(name)}</h2><p>{_html.escape(desc)}</p>"
     # Phase D-1/D-2: {variable} → <span data-ph> 변환 (빌드 시 유효성 검증 포함)
     article = _apply_article_placeholders(article, slug)
+    # E-4: 자매 계산기 내부링크 자동화 + 앵커 텍스트 다양화
+    article = _auto_internal_links(article, slug)
     return ('  <!-- ⑧ 본문 -->\n'
             '  <section class="sm-card sm-article">\n'
             f'    {article}\n'
@@ -1313,6 +1487,10 @@ def generate_html(calc: dict, cfg: dict = None) -> str:
         "INLINE_CTA": render_inline_cta(calc, cfg),
         "RELATED_POSTS_SECTION": render_related_posts(calc, cfg),
         "FOOTER_CTA": render_footer_cta(calc, cfg),
+        # Phase E 추가
+        "GA4_SCRIPT": _render_ga4_script(cfg),
+        "JSON_LD": render_json_ld(calc, cfg),
+        "ADSENSE_SLOT_2": render_adsense_slot_2(cfg),
         "SM_CONFIG": json.dumps(_sm_config(calc, cfg), ensure_ascii=False),
     }
     if _TPL_V2.exists():

@@ -9,6 +9,10 @@
     btn.setAttribute("aria-expanded", isOpen ? "true" : "false");
     var ans = item.querySelector(".sm-faq-a");
     if (ans) ans.hidden = !isOpen;
+    // E-1: faq_open 이벤트 (열릴 때만)
+    if (isOpen && w.smTrack) {
+      w.smTrack("faq_open", { q: (btn.textContent || "").trim().replace(/[+−]/g, "").trim() });
+    }
   };
 
   function initFaqAria() {

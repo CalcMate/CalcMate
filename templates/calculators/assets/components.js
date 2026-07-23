@@ -140,6 +140,11 @@
     // Phase D-4: 동적 FAQ 삽입
     renderDynamicFaq(inputs, outputs);
 
+    // E-1: result_view 이벤트
+    if (w.smTrack) {
+      w.smTrack("result_view", { primary_key: primary, primary_value: pv });
+    }
+
     // 기존 계산 상세 (detail-card) — steps-card와 중복 방지: steps-card 있으면 detail-card 숨김
     if (!d.getElementById("steps-card")) {
       var rows = [];
@@ -244,8 +249,16 @@
     }).join("");
   }
 
+  // E-1: calculate 호출 횟수 (retry 감지)
+  var _calcCount = 0;
+
   // 공통 계산 진입점 — 계산기별 computeResult(inputs)만 교체하면 재사용
   function calculate() {
+    _calcCount++;
+    // E-1: calculator_submit (첫 번째) / retry_calculation (2번째~)
+    if (w.smTrack) {
+      w.smTrack(_calcCount > 1 ? "retry_calculation" : "calculator_submit", {});
+    }
     var inputs = collectInputs();
     var outputs;
     try {

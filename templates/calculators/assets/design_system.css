@@ -251,3 +251,33 @@ body{font-family:-apple-system,'Apple SD Gothic Neo','Pretendard','Noto Sans KR'
 
 /* 모바일 관련 계산기 1열 (작은 화면) */
 @media(max-width: 400px) { .sm-related-grid { grid-template-columns: 1fr; } }
+
+/* ── Phase E-5: Core Web Vitals — CLS 방지 ── */
+/* 동적 콘텐츠 영역 최소 높이 예약 (계산 전 빈 상태에서 레이아웃 이동 방지) */
+#sm-result-cta { min-height: 72px; }
+#sm-dynamic-faq { min-height: 0; }
+/* 이미지 크기 명시 (기본값) */
+.sm-article img { max-width: 100%; height: auto; }
+
+/* ── Phase E-6: AdSense 배치 최적화 ── */
+/* 슬롯 높이 예약 — CLS 방지, 승인 전에는 배경색으로 처리 */
+.sm-adsense {
+  min-height: 100px;
+  background: var(--c-bg);
+  border-radius: var(--r-card);
+  margin-bottom: var(--sp-2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: var(--c-text-light);
+}
+.sm-adsense-2 {
+  min-height: 90px;
+}
+
+/* ── Phase E-4: 내부링크 스타일 ── */
+.sm-internal-link {
+  color: var(--c-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-weight: 500;
+}
+.sm-internal-link:hover { color: var(--c-primary-dark); }

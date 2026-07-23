@@ -11,6 +11,10 @@
 #   변수 expose:false → 빌드 오류 (민감정보 노출 차단)
 
 weekly-holiday-allowance:
+  cta_variant:
+    expose: true
+    formatter: text
+    fallback: "A"
   hourly_wage:
     expose: true
     formatter: currency
@@ -25,6 +29,10 @@ weekly-holiday-allowance:
     fallback: "예상 주휴수당"
 
 severance-pay:
+  cta_variant:
+    expose: true
+    formatter: text
+    fallback: "A"
   avg_monthly_wage:
     expose: true
     formatter: currency
@@ -35,6 +43,10 @@ severance-pay:
     fallback: "예상 퇴직금"
 
 annual-leave-allowance:
+  cta_variant:
+    expose: true
+    formatter: text
+    fallback: "A"
   daily_wage:
     expose: true
     formatter: currency
@@ -49,6 +61,10 @@ annual-leave-allowance:
     fallback: "예상 연차수당"
 
 unemployment-benefit:
+  cta_variant:
+    expose: true
+    formatter: text
+    fallback: "A"
   avg_daily_wage:
     expose: true
     formatter: currency
@@ -67,6 +83,10 @@ unemployment-benefit:
     fallback: "예상 총 구직급여"
 
 four-insurances:
+  cta_variant:
+    expose: true
+    formatter: text
+    fallback: "A"
   monthly_salary:
     expose: true
     formatter: currency
@@ -89,6 +109,10 @@ four-insurances:
     fallback: "고용보험"
 
 연말정산_환급액_계산기:
+  cta_variant:
+    expose: true
+    formatter: text
+    fallback: "A"
   total_salary:
     expose: true
     formatter: currency
@@ -112,6 +136,10 @@ four-insurances:
     fallback: ""
 
 육아휴직_급여_계산기:
+  cta_variant:
+    expose: true
+    formatter: text
+    fallback: "A"
   monthly_wage:
     expose: true
     formatter: currency
