@@ -28,17 +28,15 @@ def append_log(cfg: dict, log: dict):
     db = get_db_adapter(cfg)
     from datetime import datetime
     import uuid
+    # 키명을 실제 Sheets 운영로그 헤더와 1:1 일치시킴
     db.insert("logs", {
-        "로그ID":    log.get("로그ID", uuid.uuid4().hex[:8]),
-        "실행일시":  log.get("실행일시", datetime.now().isoformat()),
-        "마스터ID":  log.get("마스터ID", ""),
-        "대상정책명": log.get("대상 정책명", ""),
-        "가동결과":  log.get("가동 결과", ""),
-        "실패모듈":  log.get("실패 모듈명", ""),
-        "오류내용":  log.get("오류 원인 내용", ""),
-        "발행URL":   log.get("발행 URL (성공 시)", ""),
-        "소요시간":  str(log.get("총 소요시간(초)", "")),
-        "토큰합계":  str(log.get("사용 토큰 합계", "")),
+        "로그ID":                log.get("로그ID", uuid.uuid4().hex[:8]),
+        "실행일시":              log.get("실행일시", datetime.now().isoformat()),
+        "마스터ID":              log.get("마스터ID", ""),
+        "대상 정책명":           log.get("대상 정책명", ""),
+        "가동 결과 (성공/오류)": log.get("가동 결과", ""),
+        "실패 모듈명":           log.get("실패 모듈명", ""),
+        "오류 원인 내용":        log.get("오류 원인 내용", ""),
     })
 
 def get_all_posts(cfg: dict) -> list[dict]:
