@@ -15,5 +15,8 @@ def get_db_adapter(cfg: dict) -> AbstractDBAdapter:
     elif adapter_type == "postgres":
         from .postgres_adapter import PostgresAdapter
         return PostgresAdapter(cfg)
+    elif adapter_type == "dual":
+        from .dual_adapter import DualAdapter
+        return DualAdapter(cfg)
     else:
         raise ValueError(f"알 수 없는 DB_ADAPTER: {adapter_type}")
