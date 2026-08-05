@@ -1,26 +1,39 @@
 """
-telegram_notifier.py — 텔레그램 알림 발송
+modules/telegram_notifier.py — 텔레그램 알림 발송 (v12.1, cfg 참조 방식 수정)
 """
 import requests
 from .logger import get_logger
 
 LOG = get_logger()
 
+def _send_telegram(cfg: dict, message: str):
+    token = cfg.get('TELEGRAM_BOT_TOKEN')
+    chat_id = cfg.get('TELEGRAM_CHAT_ID')
+
+    if not token or not chat_id:
+        LOG.warning("Telegram configuration missing (TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID).")
+        return
+
+    try:
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        payload = {'chat_id': chat_id, 'text': f"[블로그자동화]\n{message}"}
+        response = requests.post(url, json=payload, timeout=10)
+        if not response.ok:
+            LOG.warning("Telegram API error (HTTP %s): %s", response.status_code, response.text[:200])
+    except Exception as e:
+        LOG.warning("Failed to send Telegram message: %s", e)
 
 def send(cfg: dict, message: str):
-    token = cfg.get("TELEGRAM_BOT_TOKEN", "")
-    chat_id = cfg.get("TELEGRAM_CHAT_ID", "")
-    if not token or not chat_id:
-        return
-    try:
-        resp = requests.post(
-            f"https://api.telegram.org/bot{token}/sendMessage",
-            json={"chat_id": chat_id, "text": f"[블로그자동화]\n{message}"},
-            timeout=5,
-        )
-        if not resp.ok:
-            LOG.error("텔레그램 발송 실패(HTTP %s): %s", resp.status_code, resp.text[:200])
-    except Exception as e:
-        # 알림 실패가 파이프라인을 막지 않도록 흡수하되, 원인은 반드시 기록
-        LOG.error("텔레그램 발송 실패(네트워크): %s", e,
-                  exc_info=(cfg.get("LOG_LEVEL", "INFO") == "DEBUG"))
+    _send_telegram(cfg, message)
+
+def send_message(cfg: dict, text: str):
+    _send_telegram(cfg, text)
+
+def send_success(cfg: dict, summary: str):
+    _send_telegram(cfg, f"✅ SUCCESS: {summary}")
+
+def send_failure(cfg: dict, summary: str):
+    _send_telegram(cfg, f"❌ FAILURE: {summary}")
+
+def send_warning(cfg: dict, summary: str):
+    _send_telegram(cfg, f"⚠️ WARNING: {summary}")

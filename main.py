@@ -27,7 +27,7 @@ import modules.image_generator as image_generator
 import modules.publisher as publisher
 import modules.sheet_sync as sheet_sync
 import modules.backup_manager as backup_manager
-import health_check
+from modules.utils import health_monitor as health_check
 
 LOG = get_logger("pipeline")
 DLQ_DIR = BASE / "data" / "dlq"
@@ -41,7 +41,10 @@ def parse_args():
     p.add_argument("--scheduler", action="store_true", help="슬롯 기반 발행 스케줄러 (오늘 일정대로 시각별 1건 발행)")
     p.add_argument("--instance", default=None, help="멀티 인스턴스 ID (config/instances/{id}/config.yaml 로드)")
     p.add_argument("--strategy-room", action="store_true", help="전략회의실 즉시 실행")
-    p.add_argument("--calculator", action="store_true", help="계산기 콘텐츠 파이프라인 1회 실행")
+    p.add_argument("--calculator-id", default=None, help="특정 계산기(ID)만 파이프라인 실행")
+    p.add_argument("--intent", default=None, help="특정 Intent(예: eligibility)만 실행")
+    p.add_argument("--allow-duplicate-draft", action="store_true", help="QA 모드에서 중복 Draft 생성 허용")
+    p.add_argument("--skip-quality-gate", action="store_true", help="QA 모드에서 품질 게이트 우회")
     p.add_argument("--seed-calculators", action="store_true", help="SalaryMate 초기 계산기/템플릿 시드 등록")
     p.add_argument("--reevaluate-hold", action="store_true",
                    help="품질보류 재평가 리포트(서명 변경으로 재도전 대상 집계). --apply로 즉시 재생성")
@@ -397,10 +400,15 @@ def main():
         print(json.dumps(seed_all(cfg), ensure_ascii=False))
         return
 
-    if args.calculator:
+    if args.calculator_id:
         from modules.calculator_pipeline import run_calculator_once
-        LOG.info("계산기 콘텐츠 파이프라인 실행")
-        print(json.dumps(run_calculator_once(cfg), ensure_ascii=False))
+        LOG.info("QA MODE: Target Calculator: %s | Intent: %s | Duplicate Draft: %s | Skip Quality Gate: %s", args.calculator_id, args.intent, args.allow_duplicate_draft, args.skip_quality_gate)
+        
+        # cfg에 intent 추가
+        cfg["intent"] = args.intent
+        
+        res = run_calculator_once(cfg, only_cid=args.calculator_id, allow_duplicate=args.allow_duplicate_draft, skip_quality=args.skip_quality_gate)
+        print(json.dumps(res, ensure_ascii=False, indent=2))
         return
 
     if args.reevaluate_hold:

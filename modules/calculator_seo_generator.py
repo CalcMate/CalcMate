@@ -51,8 +51,17 @@ def generate_meta_description(cfg: dict, calc: dict) -> str:
         return f"{base} 계산 방법과 기준을 확인하고 자동 계산기로 즉시 계산해보세요."
 
 
-def generate_seo(cfg: dict, name: str, keyword: str = "") -> dict:
+def generate_seo(cfg: dict, name: str, keyword: str = "", intent: str = None) -> dict:
     year = datetime.now().year
+    
+    # 2. 제목 생성 규칙 - eligibility intent일 경우
+    if intent == "eligibility":
+        base = name.replace("계산기", "").strip()
+        seo_title = f"{year} {base} 지급 조건은? 핵심 자격요건 쉽게 설명"
+    else:
+        # 기존 로직
+        seo_title = None
+
     system = ("너는 SEO 전문가다. 주어진 계산기/키워드에 대한 SEO 메타데이터를 작성하라. "
               "규칙: "
               "1) seo_title은 28~40자, 연도 포함. "
@@ -61,6 +70,7 @@ def generate_seo(cfg: dict, name: str, keyword: str = "") -> dict:
               "순수 JSON만 반환: "
               '{"seo_title":"","seo_description":"","seo_keywords":[]}')
     user = f"계산기명: {name}\n타겟 키워드: {keyword or name}\n연도: {year}"
+    
     try:
         provider, model = make_provider(cfg, "writer")
         text, tokens = provider.chat(system, user, model, max_tokens=500)
@@ -69,16 +79,21 @@ def generate_seo(cfg: dict, name: str, keyword: str = "") -> dict:
         except Exception as _e:
             LOG.warning("토큰 비용 기록/조회 실패: %s", _e)
         d = parse_json_lenient(text)
+        
+        # intent가 지정되었고 생성된 제목보다 규칙 제목이 우선되어야 한다면 덮어쓰기
+        final_title = seo_title if seo_title else d.get("seo_title", "")
+        
         return {
-            "seo_title": d.get("seo_title", "") or f"{year} {name} | 자동 계산",
+            "seo_title": final_title or f"{year} {name} | 자동 계산",
             "seo_description": d.get("seo_description", ""),
             "seo_keywords": d.get("seo_keywords", []),
         }
     except Exception as e:
         LOG.warning("SEO 생성 실패(%s) → 기본값: %s", name, e)
         base = name.replace("계산기", "").strip()
+        final_title = seo_title if seo_title else f"{year} {name} | 자동 계산"
         return {
-            "seo_title": f"{year} {name} | 자동 계산",
+            "seo_title": final_title,
             "seo_description": f"{base} 지급 기준과 계산 방법을 확인하고 자동 계산기를 이용해보세요.",
             "seo_keywords": [keyword or name, f"{base} 계산", f"{base} 계산법"],
         }

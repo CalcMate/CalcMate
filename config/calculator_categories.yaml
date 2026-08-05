@@ -1,0 +1,21 @@
+weekly-holiday-allowance:
+  categories: ["노동", "급여계산"]
+  tags: ["주휴수당", "급여계산", "알바"]
+unemployment-benefit:
+  categories: ["정부지원", "실업"]
+  tags: ["실업급여", "고용보험"]
+parental-leave-benefit:
+  categories: ["정부지원", "육아"]
+  tags: ["육아휴직", "급여계산", "정부지원"]
+four-insurances:
+  categories: ["노동", "보험"]
+  tags: ["4대보험", "급여계산"]
+severance-pay:
+  categories: ["노동", "급여계산"]
+  tags: ["퇴직금", "계산"]
+annual-leave-allowance:
+  categories: ["노동", "급여계산"]
+  tags: ["연차수당", "계산"]
+연말정산_환급액_계산기:
+  categories: ["세금", "연말정산"]
+  tags: ["연말정산", "환급"]

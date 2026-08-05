@@ -12,8 +12,9 @@ from . import calculator_prompt_manager as PM
 LOG = get_logger()
 
 _FALLBACK = {
-    "thumbnail": "Professional salary calculation dashboard, clean modern UI, "
-                 "Korean office worker, financial planning, soft lighting",
+    "thumbnail": "Minimalist vector illustration for financial calculator, clean flat design, "
+                 "professional icon style, soft colors, high quality, no text, no numbers, "
+                 "related to salary and working hours",
     "body": "Office workspace, calculator, salary report, business documents, "
             "natural light, realistic photography",
 }
@@ -22,6 +23,9 @@ _FALLBACK = {
 def _image_pair(cfg: dict, calc: dict) -> dict:
     """썸네일/본문 프롬프트 1회 생성. Gemini Flash 우선 → 실패 시 Writer."""
     system, user = PM.get_image_prompt(calc)
+    # 썸네일 프롬프트 보완: 풍경 금지, 일러스트/아이콘 스타일 강제
+    system += "\n[썸네일 규칙] 풍경 사진 절대 금지. 해당 계산기의 핵심 주제를 상징하는 현대적인 일러스트 또는 아이콘 스타일로 생성할 것."
+    
     for role in ("research", "writing"):   # research=Gemini Flash, writing=Writer
         try:
             provider, model = build_provider_for_role(role, cfg)

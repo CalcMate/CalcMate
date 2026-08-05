@@ -1,0 +1,9 @@
+wordpress:
+  url: "https://salarymate.test"
+  username: ""
+  app_password: ""
+  default_status:
+    PASS: draft
+    WARNING: draft
+    REWRITE: blocked
+    HOLD: blocked

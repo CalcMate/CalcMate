@@ -100,7 +100,8 @@ def _check_service_account(cfg) -> dict:
     try:
         import json as _json
         cred_file = cfg.get("GOOGLE_SERVICE_ACCOUNT_FILE", "credentials.json")
-        cred_path = Path(__file__).parent / cred_file
+        # 프로젝트 루트(modules/utils/.. -> ../..) 기준
+        cred_path = Path(__file__).resolve().parent.parent.parent / cred_file
         if not cred_path.exists():
             return {"status": "FAIL", "level": "CRITICAL",
                     "error": f"{cred_file} 파일이 없습니다. 마법사에서 업로드하세요."}

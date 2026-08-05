@@ -1,0 +1,18 @@
+[
+  {
+    "calculator": "weekly-holiday-allowance",
+    "category": "legal_question",
+    "question": "주휴수당의 법적 근거는 무엇인가요?",
+    "source_mapping": "근로기준법 제55조",
+    "answer": "주휴수당의 법적 근거는 근로기준법 제55조입니다.",
+    "validation": "PASS"
+  },
+  {
+    "calculator": "parental-leave-benefit",
+    "category": "calculation_logic",
+    "question": "6개월 이후 육아휴직 급여 계산은 어떻게 되나요?",
+    "source_mapping": "고용보험법 시행령 제95조",
+    "answer": "6개월과 7개월 이후의 급여 계산 조건은 다릅니다.",
+    "validation": "PASS"
+  }
+]

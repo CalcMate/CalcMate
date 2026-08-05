@@ -46,17 +46,24 @@ def load_secrets(config_path: str = None) -> dict:
 
 
 def merge_secrets(cfg: dict, config_path: str = None) -> dict:
-    """secrets.yaml의 최상위 scalar 키를 cfg에 병합(secrets 우선).
-    중첩 섹션(wordpress_profiles / ai_keys 등)은 cfg에 합치지 않음
-    (site_repository가 파일에서 직접 읽으므로 불필요)."""
+    """secrets.yaml의 내용을 cfg에 재귀적으로 병합(secrets 우선)."""
     if cfg is None:
         cfg = {}
     secrets = load_secrets(config_path)
-    for k, v in secrets.items():
-        if isinstance(v, (dict, list)):
-            continue  # 중첩 섹션은 제외
-        cfg[k] = v
-    return cfg
+
+    def deep_merge(source, destination):
+        for key, value in source.items():
+            if isinstance(value, dict):
+                node = destination.setdefault(key, {})
+                if isinstance(node, dict):
+                    deep_merge(value, node)
+                else:
+                    destination[key] = value
+            else:
+                destination[key] = value
+        return destination
+
+    return deep_merge(secrets, cfg)
 
 
 def save_secrets_flat(updates: dict, config_path: str = None):

@@ -150,3 +150,5 @@ v2.1 이월: 자녀세액공제(소득세법 제59조의2), 특별세액공제, 
 | 2026-07-22 | 7종 불변식 | 46 Invariant 테스트 신규 등록 (`tests/test_invariants.py`) — INV-1~9 |
 | 2026-07-22 | app_generator | `_js_open()`/`_js_close()`/`_js_read()`/`_js_init_out()` 공통 헬퍼 추출 (로직 변경 없음) |
 | 2026-07-22 | 통합 회귀 | 240 passed ALL PASS (178 → 240, 불변식+연차 테스트 추가) |
+
+- 테스트: Gemini CLI + Cline 연동 확인 완료 (2026-07-23)

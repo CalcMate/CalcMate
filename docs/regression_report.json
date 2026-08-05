@@ -1,0 +1,109 @@
+{
+  "generated_at": "2026-07-25T23:55:27",
+  "slug": "연말정산_환급액_계산기",
+  "affected": [
+    "연말정산_환급액_계산기",
+    "severance-pay",
+    "unemployment-benefit",
+    "육아휴직_급여_계산기",
+    "annual-leave-allowance",
+    "weekly-holiday-allowance",
+    "four-insurances"
+  ],
+  "passed": 0,
+  "failed": 0,
+  "result": "FAIL",
+  "total_elapsed_s": 9.92,
+  "suites": [
+    {
+      "label": "parental_leave",
+      "path": "tests/test_parental_leave_compute.py",
+      "passed": 0,
+      "failed": 0,
+      "returncode": 1,
+      "elapsed_s": 0.39,
+      "summary": "",
+      "stdout_tail": "C:\\Users\\????\\AppData\\Local\\Programs\\Python\\Python312\\python.exe: No module named pytest"
+    },
+    {
+      "label": "invariants",
+      "path": "tests/test_invariants.py",
+      "passed": 0,
+      "failed": 0,
+      "returncode": 1,
+      "elapsed_s": 0.22,
+      "summary": "",
+      "stdout_tail": "C:\\Users\\????\\AppData\\Local\\Programs\\Python\\Python312\\python.exe: No module named pytest"
+    },
+    {
+      "label": "income_tax",
+      "path": "tests/test_income_tax_compute.py",
+      "passed": 0,
+      "failed": 0,
+      "returncode": 1,
+      "elapsed_s": 0.17,
+      "summary": "",
+      "stdout_tail": "C:\\Users\\????\\AppData\\Local\\Programs\\Python\\Python312\\python.exe: No module named pytest"
+    },
+    {
+      "label": "annual_leave",
+      "path": "tests/test_annual_leave_compute.py",
+      "passed": 0,
+      "failed": 0,
+      "returncode": 1,
+      "elapsed_s": 0.15,
+      "summary": "",
+      "stdout_tail": "C:\\Users\\????\\AppData\\Local\\Programs\\Python\\Python312\\python.exe: No module named pytest"
+    },
+    {
+      "label": "severance",
+      "path": "tests/test_severance_compute.py",
+      "passed": 0,
+      "failed": 0,
+      "returncode": 1,
+      "elapsed_s": 0.14,
+      "summary": "",
+      "stdout_tail": "C:\\Users\\????\\AppData\\Local\\Programs\\Python\\Python312\\python.exe: No module named pytest"
+    },
+    {
+      "label": "weekly_holiday",
+      "path": "tests/test_weekly_holiday_compute.py",
+      "passed": 0,
+      "failed": 0,
+      "returncode": 1,
+      "elapsed_s": 0.11,
+      "summary": "",
+      "stdout_tail": "C:\\Users\\????\\AppData\\Local\\Programs\\Python\\Python312\\python.exe: No module named pytest"
+    },
+    {
+      "label": "unemployment",
+      "path": "tests/test_unemployment_benefit_compute.py",
+      "passed": 0,
+      "failed": 0,
+      "returncode": 1,
+      "elapsed_s": 0.28,
+      "summary": "",
+      "stdout_tail": "C:\\Users\\????\\AppData\\Local\\Programs\\Python\\Python312\\python.exe: No module named pytest"
+    },
+    {
+      "label": "four_insurances",
+      "path": "tests/test_four_insurances_compute.py",
+      "passed": 0,
+      "failed": 0,
+      "returncode": 1,
+      "elapsed_s": 0.12,
+      "summary": "",
+      "stdout_tail": "C:\\Users\\????\\AppData\\Local\\Programs\\Python\\Python312\\python.exe: No module named pytest"
+    },
+    {
+      "label": "snapshot",
+      "path": "tests/snapshot_calculators.py",
+      "passed": 0,
+      "failed": 0,
+      "returncode": 1,
+      "elapsed_s": 8.3,
+      "summary": "snapshot script FAIL",
+      "stdout_tail": ""
+    }
+  ]
+}

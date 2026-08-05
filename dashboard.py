@@ -31,7 +31,7 @@ if _needs_setup():
     st.stop()
 
 # ── 일반 대시보드 진입 ────────────────────────────────────────
-import health_check as hc_mod
+from modules.utils import health_monitor as hc_mod
 
 st.set_page_config(
     page_title="블로그자동화 v12 운영센터",

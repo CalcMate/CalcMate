@@ -1,0 +1,20 @@
+[
+  {
+    "calculator": "weekly-holiday-allowance",
+    "sample": "PASS",
+    "content": "서론 주휴수당은 중요합니다. 계산 방법은 시급*시간입니다. 계산 기준 15시간 이상입니다. 예시로 시급 10030원일 때 계산해보세요. 주의사항으로 15시간 미만은 안 됩니다. FAQ 자주 묻는 질문: 주휴수당 대상은? 출처 법령 제55조.",
+    "validation_result": "WARNING"
+  },
+  {
+    "calculator": "weekly-holiday-allowance",
+    "sample": "WARNING",
+    "content": "주휴수당 중요합니다. 계산하세요.",
+    "validation_result": "HOLD"
+  },
+  {
+    "calculator": "weekly-holiday-allowance",
+    "sample": "HOLD",
+    "content": "10시간 근무해도 주휴수당 받을 수 있습니다.",
+    "validation_result": "HOLD"
+  }
+]

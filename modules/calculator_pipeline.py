@@ -10,6 +10,7 @@ modules/calculator_pipeline.py — 계산기 콘텐츠 파이프라인 (v12.0)
 """
 import hashlib
 import json
+import re
 import time
 from datetime import datetime
 from pathlib import Path
@@ -21,9 +22,12 @@ from .collector.factory import get_collector
 from .ai_roles import make_provider
 from .calculator_seo_generator import generate_seo
 from .calculator_faq_generator import generate_faq
+from .calculator_image_prompt_generator import _image_pair
+from . import image_generator
 from .strategist_calculator import score_keywords
 from . import cleaner
 from . import publisher
+from . import content_quality
 from .logger import get_logger, BudgetTracker
 from . import telegram_ops as tops
 
@@ -212,9 +216,10 @@ def _resolve_context_block(calc: dict) -> str:
 
 
 def _write_article(cfg: dict, calc: dict, keyword: str, seo: dict, faq: list,
-                   failed_rules=None) -> tuple:
+                   failed_rules=None, intent: str = None) -> tuple:
     provider, model = make_provider(cfg, "writer")
-    # 정적 기본 프롬프트 + (config 금지문체) + (계산기별 검증 법적근거) + (resolve 계산근거 데이터) + (재생성 보완지시)
+    # calculator 엔진은 항상 고정 7-H2 템플릿 사용 — intent 분기 없음
+    # (eligibility/documents/howto 템플릿은 V2 블로그 엔진용으로 content/blog/ 에 예약됨)
     system = (_load_prompt() + _style_block(cfg) + _legal_basis_block(calc)
               + _resolve_context_block(calc) + _rewrite_block(failed_rules))
     user = (
@@ -231,12 +236,18 @@ def _write_article(cfg: dict, calc: dict, keyword: str, seo: dict, faq: list,
         BudgetTracker(cfg).record(model, tokens)
     except Exception as _e:
         LOG.warning("토큰 비용 기록/조회 실패: %s", _e)
-    return cleaner.parse_html_body(text), tokens
+    
+    # 본문에서 첫 번째 <h1> 제거 (워드프레스 제목과 중복 방지)
+    body = cleaner.parse_html_body(text)
+    body = re.sub(r'<h1>.*?</h1>', '', body, count=1, flags=re.IGNORECASE | re.DOTALL)
+    
+    return body, tokens
 
 
-def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None) -> dict:
+def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None, allow_duplicate: bool = False, skip_quality: bool = False, intent: str = None) -> dict:
     """활성 계산기 키워드로 SEO 글을 생산/발행. max_count 미지정 시 DAILY_POST_COUNT.
-    only_cid 지정 시 그 계산기 후보만 대상(재평가 재도전 등 특정 계산기만 재생성용)."""
+    only_cid 지정 시 그 계산기 후보만 대상(재평가 재도전 등 특정 계산기만 재생성용).
+    allow_duplicate: QA 전용. 중복 판정 건너뜀(새 Draft 생성용)."""
     start = time.time()
     budget = BudgetTracker(cfg)
     target = int(max_count if max_count is not None else cfg.get("DAILY_POST_COUNT", 1) or 1)
@@ -285,12 +296,17 @@ def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None) 
     # 계산기명이 제목에 포함되므로 계산기 간 제목 충돌 가능성 극히 낮음).
     # 같은 run 내 새 제목도 아래 루프에서 calc별로 추가되어 intra-run dedup도 유지.
     existing_by_calc: dict[str, set] = {}
-    for _r in snapshot:
-        if _r.get("상태값") == "발행완료":
-            _c = str(_r.get("calculator_id", "") or "")
-            _t = _r.get("최종추천제목", "") or ""
-            if _c and _t:
-                existing_by_calc.setdefault(_c, set()).add(_t)
+    
+    # QA 모드(allow_duplicate=True)라면 중복 판정을 건너뛴다.
+    if not allow_duplicate:
+        for _r in snapshot:
+            if _r.get("상태값") == "발행완료":
+                _c = str(_r.get("calculator_id", "") or "")
+                _t = _r.get("최종추천제목", "") or ""
+                if _c and _t:
+                    existing_by_calc.setdefault(_c, set()).add(_t)
+    else:
+        LOG.info("[QA MODE] 중복 판정(Duplicate Filter)을 건너뜁니다.")
 
     stats = {"produced": 0, "processed": 0, "failed": 0, "no_wp": 0, "dup": 0,
              "quality_hold": 0, "hold_skip": 0, "published": None}
@@ -301,6 +317,10 @@ def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None) 
     block_unverified = bool((cfg.get("QUALITY_GATE") or {}).get("BLOCK_UNVERIFIED_LEGAL", True))
     max_candidates = int(rcfg.get("MAX_CANDIDATES_PER_RUN", 5) or 5)
     reeval = bool((cfg.get("QUALITY_HOLD") or {}).get("REEVALUATE_ON_PROMPT_VERSION_CHANGE", True))
+
+    # intent 파라미터 우선순위: 전달받은 인자 > 설정 파일
+    intent = intent or cfg.get("intent") 
+
     attempted = 0   # 실제 생성까지 간 후보 수(AI 비용 기준 상한)
     for it in ranked:
         if stats["produced"] >= target:
@@ -378,7 +398,7 @@ def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None) 
                                      "quality_prompt_version": _LEGAL_HOLD_VERSION})
                     stats["quality_hold"] += 1
                     continue
-            seo = generate_seo(cfg, calc.get("name", keyword), keyword)
+            seo = generate_seo(cfg, calc.get("name", keyword), keyword, intent=intent)
             if seo.get("seo_title") in existing_by_calc.get(cid, set()):
                 stats["dup"] += 1
                 continue
@@ -426,10 +446,18 @@ def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None) 
 
             # 본문 생성 → 조립 → 품질검수(Gate→Score). REWRITE면 writer 전체재생성 재시도.
             from .publish_quality import check_publish_quality
-            body_html, _ = _write_article(cfg, calc, keyword, seo, faq)
+            LOG.info("_write_article intent=%s 호출", intent)
+            body_html, _ = _write_article(cfg, calc, keyword, seo, faq, intent=intent)
+            body_html = content_quality.improve_content(body_html)
             final_html = _assemble(body_html)
-            qc = check_publish_quality(cfg, body_html, final_html, calc,
-                                       link_pool_size=_link_pool_size)
+            
+            if skip_quality:
+                LOG.info("[QA MODE] 품질 검수(Quality Gate)를 건너뜁니다.")
+                qc = {"result": "PASS", "score": 100, "html": final_html}
+            else:
+                qc = check_publish_quality(cfg, body_html, final_html, calc,
+                                           link_pool_size=_link_pool_size)
+            
             max_total = int(rcfg.get("MAX_TOTAL_RETRY", 3) or 3)     # 총 재시도 하드상한(무한루프 방지)
             crit_limit = int(rcfg.get("CRITICAL_RETRY_LIMIT", 2) or 2)  # Critical 연속실패 임계
             q_retries, consec_critical, critical_exhausted = 0, 0, False
@@ -444,7 +472,8 @@ def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None) 
                          q_retries, max_total, keyword, qc.get("severity"))
                 # Rewrite Contract 주입: 직전 검수의 failed_rules를 우선순위 순으로 writer에 전달
                 body_html, _ = _write_article(cfg, calc, keyword, seo, faq,
-                                              failed_rules=qc.get("failed_rules"))
+                                              failed_rules=qc.get("failed_rules"), intent=intent)
+                body_html = content_quality.improve_content(body_html)
                 final_html = _assemble(body_html)
                 qc = check_publish_quality(cfg, body_html, final_html, calc,
                                            link_pool_size=_link_pool_size)
@@ -505,11 +534,21 @@ def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None) 
                 continue
 
             # PASS/WARN → 발행
-            pub = publisher.publish(datetime.now().strftime("%Y%m%d%H%M%S"),
+            post_id = datetime.now().strftime("%Y%m%d%H%M%S")
+            img_prompts = _image_pair(cfg, calc)
+            image_urls = image_generator.generate(post_id, {
+                **seo,
+                "image_prompt_thumbnail": img_prompts.get("thumbnail", ""),
+                "image_prompt_body": img_prompts.get("body", ""),
+            }, cfg)
+            calc_name = calc.get("name", keyword)
+            pub = publisher.publish(post_id,
                                     {"seo_title": seo.get("seo_title"),
                                      "meta_description": seo.get("seo_description"),
-                                     "tags_list": seo.get("seo_keywords", [])},
-                                    final_html, {}, cfg)
+                                     "tags_list": seo.get("seo_keywords", []),
+                                     "alt_thumbnail": f"{calc_name} 썸네일 이미지",
+                                     "alt_body_image": f"{calc_name} 계산 원리 설명 이미지"},
+                                    final_html, image_urls, cfg)
             pub_status = pub.get("status", "published")
             article_id = art_repo.save({
                 "정책명": keyword,
