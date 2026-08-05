@@ -1,22 +1,13 @@
 """
-adapters/db/__init__.py — DB Adapter 팩토리
-config.yaml의 DB_ADAPTER 값으로 구현체 자동 선택.
+adapters/db/__init__.py — DB Adapter 패키지
+실제 선택 로직은 factory.py에 단일화. 이 파일은 re-export 전용.
 
-DB_ADAPTER: sheets   → SheetsAdapter (기본값)
-DB_ADAPTER: sqlite   → SQLiteAdapter (홈서버 초기)
-DB_ADAPTER: postgres → PostgresAdapter (홈서버 안정화 후)
+DB_ADAPTER: sheets   → SheetsAdapter
+DB_ADAPTER: sqlite   → SQLiteAdapter
+DB_ADAPTER: postgres → PostgresAdapter
+DB_ADAPTER: dual     → DualAdapter (Sheets primary + SQLite secondary)
 """
 from .base import AbstractDBAdapter
-from .sheets_adapter import SheetsAdapter
-from .sqlite_adapter import SQLiteAdapter
-from .postgres_adapter import PostgresAdapter
+from .factory import get_db_adapter  # 단일 진입점 — dual 포함 모든 어댑터 지원
 
-
-def get_db_adapter(cfg: dict) -> AbstractDBAdapter:
-    adapter_type = cfg.get("DB_ADAPTER", "sheets").lower()
-    if adapter_type == "sqlite":
-        return SQLiteAdapter(cfg)
-    elif adapter_type == "postgres":
-        return PostgresAdapter(cfg)
-    else:
-        return SheetsAdapter(cfg)
+__all__ = ["AbstractDBAdapter", "get_db_adapter"]
