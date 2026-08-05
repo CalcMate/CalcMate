@@ -231,7 +231,7 @@ def _write_article(cfg: dict, calc: dict, keyword: str, seo: dict, faq: list,
         f"FAQ: {json.dumps(faq, ensure_ascii=False)}"
         # CTA/위젯은 시스템이 본문 뒤에 자동 삽입하므로 AI 본문에 CTA를 요구하지 않는다(중복 방지).
     )
-    text, tokens = provider.chat(system, user, model, max_tokens=3500)
+    text, tokens = provider.chat(system, user, model, max_tokens=4500)
     try:
         BudgetTracker(cfg).record(model, tokens)
     except Exception as _e:
