@@ -79,10 +79,14 @@ def publish(post_id: str, seo_data: dict, html_body: str,
                 raise Exception(f"Media upload failed: {res['error']}")
         else:
             wp_image_urls[kind] = {"source_url": fpath}
-            
-    # QA 강제 진행 (임시)
-    LOG.info("QA 검증 모드: WordPress 구성 강제 인식")
-    
+
+    if not is_wordpress_ready(cfg):
+        LOG.info("WordPress 미구성 — 발행 건너뜀(검수대기)")
+        _save_preview(seo_data, html_body, link="")
+        return {"wordpress": "", "wp_post_id": "", "wp_permalink": "",
+                "wp_status": "skipped", "published_at": datetime.now().isoformat(),
+                "status": "skipped_no_wp"}
+
     res = _wordpress_api(seo_data, html_body, wp_image_urls, cfg)
     res["status"] = "published"
     return res

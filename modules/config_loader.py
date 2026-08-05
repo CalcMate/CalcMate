@@ -123,7 +123,10 @@ def is_wordpress_ready(cfg: dict) -> bool:
     미구축(빈 값/placeholder) 시 False → 파이프라인은 발행을 건너뛰고 대기."""
     url = (cfg.get("WORDPRESS_URL") or "").strip()
     user = (cfg.get("WORDPRESS_USERNAME") or "").strip()
-    pw = (cfg.get("WORDPRESS_APP_PASSWORD") or cfg.get("WORDPRESS_PASSWORD") or "").strip()
+    pw = (cfg.get("WORDPRESS_APP_PASSWORD")
+          or cfg.get("WORDPRESS_PASSWORD")
+          or (cfg.get("wordpress") or {}).get("app_password")
+          or "").strip()
     if not url or not user or not pw:
         return False
     # placeholder/예시 값은 미구성으로 취급

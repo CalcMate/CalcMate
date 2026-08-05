@@ -26,7 +26,6 @@ from .calculator_image_prompt_generator import _image_pair
 from . import image_generator
 from .strategist_calculator import score_keywords
 from . import cleaner
-from . import publisher
 from . import content_quality
 from .logger import get_logger, BudgetTracker
 from . import telegram_ops as tops
@@ -534,6 +533,7 @@ def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None, 
                 continue
 
             # PASS/WARN → 발행
+            from . import publisher  # WP 발행 시점에만 로드(계산기앱 라인과 분리)
             post_id = datetime.now().strftime("%Y%m%d%H%M%S")
             img_prompts = _image_pair(cfg, calc)
             image_urls = image_generator.generate(post_id, {
