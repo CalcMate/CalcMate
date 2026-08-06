@@ -15,16 +15,8 @@
     "category": "고용/보험",
     "name": "실업급여 계산기"
   },
-  "weekly-holiday-allowance": {
+  "weekly-pay": {
     "category": "노무/급여",
     "name": "주휴수당 계산기"
-  },
-  "연말정산_환급액_계산기": {
-    "category": "세금/정부혜택",
-    "name": "연말정산 환급액 계산기"
-  },
-  "육아휴직_급여_계산기": {
-    "category": "노무/급여/보험",
-    "name": "육아휴직 급여 계산기"
   }
 }

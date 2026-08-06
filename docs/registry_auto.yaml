@@ -1,8 +1,38 @@
-# registry_auto.yaml — App Factory 자동생성 계산기 registry (작업지시서 E §1)
+# registry_auto.yaml — App Factory 자동생성 계산기 registry (RMS G-1)
 #
-# ⚠️ 이 파일은 App Factory(modules/app_factory.save_app)가 자동으로 씁니다.
-#    사람이 직접 편집하지 마세요.
-#
-# 자동생성 엔트리는 legal(law/article/authority 등)이 전부 null이며 needs_human_legal: true 입니다.
-# 정식 legal 검증이 끝나면 해당 slug를 docs/legal_basis.draft.yaml 로 "승격"해서 옮겨 적으세요.
-# (동일 slug는 legal_basis.draft.yaml 이 우선하므로, 승격 후 이 파일의 항목은 자동으로 무시됩니다.)
+# ⚠️ 이 파일은 App Factory(modules/app_factory.save_app)가 자동으로 씁니다. 사람이 직접 편집하지 마세요.
+# 자동생성 엔트리는 legal(law/article/authority 등) 전부 null + needs_human_legal: true 입니다.
+# 정식 legal 검증이 끝나면 rms_promote.py 워크플로를 통해 docs/legal_basis.master.yaml 에 승격하세요
+# (동일 slug는 master.yaml 이 우선하므로, 승격 후 이 파일의 항목은 자동으로 무시됩니다).
+
+weekly-pay:
+  slug: weekly-pay
+  name: 주휴수당 계산기
+  category: 노무/급여
+  emoji: 🧮
+  card_label: 주휴수당 계산기
+  compute_type: single
+  date_fields: []
+  validation_mode: formula
+  field_labels:
+    weekly_work_hours: 주당 근무 시간
+    hourly_wage: 시급
+    weekly_holiday_pay: 주휴수당
+  difficulty: simple
+  difficulty_status: provisional
+  needs_human_legal: true
+  law: null
+  article: null
+  authority: null
+  related_articles: []
+  writer_note: null
+  reviewer_expectation: []
+  forbidden_articles: []
+  forbidden_phrases: []
+  confidence: null
+  last_verified: null
+  verification_source: []
+  content:
+    evergreen: null
+    update_cycle: null
+  related_slugs: []

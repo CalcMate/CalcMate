@@ -1797,7 +1797,12 @@ elif tab == "🧮 계산기 관리":
             # 수식 편집(검증 후 저장)
             cur_formula = c.get("formula", "")
             new_formula = st.text_input("수식(formula)", value=str(cur_formula), key=f"cm_f_{cid}")
-            ins = FE._pj(c.get("input_schema"), {}) if hasattr(FE, "_pj") else {}
+            _raw_ins = c.get("input_schema")
+            try:
+                import json as _json
+                ins = _raw_ins if isinstance(_raw_ins, dict) else (_json.loads(_raw_ins) if _raw_ins else {})
+            except Exception:
+                ins = {}
             if st.button("💾 수식 저장(검증)", key=f"cm_fs_{cid}"):
                 ok, msg = FE.validate_formula(new_formula, ins)
                 if ok:

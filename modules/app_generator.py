@@ -1191,7 +1191,7 @@ _KW_SLUG = [
 _SLUG_ORDER = [k for k in _INTERNAL_LINK_MAP]
 
 
-def _auto_internal_links(html: str, cur_slug: str) -> str:
+def _auto_internal_links(html: str, cur_slug: str, site_url: str = "") -> str:
     """article_content HTML에서 자매 계산기 첫 출현 키워드를 내부링크로 변환.
 
     규칙:
@@ -1203,6 +1203,7 @@ def _auto_internal_links(html: str, cur_slug: str) -> str:
     src_idx = _SLUG_ORDER.index(cur_slug) if cur_slug in _SLUG_ORDER else 0
     linked: set = set()
     in_anchor = 0
+    base = site_url.rstrip("/") if site_url else ""
 
     tokens = re.split(r'(<[^>]+>)', html)
     result = []
@@ -1220,11 +1221,15 @@ def _auto_internal_links(html: str, cur_slug: str) -> str:
             for kw, slug in _KW_SLUG:
                 if slug == cur_slug or slug in linked or kw not in token:
                     continue
-                href, variants = _INTERNAL_LINK_MAP[slug]
+                href_rel, variants = _INTERNAL_LINK_MAP[slug]
+                href = f"{base}/{slug}/" if base else href_rel
                 anchor = _html.escape(variants[src_idx % len(variants)])
                 linked.add(slug)
+                # kw 바로 뒤에 " 계산기"가 오면 함께 소비해 anchor 중복 방지
+                kw_ext = kw + " 계산기"
+                match_kw = kw_ext if kw_ext in token else kw
                 token = token.replace(
-                    kw,
+                    match_kw,
                     f'<a href="{_html.escape(href)}" class="sm-internal-link">{anchor}</a>',
                     1,
                 )
@@ -1330,7 +1335,7 @@ def render_article(calc: dict, cfg: dict = None) -> str:
     # Phase D-1/D-2: {variable} → <span data-ph> 변환 (빌드 시 유효성 검증 포함)
     article = _apply_article_placeholders(article, slug)
     # E-4: 자매 계산기 내부링크 자동화 + 앵커 텍스트 다양화
-    article = _auto_internal_links(article, slug)
+    article = _auto_internal_links(article, slug, str((cfg or {}).get("SITE_URL", "")))
     return ('  <!-- ⑧ 본문 -->\n'
             '  <section class="sm-card sm-article">\n'
             f'    {article}\n'
@@ -1350,17 +1355,19 @@ def render_result_cta(calc: dict, cfg: dict = None) -> str:
     SM_CTA_RULES 없으면 slug 기반 기본값으로 폴백 (Progressive Enhancement)."""
     slug = str(calc.get("slug", ""))
     category = calc.get("category", "")
+    _base = str((cfg or {}).get("SITE_URL", "")).rstrip("/")
+    def _u(path): return f"{_base}{path}" if _base else path
     # default 폴백 (JS 없는 환경 + SM_CTA_RULES 미적용 케이스)
     if "세금" in category or "연말정산" in slug:
-        text, links = "절세 방법이 궁금하다면", [("연말정산 공제 가이드", "/blog/yearend-tax-refund-maximize/"), ("전체 계산기 보기", "/")]
+        text, links = "절세 방법이 궁금하다면", [("연말정산 공제 가이드", _u("/blog/yearend-tax-refund-maximize/")), ("전체 계산기 보기", _u("/"))]
     elif "육아" in slug or "parental" in slug:
-        text, links = "육아휴직 관련 정보", [("6+6 특례 자세히 보기", "/blog/6plus6-parental-leave-guide/"), ("전체 계산기 보기", "/")]
+        text, links = "육아휴직 관련 정보", [("6+6 특례 자세히 보기", _u("/blog/6plus6-parental-leave-guide/")), ("전체 계산기 보기", _u("/"))]
     elif "실업" in slug or "unemployment" in slug:
-        text, links = "실업급여 더 알아보기", [("신청 가이드 보기", "/blog/unemployment-benefit-guide/"), ("전체 계산기 보기", "/")]
+        text, links = "실업급여 더 알아보기", [("신청 가이드 보기", _u("/blog/unemployment-benefit-guide/")), ("전체 계산기 보기", _u("/"))]
     elif "퇴직" in slug or "severance" in slug:
-        text, links = "퇴직 관련 계산기", [("실업급여도 계산해 보기", "../unemployment-benefit/"), ("전체 계산기 보기", "/")]
+        text, links = "퇴직 관련 계산기", [("실업급여도 계산해 보기", _u("/unemployment-benefit/")), ("전체 계산기 보기", _u("/"))]
     else:
-        text, links = "더 알아보기", [("전체 계산기 보기", "/"), ("CalcMate 홈", "/")]
+        text, links = "더 알아보기", [("전체 계산기 보기", _u("/")), ("CalcMate 홈", _u("/"))]
     link_html = "".join(
         f'<a class="sm-result-cta-link" href="{_html.escape(href)}">{_html.escape(label)}</a>'
         for label, href in links
@@ -1420,16 +1427,18 @@ def render_related_posts(calc: dict, cfg: dict = None) -> str:
 
 def render_footer_cta(calc: dict, cfg: dict = None) -> str:
     """페이지 하단 CTA (전체 계산기 목록 및 주요 링크)."""
-    name = calc.get("name", "계산기")
+    site_url = str((cfg or {}).get("SITE_URL", "")).rstrip("/")
+    home_url = site_url or "/"
+    blog_url = f"{site_url}/blog/" if site_url else "/blog/"
     return (
         '  <!-- Phase C: 페이지 하단 CTA -->\n'
         '  <div class="sm-footer-cta">\n'
         f'    <p class="sm-footer-cta-title">CalcMate — 급여·노무 계산기 모음</p>\n'
         '    <p class="sm-footer-cta-sub">퇴직금·주휴수당·실업급여·4대보험·연말정산·육아휴직까지</p>\n'
         '    <div class="sm-footer-cta-links">\n'
-        '      <a class="sm-footer-cta-link" href="/">전체 계산기</a>\n'
-        '      <a class="sm-footer-cta-link" href="/blog/">블로그</a>\n'
-        '      <a class="sm-footer-cta-link" href="../">다른 계산기 보기</a>\n'
+        f'      <a class="sm-footer-cta-link" href="{home_url}">전체 계산기</a>\n'
+        f'      <a class="sm-footer-cta-link" href="{blog_url}">블로그</a>\n'
+        f'      <a class="sm-footer-cta-link" href="{home_url}">다른 계산기 보기</a>\n'
         '    </div>\n'
         '  </div>'
     )
