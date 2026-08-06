@@ -1906,6 +1906,55 @@ elif tab == "🧮 계산기 관리":
     if _just_saved:
         st.session_state["af_just_saved_name"] = None
 
+    # ── 사이트 페이지 배포 ─────────────────────────────────────────
+    st.divider()
+    st.subheader("🌐 사이트 페이지 배포")
+    st.caption("메인 홈 + 소개 / 개인정보처리방침 / 이용약관 / 문의하기 페이지를 GitHub Pages에 배포합니다.")
+
+    from modules import site_generator as SG
+    site_pages = SG.generate_all(cfg)
+    page_list = [p for p in site_pages if not p.endswith(".css")]
+
+    with st.expander("📄 생성 페이지 미리보기"):
+        preview_page = st.selectbox("페이지 선택", page_list,
+                                    key="site_preview_page")
+        if preview_page:
+            import streamlit.components.v1 as _comp
+            _comp.html(site_pages[preview_page], height=500, scrolling=True)
+
+    col_a, col_b = st.columns(2)
+    if col_a.button("🚀 사이트 페이지 배포",
+                    disabled=not GH.is_configured(cfg),
+                    key="cm_site_deploy"):
+        with st.spinner("사이트 페이지 업로드 중..."):
+            _repo_name = cfg.get("GITHUB_REPO", "calcmate-calculators")
+            ok_r, full_name = GH.create_repo(cfg, _repo_name)
+            if not ok_r:
+                st.error(f"저장소 생성 실패: {full_name}")
+            else:
+                _ok, _fail = 0, []
+                for _path, _content in site_pages.items():
+                    try:
+                        GH._put_file(cfg, full_name, _path, _content)
+                        _ok += 1
+                    except Exception as _e:
+                        _fail.append(f"{_path}: {_e}")
+                GH._enable_pages(cfg, full_name)
+                if _fail:
+                    st.warning(f"배포 완료({_ok}개) — 실패: {'; '.join(_fail)}")
+                else:
+                    _site_url = cfg.get("SITE_URL", "https://calcmate.kr")
+                    st.success(f"✅ {_ok}개 페이지 배포 완료 → {_site_url}/")
+
+    if col_b.button("💾 로컬 저장", key="cm_site_local"):
+        import os
+        _out = BASE / "data" / "workspace" / "_site"
+        for _path, _content in site_pages.items():
+            _fp = _out / _path
+            os.makedirs(_fp.parent, exist_ok=True)
+            _fp.write_text(_content, encoding="utf-8")
+        st.success(f"✅ data/workspace/_site/ 에 {len(site_pages)}개 파일 저장")
+
 # ══════════════════════════════════════════════════════════════
 # 탭: 🏭 App Factory (계산기 자동 생성)
 # ══════════════════════════════════════════════════════════════
