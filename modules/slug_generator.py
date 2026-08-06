@@ -13,8 +13,8 @@ import re
 # 한국어 계산기 이름 → 영문 slug 매핑 (우선순위: 긴 문자열부터 매칭)
 _KO_SLUG_MAP: dict[str, str] = {
     # ── 핵심 급여/수당 ──────────────────────────────────────────
-    "주휴수당":          "weekly-pay",
-    "주휴":             "weekly-pay",
+    "주휴수당":          "weekly-holiday-allowance",
+    "주휴":             "weekly-holiday-allowance",
     "실업급여":          "unemployment-benefit",
     "실업":             "unemployment",
     "퇴직금":           "severance-pay",
@@ -95,7 +95,7 @@ def generate_slug(name: str) -> str:
         name: 계산기 이름 (예: "주휴수당 계산기")
 
     Returns:
-        영문 slug (예: "weekly-pay"), 생성 불가 시 ""
+        영문 slug (예: "weekly-holiday-allowance"), 생성 불가 시 ""
     """
     if not name or not isinstance(name, str):
         return ""
