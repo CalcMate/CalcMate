@@ -29,7 +29,7 @@ APP_TEMPLATES = [
      "desc": "입력 기반 진단/등급 산출"},
 ]
 
-# ── 작업10: 초기 계산기 5종 ───────────────────────────────────────
+# ── 초기 계산기 7종 ───────────────────────────────────────
 SAMPLE_CALCULATORS = [
     {
         "name": "주휴수당 계산기", "slug": "weekly-holiday-allowance", "category": "노무/급여",
@@ -82,6 +82,33 @@ SAMPLE_CALCULATORS = [
         "output_schema": {"national_pension": "number", "health_insurance": "number",
                           "employment_insurance": "number", "total": "number"},
         "faq": [{"q": "4대보험은 의무인가요?", "a": "상시근로자는 원칙적으로 가입 의무가 있습니다."}],
+    },
+    {
+        "name": "연말정산 환급액 계산기", "slug": "연말정산_환급액_계산기", "category": "세금/정부혜택",
+        "calculator_type": "calculator_report",
+        "seo_title": "2026 연말정산 환급액 계산기 | 예상 환급금 자동 계산",
+        "seo_desc": "연봉·공제항목으로 연말정산 예상 환급액(또는 추가납부세액)을 자동 계산해 보세요.",
+        "formula": "estimated_refund = paid_tax - income_tax_after_deduction",
+        "input_schema": {"total_salary": "number", "family_count": "number", "paid_tax": "number"},
+        "output_schema": {"estimated_refund": "number"},
+        "faq": [
+            {"q": "연말정산 환급은 언제 받나요?", "a": "다음 해 2월 급여와 함께 환급(또는 추가납부)됩니다."},
+            {"q": "이 계산기 결과는 정확한가요?", "a": "참고용 예상치이며 실제 결과는 국세청 홈택스와 다를 수 있습니다."},
+        ],
+    },
+    {
+        "name": "육아휴직 급여 계산기", "slug": "육아휴직_급여_계산기", "category": "노무/급여/보험",
+        "calculator_type": "calculator_report",
+        "seo_title": "2026 육아휴직 급여 계산기 | 월 지급액 자동 계산",
+        "seo_desc": "육아휴직 급여 월 지급액을 고용보험법 기준으로 자동 계산합니다. 6+6 특례 포함.",
+        "formula": "",
+        "input_schema": {"monthly_wage": "number", "insured_days": "number",
+                         "use_6plus6": "boolean", "leave_month": "number"},
+        "output_schema": {"monthly_allowance": "number"},
+        "faq": [
+            {"q": "육아휴직 급여 수급 조건은?", "a": "30일 이상 육아휴직 + 피보험단위기간 180일 이상이어야 합니다."},
+            {"q": "6+6 특례란?", "a": "부모 모두 육아휴직 시 최초 6개월 급여를 상향 지원하는 제도입니다."},
+        ],
     },
 ]
 

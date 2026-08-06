@@ -2,7 +2,7 @@
 """
 modules/calculator_seeder.py — 초기 계산기 데이터 시더 (SalaryMate 확장, 신규)
 
-퇴직금/주휴수당/실업급여/연차수당/4대보험 5종을 calculators 시트에 등록.
+퇴직금/주휴수당/실업급여/연차수당/4대보험/연말정산/육아휴직 7종을 calculators 시트에 등록.
 기본 SEO/FAQ/스키마/수식 포함. Repository 경유(직접 Sheets 접근 금지). 멱등(이름 중복 스킵).
 
 지시서 요구 함수: seed_default_calculators()
@@ -27,11 +27,13 @@ DEFAULT_FORMULAS = {
                                  "health_insurance": "monthly_salary*0.03545",
                                  "employment_insurance": "monthly_salary*0.009",
                                  "total": "monthly_salary*(0.045+0.03545+0.009)"},
+    "연말정산_환급액_계산기":       "",   # _compute_js 내 누진세율 로직 사용 — formula 필드 미사용
+    "육아휴직_급여_계산기":         "",   # _compute_js 내 6+6 특례 분기 사용 — formula 필드 미사용
 }
 
 
 def seed_default_calculators(cfg: dict) -> dict:
-    """초기 5종 등록(멱등). 반환: {'created': n, 'skipped': m, 'names': [...]}"""
+    """초기 7종 등록(멱등 upsert). 반환: {'created': n, 'skipped': m, 'names': [...]}"""
     repo = CalculatorRepository(get_db_adapter(cfg))
     try:
         existing = {str(c.get("name", "")).strip() for c in repo.get_all()}
