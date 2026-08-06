@@ -33,7 +33,7 @@ from . import telegram_ops as tops
 LOG = get_logger()
 _PROMPT = Path(__file__).resolve().parent.parent / "prompts" / "calculator_writer_prompt.txt"
 
-CTA_TEXT = "아래 SalaryMate 계산기를 이용하면 자동으로 계산할 수 있습니다."
+CTA_TEXT = "아래 CalcMate 계산기를 이용하면 자동으로 계산할 수 있습니다."
 
 
 def _load_prompt() -> str:
@@ -606,7 +606,7 @@ def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None, 
             if pub_status == "published":
                 try:
                     tops.notify_publish_success(
-                        cfg, site=cfg.get("SITE_NAME", "SalaryMate"),
+                        cfg, site=cfg.get("SITE_NAME", "CalcMate"),
                         calculator=calc.get("name", ""), keyword=keyword,
                         title=seo.get("seo_title", ""),
                         published_at=datetime.now().strftime("%Y-%m-%d %H:%M"),

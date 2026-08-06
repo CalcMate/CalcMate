@@ -32,6 +32,7 @@ if _needs_setup():
 
 # ── 일반 대시보드 진입 ────────────────────────────────────────
 from modules.utils import health_monitor as hc_mod
+from modules.slug_generator import generate_slug
 
 st.set_page_config(
     page_title="블로그자동화 v12 운영센터",
@@ -227,7 +228,7 @@ def render_header():
         '<div class="sm-card" style="margin-bottom:16px">'
         '<div style="font-size:25px;font-weight:800;letter-spacing:-.5px;'
         'background:linear-gradient(90deg,#a5b4fc,#67e8f9);-webkit-background-clip:text;'
-        'background-clip:text;-webkit-text-fill-color:transparent">SalaryMate OS</div>'
+        'background-clip:text;-webkit-text-fill-color:transparent">CalcMate OS</div>'
         '<div class="sm-dim" style="font-size:13px;margin-top:3px">AI Content Operating System</div>'
         '</div>', unsafe_allow_html=True)
 
@@ -278,10 +279,10 @@ def render_current_site_card():
             sel_i = labels.index(pick)
             st.session_state["current_site_id"] = ids[sel_i]
             site = sites[sel_i]
-            name = site.get("site_name") or site.get("site_id") or "SalaryMate"
+            name = site.get("site_name") or site.get("site_id") or "CalcMate"
         else:
             st.session_state["current_site_id"] = ""
-            site, name = {}, "SalaryMate"
+            site, name = {}, "CalcMate"
             with right:
                 st.caption("등록 사이트 없음 — 기본 사이트")
         try:
@@ -406,7 +407,7 @@ def render_quick_actions():
         st.markdown("**⚡ 실행**")
         site, platforms = _resolve_run_site()
         has_wp, has_calc = ("WordPress" in platforms), ("Calculator" in platforms)
-        sname = site.get("site_name") if site else "기본(SalaryMate)"
+        sname = site.get("site_name") if site else "기본(CalcMate)"
         if not platforms:
             st.caption(f"대상: **{sname}** · Platform 미설정 → 기본 블로그 파이프라인 실행")
         else:
@@ -1198,7 +1199,7 @@ elif tab == "🌐 사이트 관리":
         st.session_state["current_site_id"] = _ids[_labels.index(_pick)]
         hc1.info(f"현재 선택: **{_pick}**")
     else:
-        st.caption("등록된 사이트 없음 — 기본 사이트(SalaryMate). 아래에서 새 사이트를 추가하세요.")
+        st.caption("등록된 사이트 없음 — 기본 사이트(CalcMate). 아래에서 새 사이트를 추가하세요.")
 
     # ── ⬇️⬆️ Export / Import (메타데이터만 · 자격증명 제외) ──
     with st.expander("⬇️⬆️ Export / Import"):
@@ -1628,7 +1629,7 @@ elif tab == "🧮 Calculator Builder":
     repo = CalculatorRepository(get_db_adapter(cfg))
 
     ab1, ab2 = st.columns(2)
-    if ab1.button("🌱 SalaryMate 초기 5종 시드"):
+    if ab1.button("🌱 CalcMate 초기 5종 시드"):
         try:
             from modules.calculator_seed import seed_all
             r = seed_all(cfg)
@@ -1697,7 +1698,18 @@ elif tab == "🧮 Calculator Builder":
 
     c1, c2 = st.columns(2)
     name = c1.text_input("계산기명 *", value=_v("name"), key="cb_name")
-    slug = c2.text_input("slug", value=_v("slug"), key="cb_slug")
+
+    # Slug 자동생성: 편집 대상 전환 시 리셋, 신규 생성 + 공백이면 이름에서 자동생성
+    _cb_editing_id = (editing or {}).get("id") or "__new__"
+    if st.session_state.get("_cb_prev_editing_id") != _cb_editing_id:
+        st.session_state["_cb_prev_editing_id"] = _cb_editing_id
+        st.session_state["cb_slug"] = _v("slug")
+    if not editing and not st.session_state.get("cb_slug") and name:
+        _auto = generate_slug(name)
+        if _auto:
+            st.session_state["cb_slug"] = _auto
+
+    slug = c2.text_input("slug (자동생성 — 수정 가능)", key="cb_slug")
     c3, c4 = st.columns(2)
     category = c3.text_input("category", value=_v("category"), key="cb_cat")
     ctype = c4.text_input("calculator_type", value=_v("calculator_type", "general"), key="cb_type")
@@ -1959,9 +1971,16 @@ elif tab == "🏭 App Factory":
             with st.expander("🔎 실제 렌더 미리보기"):
                 import streamlit.components.v1 as components
                 components.html(app["html"], height=420, scrolling=True)
+        # Slug 자동생성: 새 앱 생성 시 또는 af_slug 공백이면 자동완성
+        _af_auto_slug = generate_slug(app.get("name", ""))
+        if app.get("name") != st.session_state.get("_af_last_slug_for"):
+            st.session_state["af_slug"] = _af_auto_slug
+            st.session_state["_af_last_slug_for"] = app.get("name", "")
+        elif not st.session_state.get("af_slug") and _af_auto_slug:
+            st.session_state["af_slug"] = _af_auto_slug
         af_slug = st.text_input(
             "영문 slug * (폴더·URL·내부 식별자 — 저장 후 변경 불가)",
-            placeholder="annual-tax-settlement", key="af_slug",
+            key="af_slug",
             help="영문 소문자·숫자·하이픈만. 한글/공백 불가. 대시보드 표시는 계속 한글 이름(name)을 사용합니다.")
         if st.button("💾 calculators + app_templates 저장", type="primary", key="af_save"):
             import re as _re_slug
@@ -2437,7 +2456,7 @@ elif tab == "🔧 설정":
                 st.warning("토큰과 Chat ID를 먼저 입력하세요.")
             else:
                 try:
-                    _TG.notify(_tcfg, "✅ SalaryMate 텔레그램 연결 테스트 — 정상")
+                    _TG.notify(_tcfg, "✅ CalcMate 텔레그램 연결 테스트 — 정상")
                     st.success("전송 시도 완료. 텔레그램 메시지를 확인하세요(미수신 시 토큰/Chat ID 재확인).")
                 except Exception as _e:
                     st.error(f"전송 실패: {_e}")

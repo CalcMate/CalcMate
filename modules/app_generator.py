@@ -953,7 +953,7 @@ def _related_html(calc):
         blocks.append('<section class="sm-card"><div class="sm-ad">광고 영역 (AdSense)</div></section>')
     if related:
         blocks.append('<section class="sm-card sm-related"><h2>관련 계산기</h2>'
-                      '<a href="../">SalaryMate 계산기 모음 →</a></section>')
+                      '<a href="../">CalcMate 계산기 모음 →</a></section>')
     if share:
         blocks.append('<section class="sm-card"><h2>공유</h2>'
                       '<a href="#" onclick="navigator.share&&navigator.share({title:document.title,url:location.href});return false">🔗 공유하기</a></section>')
@@ -1245,6 +1245,14 @@ def _render_ga4_script(cfg: dict = None) -> str:
     )
 
 
+def render_canonical(calc: dict, cfg: dict = None) -> str:
+    site_url = str((cfg or {}).get("SITE_URL", "https://salarymate.github.io"))
+    slug = str(calc.get("slug", ""))
+    if not slug:
+        return ""
+    return f'<link rel="canonical" href="{site_url.rstrip("/")}/{slug}/">'
+
+
 def render_json_ld(calc: dict, cfg: dict = None) -> str:
     """E-3: JSON-LD 구조화 데이터 (FAQPage + Organization + BreadcrumbList).
     Rich Results Test 통과 기준으로 생성."""
@@ -1275,7 +1283,7 @@ def render_json_ld(calc: dict, cfg: dict = None) -> str:
     schemas.append({
         "@context": "https://schema.org",
         "@type": "Organization",
-        "name": "SalaryMate",
+        "name": "CalcMate",
         "url": site_url,
         "description": "급여·노무 계산기 모음 — 퇴직금·주휴수당·실업급여·4대보험·연말정산·육아휴직",
     })
@@ -1286,7 +1294,7 @@ def render_json_ld(calc: dict, cfg: dict = None) -> str:
         "@context": "https://schema.org",
         "@type": "BreadcrumbList",
         "itemListElement": [
-            {"@type": "ListItem", "position": 1, "name": "SalaryMate", "item": site_url},
+            {"@type": "ListItem", "position": 1, "name": "CalcMate", "item": site_url},
             {"@type": "ListItem", "position": 2, "name": category,
              "item": f"{site_url}/#calculators"},
             {"@type": "ListItem", "position": 3, "name": name, "item": calc_url},
@@ -1352,7 +1360,7 @@ def render_result_cta(calc: dict, cfg: dict = None) -> str:
     elif "퇴직" in slug or "severance" in slug:
         text, links = "퇴직 관련 계산기", [("실업급여도 계산해 보기", "../unemployment-benefit/"), ("전체 계산기 보기", "/")]
     else:
-        text, links = "더 알아보기", [("전체 계산기 보기", "/"), ("SalaryMate 홈", "/")]
+        text, links = "더 알아보기", [("전체 계산기 보기", "/"), ("CalcMate 홈", "/")]
     link_html = "".join(
         f'<a class="sm-result-cta-link" href="{_html.escape(href)}">{_html.escape(label)}</a>'
         for label, href in links
@@ -1416,7 +1424,7 @@ def render_footer_cta(calc: dict, cfg: dict = None) -> str:
     return (
         '  <!-- Phase C: 페이지 하단 CTA -->\n'
         '  <div class="sm-footer-cta">\n'
-        f'    <p class="sm-footer-cta-title">SalaryMate — 급여·노무 계산기 모음</p>\n'
+        f'    <p class="sm-footer-cta-title">CalcMate — 급여·노무 계산기 모음</p>\n'
         '    <p class="sm-footer-cta-sub">퇴직금·주휴수당·실업급여·4대보험·연말정산·육아휴직까지</p>\n'
         '    <div class="sm-footer-cta-links">\n'
         '      <a class="sm-footer-cta-link" href="/">전체 계산기</a>\n'
@@ -1489,6 +1497,7 @@ def generate_html(calc: dict, cfg: dict = None) -> str:
         "FOOTER_CTA": render_footer_cta(calc, cfg),
         # Phase E 추가
         "GA4_SCRIPT": _render_ga4_script(cfg),
+        "CANONICAL": render_canonical(calc, cfg),
         "JSON_LD": render_json_ld(calc, cfg),
         "ADSENSE_SLOT_2": render_adsense_slot_2(cfg),
         "SM_CONFIG": json.dumps(_sm_config(calc, cfg), ensure_ascii=False),

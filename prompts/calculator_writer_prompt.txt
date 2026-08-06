@@ -70,7 +70,7 @@
 
 [출력 금지 항목]
 - 업데이트 내역, 콘텐츠 생성일, 검수일 표기 절대 금지.
-- "Powered by SalaryMate" 외 내부 운영 정보 노출 금지.
+- "Powered by CalcMate" 외 내부 운영 정보 노출 금지.
 - AI 관련 표현(ChatGPT, Claude, AI가 작성 등) 절대 금지.
 
 [출력 전 자기 점검 — 필수]

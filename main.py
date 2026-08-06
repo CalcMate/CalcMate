@@ -45,7 +45,7 @@ def parse_args():
     p.add_argument("--intent", default=None, help="특정 Intent(예: eligibility)만 실행")
     p.add_argument("--allow-duplicate-draft", action="store_true", help="QA 모드에서 중복 Draft 생성 허용")
     p.add_argument("--skip-quality-gate", action="store_true", help="QA 모드에서 품질 게이트 우회")
-    p.add_argument("--seed-calculators", action="store_true", help="SalaryMate 초기 계산기/템플릿 시드 등록")
+    p.add_argument("--seed-calculators", action="store_true", help="CalcMate 초기 계산기/템플릿 시드 등록")
     p.add_argument("--reevaluate-hold", action="store_true",
                    help="품질보류 재평가 리포트(서명 변경으로 재도전 대상 집계). --apply로 즉시 재생성")
     p.add_argument("--apply", action="store_true",
@@ -396,7 +396,7 @@ def main():
 
     if args.seed_calculators:
         from modules.calculator_seed import seed_all
-        LOG.info("SalaryMate 초기 계산기/템플릿 시드 등록")
+        LOG.info("CalcMate 초기 계산기/템플릿 시드 등록")
         print(json.dumps(seed_all(cfg), ensure_ascii=False))
         return
 

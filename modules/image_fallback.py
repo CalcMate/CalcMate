@@ -18,7 +18,7 @@ _ACCENT = (99, 102, 241)
 _TEXT = (232, 237, 246)
 
 
-def generate_brand_image(post_id: str, kind: str, title: str = "SalaryMate") -> str | None:
+def generate_brand_image(post_id: str, kind: str, title: str = "CalcMate") -> str | None:
     """브랜드 템플릿 이미지(webp) 생성 후 경로 반환. 실패 시 None."""
     try:
         from PIL import Image, ImageDraw, ImageFont
@@ -35,8 +35,8 @@ def generate_brand_image(post_id: str, kind: str, title: str = "SalaryMate") -> 
                 except Exception:
                     pass
             return ImageFont.load_default()
-        brand = "🧮 SalaryMate"
-        d.text((w // 2, h // 2 - 40), "SalaryMate", font=F(46 if kind == "thumb" else 56),
+        brand = "🧮 CalcMate"
+        d.text((w // 2, h // 2 - 40), "CalcMate", font=F(46 if kind == "thumb" else 56),
                fill=_TEXT, anchor="mm")
         t = (title or "")[:22]
         d.text((w // 2, h // 2 + 26), t, font=F(22 if kind == "thumb" else 26),

@@ -21,10 +21,10 @@
     var card = d.getElementById("result-card");
     if (!card || !card.classList.contains("show")) { alert("먼저 계산을 실행해주세요."); return; }
     var cfg = w.SM_CONFIG || {};
-    // 캡처용 임시 정보(계산기명 · 계산일시 · SalaryMate) — 본문/광고 미포함
+    // 캡처용 임시 정보(계산기명 · 계산일시 · CalcMate) — 본문/광고 미포함
     var tag = d.createElement("div");
     tag.style.cssText = "margin-top:12px;font-size:12px;opacity:.85;line-height:1.6";
-    tag.innerHTML = (cfg.name || "계산 결과") + "<br>" + ts(true) + " · SalaryMate";
+    tag.innerHTML = (cfg.name || "계산 결과") + "<br>" + ts(true) + " · CalcMate";
     card.appendChild(tag);
     load().then(function (h2c) {
       return h2c(card, { backgroundColor: null, scale: 2 });

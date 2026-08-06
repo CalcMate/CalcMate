@@ -69,7 +69,7 @@ def generate_cta(calc: dict) -> str:
     url = calc.get("published_url", "")
     link = f' <a href="{_html.escape(url)}">{name} 바로가기 →</a>' if url else ""
     return (f'<div class="sm-cta"><strong>🧮 {name}</strong> — '
-            f'아래 SalaryMate 계산기를 이용하면 자동으로 계산할 수 있습니다.{link}</div>')
+            f'아래 CalcMate 계산기를 이용하면 자동으로 계산할 수 있습니다.{link}</div>')
 
 
 def inject_internal_links(html_body: str, related_calcs: list = None,
