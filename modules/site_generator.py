@@ -16,14 +16,16 @@ from __future__ import annotations
 
 import html as _html
 
-# ── 대표 계산기 목록 (홈 그리드용) ─────────────────────────────────
-_CALCS = [
-    ("🏢", "퇴직금 계산기",    "근속기간과 평균임금으로 퇴직금을 계산해보세요",     "severance-pay"),
-    ("📅", "주휴수당 계산기",   "주 15시간 이상 근무했다면 꼭 확인하세요",          "weekly-holiday-allowance"),
-    ("💼", "실업급여 계산기",   "고용보험 가입기간 기준 예상 수급액을 확인하세요",   "unemployment-benefit"),
-    ("🌴", "연차수당 계산기",   "미사용 연차를 수당으로 환산해보세요",              "annual-leave-allowance"),
-    ("🛡️", "4대보험 계산기",   "국민연금·건강보험·고용보험·산재보험 공제액 확인",   "four-insurances"),
-]
+# ── 계산기 설명 (registry에 없는 사이트 카피 — 슬러그별 fallback) ──
+_CALC_DESCS: dict[str, str] = {
+    "severance-pay":            "근속기간과 평균임금으로 퇴직금을 계산해보세요",
+    "weekly-holiday-allowance": "주 15시간 이상 근무했다면 꼭 확인하세요",
+    "unemployment-benefit":     "고용보험 가입기간 기준 예상 수급액을 확인하세요",
+    "annual-leave-allowance":   "미사용 연차를 수당으로 환산해보세요",
+    "four-insurances":          "국민연금·건강보험·고용보험·산재보험 공제액 확인",
+    "연말정산_환급액_계산기":    "연간 납부 세금과 공제 항목으로 환급액을 계산해보세요",
+    "육아휴직_급여_계산기":      "육아휴직 기간별 예상 급여를 확인해보세요",
+}
 
 _CONTACT_EMAIL = "contact@calcmate.kr"
 _EFFECTIVE_DATE = "2026년 8월 6일"
@@ -153,6 +155,23 @@ a:hover{text-decoration:underline}
 .cm-footer-links a:hover{color:var(--c-primary)}
 .cm-footer-copy{font-size:12px;color:var(--c-text-light)}
 
+/* ── 404 페이지 ── */
+.cm-404{text-align:center;padding:var(--sp-5) 0 var(--sp-4)}
+.cm-404-code{font-size:80px;font-weight:900;color:var(--c-primary);
+  letter-spacing:-3px;line-height:1;margin-bottom:var(--sp-2);opacity:.15}
+.cm-404-title{font-size:22px;font-weight:800;letter-spacing:-.4px;
+  margin-bottom:var(--sp-2);line-height:1.4}
+.cm-404-sub{font-size:14px;color:var(--c-text-sub);margin-bottom:var(--sp-4)}
+.cm-404-actions{display:flex;gap:var(--sp-2);justify-content:center;flex-wrap:wrap}
+.cm-404-btn{display:inline-flex;align-items:center;padding:13px 28px;
+  border-radius:var(--r-btn);font-size:15px;font-weight:700;
+  text-decoration:none;transition:background .15s,transform .1s}
+.cm-404-btn--primary{background:var(--c-primary);color:#fff;box-shadow:var(--shadow-btn)}
+.cm-404-btn--primary:hover{background:var(--c-primary-dark);transform:translateY(-1px);text-decoration:none}
+.cm-404-btn:not(.cm-404-btn--primary){background:var(--c-card);color:var(--c-primary);
+  border:1.5px solid var(--c-primary)}
+.cm-404-btn:not(.cm-404-btn--primary):hover{background:var(--c-primary-bg);text-decoration:none}
+
 /* ── 반응형 ── */
 @media(max-width:700px){
   .cm-calc-grid{grid-template-columns:repeat(2,1fr)}
@@ -237,13 +256,17 @@ def generate_index(cfg: dict) -> str:
     u = cfg.get("SITE_URL", "https://calcmate.kr").rstrip("/")
     site_name = cfg.get("SITE_NAME", "CalcMate")
 
+    # 계산기 목록을 registry에서 동적 조회 (새 계산기 추가 시 자동 반영)
+    from modules.app_generator import _registry, _SLUG_ORDER  # lazy import (circular 방지)
+    reg = _registry()
     calc_cards = "\n".join(
-        f'<a class="cm-calc-card" href="{u}/{slug}/" aria-label="{_esc(name)}">'
-        f'<span class="cm-calc-emoji" aria-hidden="true">{emoji}</span>'
-        f'<div class="cm-calc-name">{_esc(name)}</div>'
-        f'<div class="cm-calc-desc">{_esc(desc)}</div>'
+        f'<a class="cm-calc-card" href="{u}/{slug}/" aria-label="{_esc(calc.get("name", slug))}">'
+        f'<span class="cm-calc-emoji" aria-hidden="true">{_esc(calc.get("emoji", "🧮"))}</span>'
+        f'<div class="cm-calc-name">{_esc(calc.get("name", slug))}</div>'
+        f'<div class="cm-calc-desc">{_esc(_CALC_DESCS.get(slug, ""))}</div>'
         f'</a>'
-        for emoji, name, desc, slug in _CALCS
+        for slug in _SLUG_ORDER
+        if (calc := reg.get(slug))
     )
 
     body = f"""
@@ -488,6 +511,37 @@ def generate_contact(cfg: dict) -> str:
     )
 
 
+# ── 404 페이지 ────────────────────────────────────────────────────────
+
+def generate_404(cfg: dict) -> str:
+    u = cfg.get("SITE_URL", "https://calcmate.kr").rstrip("/")
+    site_name = cfg.get("SITE_NAME", "CalcMate")
+
+    body = f"""
+<main>
+  <div class="cm-wrap--narrow">
+    <div class="cm-404">
+      <div class="cm-404-code" aria-hidden="true">404</div>
+      <h1 class="cm-404-title">죄송합니다.<br>찾으시는 계산기가 없습니다.</h1>
+      <p class="cm-404-sub">URL을 다시 확인하거나 아래 버튼으로 이동하세요.</p>
+      <div class="cm-404-actions">
+        <a class="cm-404-btn cm-404-btn--primary" href="{u}/">홈으로</a>
+        <a class="cm-404-btn" href="{u}/#calculators">계산기 목록</a>
+      </div>
+    </div>
+    {_footer(u)}
+  </div>
+</main>"""
+
+    return _page(
+        title=f"페이지를 찾을 수 없습니다 — {site_name}",
+        description=f"요청하신 페이지를 찾을 수 없습니다. {site_name} 홈으로 이동하세요.",
+        css_path="site.css",
+        site_url=u,
+        body=body,
+    )
+
+
 # ── 전체 생성 ────────────────────────────────────────────────────────
 
 def generate_all(cfg: dict) -> dict:
@@ -499,4 +553,5 @@ def generate_all(cfg: dict) -> dict:
         "privacy/index.html":   generate_privacy(cfg),
         "terms/index.html":     generate_terms(cfg),
         "contact/index.html":   generate_contact(cfg),
+        "404.html":             generate_404(cfg),
     }

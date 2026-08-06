@@ -1444,6 +1444,34 @@ def render_footer_cta(calc: dict, cfg: dict = None) -> str:
     )
 
 
+def render_site_footer(cfg: dict = None) -> str:
+    """사이트 공용 footer — 사이트 5페이지와 동일 구조."""
+    u = str((cfg or {}).get("SITE_URL", "")).rstrip("/")
+    _ls = "font-size:13px;color:var(--c-text-sub);text-decoration:none"
+    links = "".join(
+        f'<a href="{u}{path}" style="{_ls}">{label}</a>'
+        for path, label in [
+            ("/about/", "소개"),
+            ("/privacy/", "개인정보처리방침"),
+            ("/terms/", "이용약관"),
+            ("/contact/", "문의하기"),
+        ]
+    )
+    return (
+        '\n  <!-- ⑫ Footer -->\n'
+        '  <footer style="text-align:center;padding-top:var(--sp-3);'
+        'border-top:1px solid var(--c-border);margin-top:var(--sp-3)">\n'
+        '    <p style="font-size:13px;color:var(--c-text-light);margin-bottom:var(--sp-1)">'
+        '본 계산기는 참고용이며 실제 지급액과 다를 수 있습니다.</p>\n'
+        f'    <div style="font-size:16px;font-weight:800;color:var(--c-primary);'
+        f'margin-bottom:var(--sp-1)">CalcMate</div>\n'
+        f'    <nav style="display:flex;gap:var(--sp-2);justify-content:center;'
+        f'flex-wrap:wrap;margin-bottom:var(--sp-1)">{links}</nav>\n'
+        '    <p style="font-size:12px;color:var(--c-text-light)">© 2026 CalcMate. All rights reserved.</p>\n'
+        '  </footer>'
+    )
+
+
 def render_faq(calc: dict, cfg: dict = None) -> str:
     if not _show_flags(cfg)["show_faq"]:
         return ""
@@ -1504,6 +1532,7 @@ def generate_html(calc: dict, cfg: dict = None) -> str:
         "INLINE_CTA": render_inline_cta(calc, cfg),
         "RELATED_POSTS_SECTION": render_related_posts(calc, cfg),
         "FOOTER_CTA": render_footer_cta(calc, cfg),
+        "SITE_FOOTER": render_site_footer(cfg),
         # Phase E 추가
         "GA4_SCRIPT": _render_ga4_script(cfg),
         "CANONICAL": render_canonical(calc, cfg),
