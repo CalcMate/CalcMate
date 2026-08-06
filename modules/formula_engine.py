@@ -20,6 +20,13 @@ import ast
 import json
 import operator
 
+# custom compute slugs: _compute_js() 전용 분기 사용, formula 필드 의도적 공백
+# validate_formula()에서 formula 검증을 건너뛰고 compute handler 존재만 확인한다.
+CUSTOM_COMPUTE_SLUGS: frozenset = frozenset({
+    "연말정산_환급액_계산기",
+    "육아휴직_급여_계산기",
+})
+
 from .logger import get_logger
 
 LOG = get_logger()
@@ -102,8 +109,20 @@ def execute_formula(formula, inputs: dict, output_schema=None) -> dict:
     return results
 
 
-def validate_formula(formula, inputs_schema=None) -> tuple:
-    """수식 안전성/변수 검증. (ok, message). 실제 계산은 더미값(1)으로 시도."""
+def validate_formula(formula, inputs_schema=None, slug: str | None = None) -> tuple:
+    """수식 안전성/변수 검증. (ok, message). 실제 계산은 더미값(1)으로 시도.
+
+    slug가 CUSTOM_COMPUTE_SLUGS에 포함되면 formula 검증을 건너뛰고
+    validate_compute_handler()로 핸들러 존재만 확인한다.
+    """
+    if slug and slug in CUSTOM_COMPUTE_SLUGS:
+        return validate_compute_handler(slug)
+    # DB에 JSON 문자열로 저장된 dict 수식을 파싱
+    if isinstance(formula, str) and formula.strip().startswith("{"):
+        try:
+            formula = json.loads(formula)
+        except json.JSONDecodeError:
+            pass
     try:
         exprs = list(formula.values()) if isinstance(formula, dict) else [formula]
         allowed = set((inputs_schema or {}).keys())
@@ -120,6 +139,20 @@ def validate_formula(formula, inputs_schema=None) -> tuple:
         return True, "OK"
     except Exception as e:
         return False, str(e)
+
+
+def validate_compute_handler(slug: str) -> tuple:
+    """CUSTOM_COMPUTE_SLUGS의 _compute_js 핸들러 존재 및 정상 생성 확인."""
+    try:
+        from modules.app_generator import _compute_js, _registry
+        reg_entry = dict(_registry().get(slug) or {})
+        reg_entry["slug"] = slug
+        js = _compute_js(reg_entry)
+        if js and len(js) > 100:
+            return True, f"OK (custom handler: {slug})"
+        return False, f"compute handler 빈 응답: {slug}"
+    except Exception as e:
+        return False, f"compute handler 오류: {e}"
 
 
 # ── Repository 연동 (Sheets 직접 접근 금지) ───────────────────────

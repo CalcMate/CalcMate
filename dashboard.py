@@ -1804,7 +1804,7 @@ elif tab == "🧮 계산기 관리":
             except Exception:
                 ins = {}
             if st.button("💾 수식 저장(검증)", key=f"cm_fs_{cid}"):
-                ok, msg = FE.validate_formula(new_formula, ins)
+                ok, msg = FE.validate_formula(new_formula, ins, slug=c.get("slug"))
                 if ok:
                     FE.save_formula(cfg, cid, new_formula); st.success("수식 저장 완료"); st.rerun()
                 else:
