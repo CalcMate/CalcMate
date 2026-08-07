@@ -15,6 +15,7 @@ deploy_all(cfg) → {path: content} dict — github_deployer.deploy_app과 동�
 from __future__ import annotations
 
 import html as _html
+import datetime
 
 # ── 계산기 설명 (registry에 없는 사이트 카피 — 슬러그별 fallback) ──
 _CALC_DESCS: dict[str, str] = {
@@ -224,10 +225,24 @@ def _footer(site_url: str) -> str:
     )
 
 
+def _ga4_snippet(ga4_id: str) -> str:
+    if not ga4_id:
+        return ""
+    gid = _esc(ga4_id)
+    return (
+        f'<script async src="https://www.googletagmanager.com/gtag/js?id={gid}"></script>\n'
+        f'<script>window.dataLayer=window.dataLayer||[];'
+        f'function gtag(){{dataLayer.push(arguments);}}'
+        f"gtag('js',new Date());gtag('config','{gid}');</script>"
+    )
+
+
 def _page(title: str, description: str, css_path: str,
-          site_url: str, body: str, canonical: str = "") -> str:
+          site_url: str, body: str, canonical: str = "",
+          ga4_id: str = "") -> str:
     u = site_url.rstrip("/")
     canon_tag = f'<link rel="canonical" href="{_esc(canonical)}">' if canonical else ""
+    ga4_tag   = _ga4_snippet(ga4_id)
     return f"""<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -242,6 +257,7 @@ def _page(title: str, description: str, css_path: str,
 <title>{_esc(title)}</title>
 {canon_tag}
 <link rel="stylesheet" href="{css_path}">
+{ga4_tag}
 </head>
 <body>
 {_nav(u)}
@@ -255,6 +271,7 @@ def _page(title: str, description: str, css_path: str,
 def generate_index(cfg: dict) -> str:
     u = cfg.get("SITE_URL", "https://calcmate.kr").rstrip("/")
     site_name = cfg.get("SITE_NAME", "CalcMate")
+    ga4_id = cfg.get("GA4_MEASUREMENT_ID", "") or ""
 
     # 계산기 목록을 registry에서 동적 조회 (새 계산기 추가 시 자동 반영)
     from modules.app_generator import _registry, _SLUG_ORDER  # lazy import (circular 방지)
@@ -320,6 +337,7 @@ def generate_index(cfg: dict) -> str:
         site_url=u,
         body=body,
         canonical=f"{u}/",
+        ga4_id=ga4_id,
     )
 
 
@@ -328,6 +346,7 @@ def generate_index(cfg: dict) -> str:
 def generate_about(cfg: dict) -> str:
     u = cfg.get("SITE_URL", "https://calcmate.kr").rstrip("/")
     site_name = cfg.get("SITE_NAME", "CalcMate")
+    ga4_id = cfg.get("GA4_MEASUREMENT_ID", "") or ""
 
     body = f"""
 <main>
@@ -366,6 +385,7 @@ def generate_about(cfg: dict) -> str:
         site_url=u,
         body=body,
         canonical=f"{u}/about/",
+        ga4_id=ga4_id,
     )
 
 
@@ -374,6 +394,7 @@ def generate_about(cfg: dict) -> str:
 def generate_privacy(cfg: dict) -> str:
     u = cfg.get("SITE_URL", "https://calcmate.kr").rstrip("/")
     site_name = cfg.get("SITE_NAME", "CalcMate")
+    ga4_id = cfg.get("GA4_MEASUREMENT_ID", "") or ""
 
     body = f"""
 <main>
@@ -419,6 +440,7 @@ def generate_privacy(cfg: dict) -> str:
         site_url=u,
         body=body,
         canonical=f"{u}/privacy/",
+        ga4_id=ga4_id,
     )
 
 
@@ -427,6 +449,7 @@ def generate_privacy(cfg: dict) -> str:
 def generate_terms(cfg: dict) -> str:
     u = cfg.get("SITE_URL", "https://calcmate.kr").rstrip("/")
     site_name = cfg.get("SITE_NAME", "CalcMate")
+    ga4_id = cfg.get("GA4_MEASUREMENT_ID", "") or ""
 
     body = f"""
 <main>
@@ -471,6 +494,7 @@ def generate_terms(cfg: dict) -> str:
         site_url=u,
         body=body,
         canonical=f"{u}/terms/",
+        ga4_id=ga4_id,
     )
 
 
@@ -479,6 +503,7 @@ def generate_terms(cfg: dict) -> str:
 def generate_contact(cfg: dict) -> str:
     u = cfg.get("SITE_URL", "https://calcmate.kr").rstrip("/")
     site_name = cfg.get("SITE_NAME", "CalcMate")
+    ga4_id = cfg.get("GA4_MEASUREMENT_ID", "") or ""
     email = _CONTACT_EMAIL
 
     body = f"""
@@ -508,6 +533,7 @@ def generate_contact(cfg: dict) -> str:
         site_url=u,
         body=body,
         canonical=f"{u}/contact/",
+        ga4_id=ga4_id,
     )
 
 
@@ -542,10 +568,56 @@ def generate_404(cfg: dict) -> str:
     )
 
 
+# ── sitemap.xml ──────────────────────────────────────────────────────
+
+def generate_sitemap(cfg: dict) -> str:
+    u = cfg.get("SITE_URL", "https://calcmate.kr").rstrip("/")
+    from modules.app_generator import _SLUG_ORDER
+    today = datetime.date.today().isoformat()
+
+    static_pages = [
+        ("", "1.0", "weekly"),
+        ("/about/", "0.6", "monthly"),
+        ("/privacy/", "0.4", "monthly"),
+        ("/terms/", "0.4", "monthly"),
+        ("/contact/", "0.5", "monthly"),
+    ]
+    calc_entries = [(f"/{slug}/", "0.8", "weekly") for slug in _SLUG_ORDER]
+    all_entries = static_pages + calc_entries
+
+    items = "\n".join(
+        f"  <url>"
+        f"<loc>{u}{path}</loc>"
+        f"<lastmod>{today}</lastmod>"
+        f"<changefreq>{freq}</changefreq>"
+        f"<priority>{priority}</priority>"
+        f"</url>"
+        for path, priority, freq in all_entries
+    )
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        f"{items}\n"
+        "</urlset>"
+    )
+
+
+# ── robots.txt ───────────────────────────────────────────────────────
+
+def generate_robots(cfg: dict) -> str:
+    u = cfg.get("SITE_URL", "https://calcmate.kr").rstrip("/")
+    return (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "\n"
+        f"Sitemap: {u}/sitemap.xml\n"
+    )
+
+
 # ── 전체 생성 ────────────────────────────────────────────────────────
 
 def generate_all(cfg: dict) -> dict:
-    """반환: {path: html_content} — github_deployer._put_file 호환."""
+    """반환: {path: content} — github_deployer._put_file 호환."""
     return {
         "index.html":           generate_index(cfg),
         "site.css":             _SITE_CSS,
@@ -554,4 +626,6 @@ def generate_all(cfg: dict) -> dict:
         "terms/index.html":     generate_terms(cfg),
         "contact/index.html":   generate_contact(cfg),
         "404.html":             generate_404(cfg),
+        "sitemap.xml":          generate_sitemap(cfg),
+        "robots.txt":           generate_robots(cfg),
     }
