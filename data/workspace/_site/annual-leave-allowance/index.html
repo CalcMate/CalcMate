@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2563EB">
+<meta name="description" content="미사용 연차 일수와 하루 통상임금을 입력하면 연차수당을 즉시 계산합니다. 법정 상한(25일) 초과 여부도 자동 안내.">
+<title>2026 연차수당 계산기 | 미사용 연차 × 통상임금 자동 계산</title>
+<link rel="canonical" href="https://calcmate.kr/annual-leave-allowance/">
+<link rel="stylesheet" href="style.css">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "연차수당 계산 방법은 무엇인가요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "「미사용 연차일수 × 1일 통상임금」입니다. 1일 통상임금은 월 통상임금을 해당 월 소정근로일수로 나눈 금액입니다."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "연차는 1년에 최대 몇 일까지 발생하나요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "1년 이상 근속자는 최대 25일까지 발생합니다(근로기준법 제60조제4항). 입사 첫 해에는 매월 1일씩 발생해 최대 11일입니다."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "퇴직할 때 남은 연차는 어떻게 되나요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "퇴직 시 미사용 연차에 대한 수당을 정산·지급해야 합니다(근로기준법 제60조제5항). 단, 사용 촉진 절차를 밟은 경우 사용자 지급 의무가 면제될 수 있습니다(제61조)."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "사용 촉진 통보를 받으면 수당을 못 받나요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "법정 절차(사용 시기 지정 통보 등)를 사용자가 이행했고 근로자가 연차를 쓰지 않은 경우 수당 청구권이 소멸됩니다. 촉진 통보를 받지 않았다면 그대로 청구할 수 있습니다."
+      }
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "CalcMate",
+  "url": "https://calcmate.kr",
+  "description": "급여·노무 계산기 모음 — 퇴직금·주휴수당·실업급여·4대보험·연말정산·육아휴직"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "CalcMate",
+      "item": "https://calcmate.kr"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "노무/급여",
+      "item": "https://calcmate.kr/#calculators"
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "name": "연차수당 계산기",
+      "item": "https://calcmate.kr/annual-leave-allowance/"
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<div class="sm-wrap">
+
+  <!-- ① Hero -->
+  <header class="sm-hero">
+    <div class="sm-hero-badge">💰 노무/급여</div>
+    <h1>연차수당 계산기</h1>
+    <p class="sm-hero-sub">미사용 연차 일수와 하루 통상임금을 입력하면 연차수당을 즉시 계산합니다. 법정 상한(25일) 초과 여부도 자동 안내.</p>
+  </header>
+
+  <!-- ② 계산 입력 -->
+  <section class="sm-card" aria-label="계산 입력">
+    <h2 class="sm-card-title">계산 입력</h2>
+    <div class="sm-field"><label class="sm-label" for="in_daily_wage">일급</label><div class="sm-input-wrap"><input class="sm-input" type="text" inputmode="numeric" data-comma id="in_daily_wage" name="in_daily_wage" placeholder="예) 67000"><span class="sm-unit">원</span></div></div>
+<div class="sm-field"><label class="sm-label" for="in_unused_days">미사용 연차</label><div class="sm-input-wrap"><input class="sm-input" type="text" inputmode="numeric" data-comma id="in_unused_days" name="in_unused_days" placeholder="예) 5"><span class="sm-unit">일</span></div></div>
+    <button class="sm-btn" type="button" onclick="calculate()">연차수당 계산하기</button>
+  </section>
+
+  <!-- ③ 결과 카드 -->
+  <div class="sm-result-card" id="result-card" role="region" aria-label="계산 결과" aria-live="polite">
+    <div class="sm-result-label">예상 연차수당</div>
+    <div>
+      <span class="sm-result-value" id="out_annual_leave_allowance">-</span>
+      <span class="sm-result-unit">원</span>
+    </div>
+    <div class="sm-result-sub" id="result-formula"></div>
+    <!-- ③-CTA: 결과 하단 CTA (정적, Phase D에서 개인화) -->
+        <div id="sm-result-cta" class="sm-result-cta">
+      <p class="sm-result-cta-text">더 알아보기</p>
+      <div class="sm-result-cta-links"><a class="sm-result-cta-link" href="https://calcmate.kr/">전체 계산기 보기</a><a class="sm-result-cta-link" href="https://calcmate.kr/">CalcMate 홈</a></div>
+    </div>
+  </div>
+
+  <!-- ④ 결과 액션 버튼 (계산 후에만 표시) -->
+  <div class="sm-result-actions" id="result-actions">
+    <button class="sm-action-btn" type="button" data-action="result_save" onclick="saveResultPng()">
+      <span class="sm-action-icon" aria-hidden="true">📄</span>결과 저장
+    </button>
+    <button class="sm-action-btn" type="button" data-action="share" onclick="kakaoShare()">
+      <span class="sm-action-icon" aria-hidden="true">💬</span>카카오 공유
+    </button>
+    <button class="sm-action-btn" type="button" data-action="pwa" id="pwa-btn" onclick="pwaInstall()">
+      <span class="sm-action-icon" aria-hidden="true">📱</span>홈 화면 추가
+    </button>
+  </div>
+
+  <!-- ⑤ Notices: 계산 결과 안내 메시지 (JS가 동적으로 채움) -->
+  <div class="sm-notices" id="notices-container" role="status" aria-label="계산 결과 안내"></div>
+
+  <!-- ⑥ 계산 과정 보기 (Phase C: step accordion, JS가 채움) -->
+  <section class="sm-card" id="steps-card" style="display:none" aria-label="계산 과정">
+    <h2 class="sm-card-title">계산 과정 보기</h2>
+    <div id="steps-list"></div>
+  </section>
+
+  <!-- ⑦ 기존 계산 상세 (steps-card 없는 계산기 폴백) -->
+  <section class="sm-card" id="detail-card" style="display:none" aria-label="계산 상세">
+    <h2 class="sm-card-title">계산 상세</h2>
+    <div id="detail-rows"></div>
+  </section>
+
+  <!-- ⑧ 안내사항 -->
+  <div class="sm-notice" role="note">
+    <span class="sm-notice-icon" aria-hidden="true">⚠️</span>
+    <span>본 계산 결과는 참고용이며, 실제 지급액은 근로계약·관련 법령에 따라 달라질 수 있습니다.</span>
+  </div>
+
+
+
+  <!-- ⑧ 본문 -->
+  <section class="sm-card sm-article">
+    <h2>연차수당이란</h2>
+<p>연차수당은 근로기준법이 보장하는 유급연차휴가를 사용하지 못한 경우, 해당 일수에 상응하는 임금을 금전으로 지급하는 것입니다. 근로기준법 제60조 제5항은 사용자가 미사용 연차에 대해 통상임금을 지급하도록 규정합니다. 퇴직 시 일괄 정산하는 경우가 가장 흔하며, 재직 중에도 연차 소멸 시점에 지급되기도 합니다.</p>
+<p>연차는 1년 이상 근무한 근로자 기준으로, 1년 차에는 매월 1일씩 최대 11일(80% 이상 출근 시), 2년 차부터는 15일에서 시작해 2년마다 1일씩 추가되며 최대 25일까지 발생합니다(근로기준법 제60조 제1항~제4항). 5인 미만 사업장은 연차휴가 규정 적용이 제외됩니다.</p>
+
+<h2>계산 방법</h2>
+<p>연차수당 = 미사용 연차일수 × 1일 통상임금</p>
+<p>1일 통상임금은 '월 통상임금 ÷ 해당 월 소정근로일수'로 계산합니다. 고용노동부 지침에 따라 월 소정근로시간 기준('월 통상임금 ÷ 월 소정근로시간 × 1일 소정근로시간')으로도 산정 가능합니다(근로기준법 시행령 제6조).</p>
+
+<h2>계산 예시</h2>
+<h3>예시 1 — 5년 차 직원, 미사용 연차 12일, 월 통상임금 300만 원</h3>
+<p>월 소정근로일수 22일 기준<br>
+1일 통상임금 = 3,000,000 ÷ 22 = 136,364원<br>
+연차수당 = 136,364원 × 12일 = <strong>1,636,368원</strong><br>
+퇴직 시 이 금액이 <a href="https://calcmate.kr/severance-pay/" class="sm-internal-link">퇴직금 자동 산정</a>과 별도로 지급됩니다. 퇴직 전 3개월 내에 연차수당이 지급됐다면 평균임금에도 포함돼 퇴직금도 올라갑니다.</p>
+
+<h3>예시 2 — 입사 1년 차 퇴직, 발생 11일 중 4일 사용</h3>
+<p>미사용 연차 7일, 1일 통상임금 100,000원<br>
+연차수당 = 100,000원 × 7일 = <strong>700,000원</strong><br>
+1년 미만 재직자도 발생한 월별 연차에 대한 수당을 퇴직 시 받을 수 있습니다(근로기준법 제60조 제2항). 사용하지 않은 부분만 계산합니다.</p>
+
+<h3>예시 3 — 법정 상한(25일) 전부 미사용, 월 통상임금 400만 원</h3>
+<p>월 소정근로일수 21일 기준<br>
+1일 통상임금 = 4,000,000 ÷ 21 = 190,476원<br>
+연차수당 = 190,476원 × 25일 = <strong>4,761,900원</strong><br>
+회사에서 약정 연차를 법정보다 더 부여한 경우, 초과분은 취업규칙에 따라 별도 정산됩니다. 법정 25일 초과분에 대한 수당 지급 의무는 법령이 아닌 회사 규정에 따릅니다.</p>
+
+<h2>실수하기 쉬운 사례</h2>
+<ul>
+<li><strong>통상임금과 평균임금을 혼용합니다.</strong> 연차수당의 원칙 기준은 통상임금이며, 예외적으로 평균임금이 더 높으면 평균임금으로 지급합니다(근로기준법 제2조 제2항). 성과급·상여금이 많은 직종은 두 금액을 비교해야 합니다.</li>
+<li><strong>사용 촉진 통보를 받고도 수당을 청구합니다.</strong> 사용자가 법정 절차에 따라 연차 사용 시기를 지정·통보했는데 근로자가 사용하지 않은 경우 수당 청구권이 소멸됩니다(근로기준법 제61조). 촉진 통보를 받지 않은 경우라면 그대로 청구할 수 있습니다.</li>
+<li><strong>월 소정근로일수를 30일로 잘못 입력합니다.</strong> 월 소정근로일수는 달력 일수(30~31일)가 아니라 실제 출근 일수(주 5일제 기준 통상 21~22일)입니다. 잘못 입력하면 1일 통상임금이 낮게 산정됩니다.</li>
+<li><strong>연차 발생 기준(회계연도 vs. 입사일)을 혼동합니다.</strong> 일부 회사는 회계연도 기준으로 연차를 일괄 부여하는데, 이 경우 입사 시점에 따라 첫 해 연차가 비례 계산됩니다. 소멸 시점도 달라지므로 취업규칙을 반드시 확인하세요.</li>
+</ul>
+
+
+<h2>연차 발생 기준과 소멸 시점</h2>
+<p>연차는 발생일로부터 1년 내에 사용하지 않으면 소멸합니다(근로기준법 제60조 제7항). 회사가 회계연도 기준을 적용하는 경우 소멸 시점이 달라집니다. 예를 들어 1월 1일 기산 회사에서 7월 입사한 직원은 다음 해 12월 31일까지 발생 연차를 모두 소진해야 합니다. 소멸 전 사용 촉진 통보를 받은 경우, 지정 기간에 사용하지 않으면 금전 보상 청구권이 사라집니다.</p>
+<h2>5인 미만 사업장 주의사항</h2>
+<p>근로기준법 제60조의 연차휴가 조항은 상시 5인 이상 사업장에만 적용됩니다. 5인 미만 사업장은 취업규칙이나 근로계약서에 연차 부여 규정이 있어야만 수당이 발생합니다. 단, 2021년 11월부터 4인 이하 사업장도 일부 조항이 단계적으로 확대 적용 중이므로, 고용노동부 최신 지침을 확인하세요.</p>
+<h2>관련 계산기</h2>
+<p>미사용 연차수당은 퇴직금 산정 기초인 평균임금에도 영향을 줍니다. 퇴직 직전 3개월에 연차수당이 지급됐다면 <a href="/severance-pay/">퇴직금 계산기</a> 입력 시 반드시 포함하세요. 시급제 근로자라면 <a href="/weekly-holiday-allowance/">주휴수당 계산기</a>와 함께 활용해 총 수령액을 정확히 파악하세요.</p>
+  </section>
+
+  <!-- Phase C: 본문 중간 CTA -->
+  <div class="sm-inline-cta">
+    <p class="sm-inline-cta-title">지금 바로 연차수당 계산해 보세요</p>
+    <p class="sm-inline-cta-sub">무료 · 회원가입 불필요 · 결과 즉시 확인</p>
+    <a class="sm-inline-cta-btn" href="#" onclick="window.scrollTo({top:0,behavior:'smooth'});return false;">계산 바로 하기 ↑</a>
+  </div>
+
+
+
+  <!-- ⑨ FAQ -->
+  <section class="sm-card" id="faq-card">
+    <h2 class="sm-card-title">자주 묻는 질문</h2>
+    <div id="sm-dynamic-faq"></div>
+    <div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">연차수당 계산 방법은 무엇인가요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">「미사용 연차일수 × 1일 통상임금」입니다. 1일 통상임금은 월 통상임금을 해당 월 소정근로일수로 나눈 금액입니다.</div></div>
+<div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">연차는 1년에 최대 몇 일까지 발생하나요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">1년 이상 근속자는 최대 25일까지 발생합니다(근로기준법 제60조제4항). 입사 첫 해에는 매월 1일씩 발생해 최대 11일입니다.</div></div>
+<div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">퇴직할 때 남은 연차는 어떻게 되나요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">퇴직 시 미사용 연차에 대한 수당을 정산·지급해야 합니다(근로기준법 제60조제5항). 단, 사용 촉진 절차를 밟은 경우 사용자 지급 의무가 면제될 수 있습니다(제61조).</div></div>
+<div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">사용 촉진 통보를 받으면 수당을 못 받나요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">법정 절차(사용 시기 지정 통보 등)를 사용자가 이행했고 근로자가 연차를 쓰지 않은 경우 수당 청구권이 소멸됩니다. 촉진 통보를 받지 않았다면 그대로 청구할 수 있습니다.</div></div>
+  </section>
+
+  <!-- ⑩ 관련 계산기 -->
+  <section class="sm-card" id="related-card">
+    <h2 class="sm-card-title">관련 계산기</h2>
+    <div class="sm-related-grid">
+      <a class="sm-related-item" href="../weekly-holiday-allowance/" target="_self"><span class="sm-related-emoji">💰</span><span class="sm-related-name">주휴수당 계산기</span></a>
+<a class="sm-related-item" href="../severance-pay/" target="_self"><span class="sm-related-emoji">💼</span><span class="sm-related-name">퇴직금 계산기</span></a>
+<a class="sm-related-item" href="../unemployment-benefit/" target="_self"><span class="sm-related-emoji">📋</span><span class="sm-related-name">실업급여 계산기</span></a>
+<a class="sm-related-item" href="../four-insurances/" target="_self"><span class="sm-related-emoji">🏢</span><span class="sm-related-name">4대보험 계산기</span></a>
+<a class="sm-related-item" href="../연말정산_환급액_계산기/" target="_self"><span class="sm-related-emoji">🧾</span><span class="sm-related-name">연말정산 계산기</span></a>
+<a class="sm-related-item" href="../육아휴직_급여_계산기/" target="_self"><span class="sm-related-emoji">👶</span><span class="sm-related-name">육아휴직 급여 계산기</span></a>
+    </div>
+  </section>
+
+  <!-- Phase C: 관련 글 -->
+  <section class="sm-card" id="related-posts-card">
+    <h2 class="sm-card-title">관련 글</h2>
+    <div class="sm-posts-grid">
+      <a class="sm-post-card" href="/blog/annual-leave-allowance-guide/">
+        <span class="sm-post-tag">연차</span>
+        <p class="sm-post-title">연차수당 계산법과 사용 촉진 제도 — 수당 면제 조건</p>
+        <p class="sm-post-desc">미사용 연차수당 계산과 사용촉진제도에 따른 수당 면제 조건을 설명합니다.</p>
+      </a>
+      <a class="sm-post-card" href="/blog/annual-leave-limit-25days/">
+        <span class="sm-post-tag">연차</span>
+        <p class="sm-post-title">연차 25일 상한 제도 — 초과 연차의 법적 처리 방법</p>
+        <p class="sm-post-desc">법정 최대 연차 25일을 초과하는 경우 처리 방법과 수당 계산을 안내합니다.</p>
+      </a>
+    </div>
+  </section>
+
+
+
+  <!-- Phase C: 페이지 하단 CTA -->
+  <div class="sm-footer-cta">
+    <p class="sm-footer-cta-title">CalcMate — 급여·노무 계산기 모음</p>
+    <p class="sm-footer-cta-sub">퇴직금·주휴수당·실업급여·4대보험·연말정산·육아휴직까지</p>
+    <div class="sm-footer-cta-links">
+      <a class="sm-footer-cta-link" href="https://calcmate.kr">전체 계산기</a>
+      <a class="sm-footer-cta-link" href="https://calcmate.kr/blog/">블로그</a>
+      <a class="sm-footer-cta-link" href="https://calcmate.kr">다른 계산기 보기</a>
+    </div>
+  </div>
+
+
+  <!-- ⑫ Footer -->
+  <footer style="text-align:center;padding-top:var(--sp-3);border-top:1px solid var(--c-border);margin-top:var(--sp-3)">
+    <p style="font-size:13px;color:var(--c-text-light);margin-bottom:var(--sp-1)">본 계산기는 참고용이며 실제 지급액과 다를 수 있습니다.</p>
+    <div style="font-size:16px;font-weight:800;color:var(--c-primary);margin-bottom:var(--sp-1)">CalcMate</div>
+    <nav style="display:flex;gap:var(--sp-2);justify-content:center;flex-wrap:wrap;margin-bottom:var(--sp-1)"><a href="https://calcmate.kr/about/" style="font-size:13px;color:var(--c-text-sub);text-decoration:none">소개</a><a href="https://calcmate.kr/privacy/" style="font-size:13px;color:var(--c-text-sub);text-decoration:none">개인정보처리방침</a><a href="https://calcmate.kr/terms/" style="font-size:13px;color:var(--c-text-sub);text-decoration:none">이용약관</a><a href="https://calcmate.kr/contact/" style="font-size:13px;color:var(--c-text-sub);text-decoration:none">문의하기</a></nav>
+    <p style="font-size:12px;color:var(--c-text-light)">© 2026 CalcMate. All rights reserved.</p>
+  </footer>
+
+</div>
+
+<!-- Mobile Fixed CTA -->
+<div class="sm-mobile-cta">
+  <button class="sm-btn" type="button" onclick="calculate();setTimeout(function(){var c=document.getElementById('result-card');if(c)c.scrollIntoView({behavior:'smooth',block:'center'});},100)">
+    지금 계산하기
+  </button>
+</div>
+
+<!-- 계산기 설정(파라미터) — app_generator가 주입 -->
+<script>window.SM_CONFIG = {"name": "연차수당 계산기", "slug": "annual-leave-allowance", "primaryOutput": "annual_leave_allowance", "resultUnit": "원", "inputs": [{"name": "daily_wage", "label": "일급", "type": "number", "unit": "원"}, {"name": "unused_days", "label": "미사용 연차", "type": "number", "unit": "일"}], "outputs": [{"key": "annual_leave_allowance", "label": "연차수당", "unit": "원"}], "show_adsense": false, "show_cpa": false, "show_share": true, "show_pwa": false, "show_result_save": true, "show_faq": true, "show_notice": true, "show_related": true, "show_detail": true, "show_article": true, "site_mode": "pre_adsense", "result_export_type": "png", "kakao_js_key": "", "calculator_version": "2.0.0", "law_version": "2026-07", "ga4_id": ""};</script>
+<script src="script.js"></script>
+</body>
+</html>

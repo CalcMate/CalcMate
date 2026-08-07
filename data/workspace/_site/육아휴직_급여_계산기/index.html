@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2563EB">
+<meta name="description" content="통상임금·피보험단위기간·휴직 개월 차를 입력하면 육아휴직 급여 월 지급액을 고용보험법 기준으로 자동 계산합니다.">
+<title>2026 육아휴직 급여 계산기 | 6+6 특례 포함 월 지급액 자동 계산</title>
+<link rel="canonical" href="https://calcmate.kr/육아휴직_급여_계산기/">
+<link rel="stylesheet" href="style.css">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "육아휴직 급여를 받으려면 어떤 조건이 필요한가요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "고용보험 피보험단위기간 180일 이상, 30일 이상 육아휴직을 부여받아야 합니다(고용보험법 제70조). 만 8세 이하 또는 초등학교 2학년 이하 자녀가 있어야 합니다."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "6+6 부모 육아휴직 특례란 무엇인가요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "같은 자녀에 대해 부모가 순서대로 육아휴직을 사용할 때, 두 번째 사용자의 첫 6개월 급여가 통상임금의 100%로 상향되는 제도입니다. 월별 상한은 200만 원(1개월)~450만 원(6개월)이며 2024년 1월부터 시행됩니다."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "육아휴직 급여 상한·하한은 얼마인가요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "일반 육아휴직은 통상임금의 80%, 월 상한 150만 원·하한 70만 원입니다. 6+6 특례 적용 시 최대 450만 원/월까지 상향됩니다. 상·하한은 고용노동부 고시로 매년 변경될 수 있습니다."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "육아휴직 급여 신청은 어떻게 하나요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "육아휴직 시작 후 매월 단위로 고용센터(또는 고용보험 홈페이지)에 신청합니다. 육아휴직 종료 후 12개월 이내에 신청해야 합니다."
+      }
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "CalcMate",
+  "url": "https://calcmate.kr",
+  "description": "급여·노무 계산기 모음 — 퇴직금·주휴수당·실업급여·4대보험·연말정산·육아휴직"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "CalcMate",
+      "item": "https://calcmate.kr"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "노무/급여/보험",
+      "item": "https://calcmate.kr/#calculators"
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "name": "육아휴직 급여 계산기",
+      "item": "https://calcmate.kr/육아휴직_급여_계산기/"
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<div class="sm-wrap">
+
+  <!-- ① Hero -->
+  <header class="sm-hero">
+    <div class="sm-hero-badge">💰 노무/급여/보험</div>
+    <h1>육아휴직 급여 계산기</h1>
+    <p class="sm-hero-sub">통상임금·피보험단위기간·휴직 개월 차를 입력하면 육아휴직 급여 월 지급액을 고용보험법 기준으로 자동 계산합니다.</p>
+  </header>
+
+  <!-- ② 계산 입력 -->
+  <section class="sm-card" aria-label="계산 입력">
+    <h2 class="sm-card-title">계산 입력</h2>
+    <div class="sm-field"><label class="sm-label" for="in_monthly_wage">월 통상임금</label><div class="sm-input-wrap"><input class="sm-input" type="text" inputmode="numeric" data-comma id="in_monthly_wage" name="in_monthly_wage" placeholder="예) 3000000"><span class="sm-unit">원</span></div></div>
+<div class="sm-field"><label class="sm-label" for="in_insured_days">피보험단위기간</label><div class="sm-input-wrap"><input class="sm-input" type="text" inputmode="numeric" data-comma id="in_insured_days" name="in_insured_days" placeholder="예) 365"><span class="sm-unit">일</span></div></div>
+<div class="sm-field"><label class="sm-label" for="in_use_6plus6">6+6 특례</label><div class="sm-input-wrap"><input class="sm-input" type="text" inputmode="numeric" data-comma id="in_use_6plus6" name="in_use_6plus6" placeholder="예) 0"><span class="sm-unit">1=적용, 0=일반</span></div></div>
+<div class="sm-field"><label class="sm-label" for="in_leave_month">육아휴직 개월 차</label><div class="sm-input-wrap"><input class="sm-input" type="text" inputmode="numeric" data-comma id="in_leave_month" name="in_leave_month" placeholder="예) 1"></div></div>
+    <button class="sm-btn" type="button" onclick="calculate()">육아휴직 급여 계산하기</button>
+  </section>
+
+  <!-- ③ 결과 카드 -->
+  <div class="sm-result-card" id="result-card" role="region" aria-label="계산 결과" aria-live="polite">
+    <div class="sm-result-label">예상 월 지급액</div>
+    <div>
+      <span class="sm-result-value" id="out_monthly_allowance">-</span>
+      <span class="sm-result-unit">원</span>
+    </div>
+    <div class="sm-result-sub" id="result-formula"></div>
+    <!-- ③-CTA: 결과 하단 CTA (정적, Phase D에서 개인화) -->
+        <div id="sm-result-cta" class="sm-result-cta">
+      <p class="sm-result-cta-text">육아휴직 관련 정보</p>
+      <div class="sm-result-cta-links"><a class="sm-result-cta-link" href="https://calcmate.kr/blog/6plus6-parental-leave-guide/">6+6 특례 자세히 보기</a><a class="sm-result-cta-link" href="https://calcmate.kr/">전체 계산기 보기</a></div>
+    </div>
+  </div>
+
+  <!-- ④ 결과 액션 버튼 (계산 후에만 표시) -->
+  <div class="sm-result-actions" id="result-actions">
+    <button class="sm-action-btn" type="button" data-action="result_save" onclick="saveResultPng()">
+      <span class="sm-action-icon" aria-hidden="true">📄</span>결과 저장
+    </button>
+    <button class="sm-action-btn" type="button" data-action="share" onclick="kakaoShare()">
+      <span class="sm-action-icon" aria-hidden="true">💬</span>카카오 공유
+    </button>
+    <button class="sm-action-btn" type="button" data-action="pwa" id="pwa-btn" onclick="pwaInstall()">
+      <span class="sm-action-icon" aria-hidden="true">📱</span>홈 화면 추가
+    </button>
+  </div>
+
+  <!-- ⑤ Notices: 계산 결과 안내 메시지 (JS가 동적으로 채움) -->
+  <div class="sm-notices" id="notices-container" role="status" aria-label="계산 결과 안내"></div>
+
+  <!-- ⑥ 계산 과정 보기 (Phase C: step accordion, JS가 채움) -->
+  <section class="sm-card" id="steps-card" style="display:none" aria-label="계산 과정">
+    <h2 class="sm-card-title">계산 과정 보기</h2>
+    <div id="steps-list"></div>
+  </section>
+
+  <!-- ⑦ 기존 계산 상세 (steps-card 없는 계산기 폴백) -->
+  <section class="sm-card" id="detail-card" style="display:none" aria-label="계산 상세">
+    <h2 class="sm-card-title">계산 상세</h2>
+    <div id="detail-rows"></div>
+  </section>
+
+  <!-- ⑧ 안내사항 -->
+  <div class="sm-notice" role="note">
+    <span class="sm-notice-icon" aria-hidden="true">⚠️</span>
+    <span>본 계산 결과는 참고용이며, 실제 지급액은 근로계약·관련 법령에 따라 달라질 수 있습니다.</span>
+  </div>
+
+
+
+  <!-- ⑧ 본문 -->
+  <section class="sm-card sm-article">
+    <h2>육아휴직 급여란</h2>
+<p>육아휴직 급여는 만 8세 이하(또는 초등학교 2학년 이하) 자녀를 돌보기 위해 육아휴직을 사용한 근로자에게 고용보험에서 지원하는 급여입니다. 고용보험법 제70조에 따라 수급 요건은 ① 육아휴직 개시일 전 피보험단위기간 180일 이상, ② 30일 이상 육아휴직 부여, 두 가지입니다. 남녀 구분 없이 신청 가능하며, 동일 자녀에 대해 부모가 순서대로 사용하면 6+6 특례가 적용됩니다.</p>
+<p>육아휴직 급여는 비과세 소득이므로 <a href="https://calcmate.kr/연말정산_환급액_계산기/" class="sm-internal-link">연말정산 계산기</a> 과세표준에 포함되지 않습니다. 또한 육아휴직 기간은 계속근로기간(<a href="https://calcmate.kr/severance-pay/" class="sm-internal-link">퇴직금 계산기</a> 산정)에 포함되어, 불이익이 없습니다. 2024년 1월 1일 이후 적용되는 6+6 특례는 첫 6개월간 통상임금의 100%를 지급하며, 상한액도 대폭 상향됐습니다.</p>
+
+<h2>계산 방법</h2>
+<p>일반 육아휴직: 통상임금 × 80% (월 상한 1,500,000원 / 하한 700,000원)<br>
+6+6 특례(2024년 1월 시행): 통상임금 × 100%, 월별 상한 2,000,000원(1개월)~4,500,000원(6개월)<br>
+출처: 고용보험법 시행령 제95조(일반) / 시행령 제95조의2(6+6 특례)</p>
+
+<h2>계산 예시</h2>
+<h3>예시 1 — 월 통상임금 200만 원, 일반 육아휴직 4개월</h3>
+<p>200만 원 × 80% = 160만 원 → 상한(150만 원) 초과<br>
+월 지급액 = <strong>1,500,000원</strong> × 4개월 = 6,000,000원<br>
+통상임금이 1,875,000원 이하여야 상한 적용 없이 80% 전액이 지급됩니다. 월급이 높을수록 상한에 걸릴 가능성이 높습니다.</p>
+
+<h3>예시 2 — 6+6 특례, 월 통상임금 300만 원, 3개월 차</h3>
+<p>6+6 특례 3개월 차 상한: 3,000,000원<br>
+300만 원 × 100% = 300만 원 → 상한 이내이므로 <strong>3,000,000원/월</strong> 수령<br>
+6개월 차 상한은 4,500,000원까지 올라갑니다. 두 번째로 육아휴직을 사용하는 부모(주로 아빠)가 이 특례를 활용하면 기존 일반 육아휴직 대비 최대 월 300만 원 이상 더 받을 수 있습니다.</p>
+
+<h3>예시 3 — 피보험단위기간 160일 (요건 미충족)</h3>
+<p>180일 미만으로 수급 자격이 없습니다. 현 직장 기간이 부족하더라도 이전 직장 피보험기간을 합산할 수 있습니다. 이전 직장에서 <a href="https://calcmate.kr/unemployment-benefit/" class="sm-internal-link">실업급여 계산기</a>를 받지 않았다면 최대 3년 이내 기간까지 합산 인정됩니다. 육아휴직 시작 전 고용센터에서 자격 여부를 미리 확인하세요.</p>
+
+<h2>실수하기 쉬운 사례</h2>
+<ul>
+<li><strong>통상임금과 평균임금을 혼동합니다.</strong> 육아휴직 급여는 평균임금이 아닌 통상임금 기준입니다. 통상임금은 정기적·일률적으로 지급되는 기본급·직책수당·자격수당 등이며, 성과급·연장근로수당·비정기 상여금은 제외됩니다.</li>
+<li><strong>6+6 특례를 양쪽 모두에게 적용되는 것으로 오해합니다.</strong> 특례는 같은 자녀에 대해 두 번째로 육아휴직을 사용하는 부모에게만 적용됩니다. 첫 번째 사용자는 일반 육아휴직 기준(80%, 상한 150만 원)을 적용받습니다.</li>
+<li><strong>상한·하한을 고정값으로 오해합니다.</strong> 상한액과 하한액은 고용노동부 고시로 연도별로 변경될 수 있습니다. 2026년 적용 금액은 고용보험 홈페이지(ei.go.kr) 또는 고용센터에서 반드시 확인하세요.</li>
+<li><strong>신청 기한을 놓칩니다.</strong> 육아휴직 급여는 매월 신청을 원칙으로 하며, 육아휴직 종료 후 12개월 이내에 신청해야 합니다. 기한을 넘기면 소멸됩니다. 휴직 시작 직후부터 매월 신청하는 습관을 들이세요.</li>
+</ul>
+
+
+<h2>육아기 근로시간 단축 급여</h2>
+<p>육아휴직 대신 근로시간을 주 15~35시간으로 단축하는 '육아기 근로시간 단축' 제도도 활용할 수 있습니다. 단축된 근로시간에 대해 통상임금의 80%(상한 150만 원)까지 급여를 지원받습니다(고용보험법 제73조의2). 육아휴직과 합산해 최대 2년까지 사용 가능하므로, 전면 휴직 대신 단축 근무를 선택하는 경우 직장 경력을 유지하면서도 급여를 받을 수 있습니다.</p>
+<h2>육아휴직 후 복직 보호</h2>
+<p>사업주는 육아휴직 종료 후 복직한 근로자를 휴직 전과 동일하거나 동등한 임금의 직무에 복귀시켜야 합니다(남녀고용평등법 제19조 제4항). 이를 거부하거나 불리한 처우를 한 경우 500만 원 이하의 벌금이 부과됩니다. 복직 후 임금이 줄거나 부당한 보직 변경이 있었다면 노동청에 신고할 수 있습니다.</p>
+<h2>관련 계산기</h2>
+<p>육아휴직 급여는 비과세이지만, 배우자의 부양가족 공제 적용 여부가 달라질 수 있습니다. <a href="/연말정산_환급액_계산기/">연말정산 환급액 계산기</a>로 부부 합산 절세 전략을 세워 보세요. 복직 후에는 <a href="/four-insurances/">4대보험 계산기</a>로 실수령액 변화를 미리 확인하고, <a href="/weekly-holiday-allowance/">주휴수당 계산기</a>로 시급제 전환 시 총 급여도 점검해 두세요.</p>
+  </section>
+
+  <!-- Phase C: 본문 중간 CTA -->
+  <div class="sm-inline-cta">
+    <p class="sm-inline-cta-title">지금 바로 육아휴직 급여 계산해 보세요</p>
+    <p class="sm-inline-cta-sub">무료 · 회원가입 불필요 · 결과 즉시 확인</p>
+    <a class="sm-inline-cta-btn" href="#" onclick="window.scrollTo({top:0,behavior:'smooth'});return false;">계산 바로 하기 ↑</a>
+  </div>
+
+
+
+  <!-- ⑨ FAQ -->
+  <section class="sm-card" id="faq-card">
+    <h2 class="sm-card-title">자주 묻는 질문</h2>
+    <div id="sm-dynamic-faq"></div>
+    <div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">육아휴직 급여를 받으려면 어떤 조건이 필요한가요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">고용보험 피보험단위기간 180일 이상, 30일 이상 육아휴직을 부여받아야 합니다(고용보험법 제70조). 만 8세 이하 또는 초등학교 2학년 이하 자녀가 있어야 합니다.</div></div>
+<div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">6+6 부모 육아휴직 특례란 무엇인가요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">같은 자녀에 대해 부모가 순서대로 육아휴직을 사용할 때, 두 번째 사용자의 첫 6개월 급여가 통상임금의 100%로 상향되는 제도입니다. 월별 상한은 200만 원(1개월)~450만 원(6개월)이며 2024년 1월부터 시행됩니다.</div></div>
+<div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">육아휴직 급여 상한·하한은 얼마인가요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">일반 육아휴직은 통상임금의 80%, 월 상한 150만 원·하한 70만 원입니다. 6+6 특례 적용 시 최대 450만 원/월까지 상향됩니다. 상·하한은 고용노동부 고시로 매년 변경될 수 있습니다.</div></div>
+<div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">육아휴직 급여 신청은 어떻게 하나요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">육아휴직 시작 후 매월 단위로 고용센터(또는 고용보험 홈페이지)에 신청합니다. 육아휴직 종료 후 12개월 이내에 신청해야 합니다.</div></div>
+  </section>
+
+  <!-- ⑩ 관련 계산기 -->
+  <section class="sm-card" id="related-card">
+    <h2 class="sm-card-title">관련 계산기</h2>
+    <div class="sm-related-grid">
+      <a class="sm-related-item" href="../weekly-holiday-allowance/" target="_self"><span class="sm-related-emoji">💰</span><span class="sm-related-name">주휴수당 계산기</span></a>
+<a class="sm-related-item" href="../severance-pay/" target="_self"><span class="sm-related-emoji">💼</span><span class="sm-related-name">퇴직금 계산기</span></a>
+<a class="sm-related-item" href="../annual-leave-allowance/" target="_self"><span class="sm-related-emoji">📅</span><span class="sm-related-name">연차수당 계산기</span></a>
+<a class="sm-related-item" href="../unemployment-benefit/" target="_self"><span class="sm-related-emoji">📋</span><span class="sm-related-name">실업급여 계산기</span></a>
+<a class="sm-related-item" href="../four-insurances/" target="_self"><span class="sm-related-emoji">🏢</span><span class="sm-related-name">4대보험 계산기</span></a>
+<a class="sm-related-item" href="../연말정산_환급액_계산기/" target="_self"><span class="sm-related-emoji">🧾</span><span class="sm-related-name">연말정산 계산기</span></a>
+    </div>
+  </section>
+
+  <!-- Phase C: 관련 글 -->
+  <section class="sm-card" id="related-posts-card">
+    <h2 class="sm-card-title">관련 글</h2>
+    <div class="sm-posts-grid">
+      <a class="sm-post-card" href="/blog/6plus6-parental-leave-guide/">
+        <span class="sm-post-tag">육아휴직</span>
+        <p class="sm-post-title">6+6 부모 육아휴직 특례 — 신청 조건과 급여 계산</p>
+        <p class="sm-post-desc">2024년 시행된 6+6 부모 육아휴직 특례의 조건과 월별 급여 계산 방법을 안내합니다.</p>
+      </a>
+      <a class="sm-post-card" href="/blog/parental-leave-benefit-apply/">
+        <span class="sm-post-tag">육아휴직</span>
+        <p class="sm-post-title">육아휴직 급여 신청 절차 — 서류부터 지급까지</p>
+        <p class="sm-post-desc">육아휴직 급여 신청에 필요한 서류, 신청 기한, 지급 일정을 단계별로 설명합니다.</p>
+      </a>
+    </div>
+  </section>
+
+
+
+  <!-- Phase C: 페이지 하단 CTA -->
+  <div class="sm-footer-cta">
+    <p class="sm-footer-cta-title">CalcMate — 급여·노무 계산기 모음</p>
+    <p class="sm-footer-cta-sub">퇴직금·주휴수당·실업급여·4대보험·연말정산·육아휴직까지</p>
+    <div class="sm-footer-cta-links">
+      <a class="sm-footer-cta-link" href="https://calcmate.kr">전체 계산기</a>
+      <a class="sm-footer-cta-link" href="https://calcmate.kr/blog/">블로그</a>
+      <a class="sm-footer-cta-link" href="https://calcmate.kr">다른 계산기 보기</a>
+    </div>
+  </div>
+
+
+  <!-- ⑫ Footer -->
+  <footer style="text-align:center;padding-top:var(--sp-3);border-top:1px solid var(--c-border);margin-top:var(--sp-3)">
+    <p style="font-size:13px;color:var(--c-text-light);margin-bottom:var(--sp-1)">본 계산기는 참고용이며 실제 지급액과 다를 수 있습니다.</p>
+    <div style="font-size:16px;font-weight:800;color:var(--c-primary);margin-bottom:var(--sp-1)">CalcMate</div>
+    <nav style="display:flex;gap:var(--sp-2);justify-content:center;flex-wrap:wrap;margin-bottom:var(--sp-1)"><a href="https://calcmate.kr/about/" style="font-size:13px;color:var(--c-text-sub);text-decoration:none">소개</a><a href="https://calcmate.kr/privacy/" style="font-size:13px;color:var(--c-text-sub);text-decoration:none">개인정보처리방침</a><a href="https://calcmate.kr/terms/" style="font-size:13px;color:var(--c-text-sub);text-decoration:none">이용약관</a><a href="https://calcmate.kr/contact/" style="font-size:13px;color:var(--c-text-sub);text-decoration:none">문의하기</a></nav>
+    <p style="font-size:12px;color:var(--c-text-light)">© 2026 CalcMate. All rights reserved.</p>
+  </footer>
+
+</div>
+
+<!-- Mobile Fixed CTA -->
+<div class="sm-mobile-cta">
+  <button class="sm-btn" type="button" onclick="calculate();setTimeout(function(){var c=document.getElementById('result-card');if(c)c.scrollIntoView({behavior:'smooth',block:'center'});},100)">
+    지금 계산하기
+  </button>
+</div>
+
+<!-- 계산기 설정(파라미터) — app_generator가 주입 -->
+<script>window.SM_CONFIG = {"name": "육아휴직 급여 계산기", "slug": "육아휴직_급여_계산기", "primaryOutput": "monthly_allowance", "resultUnit": "원", "inputs": [{"name": "monthly_wage", "label": "월 통상임금", "type": "number", "unit": "원"}, {"name": "insured_days", "label": "피보험단위기간", "type": "number", "unit": "일"}, {"name": "use_6plus6", "label": "6+6 특례", "type": "number", "unit": "1=적용, 0=일반"}, {"name": "leave_month", "label": "육아휴직 개월 차", "type": "number", "unit": ""}], "outputs": [{"key": "monthly_allowance", "label": "예상 월 지급액", "unit": "원"}], "show_adsense": false, "show_cpa": false, "show_share": true, "show_pwa": false, "show_result_save": true, "show_faq": true, "show_notice": true, "show_related": true, "show_detail": true, "show_article": true, "site_mode": "pre_adsense", "result_export_type": "png", "kakao_js_key": "", "calculator_version": "2.0.0", "law_version": "2026-07", "ga4_id": ""};</script>
+<script src="script.js"></script>
+</body>
+</html>

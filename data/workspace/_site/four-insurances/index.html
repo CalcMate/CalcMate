@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2563EB">
+<meta name="description" content="월 급여를 입력하면 국민연금·건강보험·장기요양보험·고용보험 근로자 부담분을 2026년 요율로 자동 계산합니다.">
+<title>2026 4대보험 계산기 | 월급 공제액 국민연금·건강보험·고용보험 한눈에</title>
+<link rel="canonical" href="https://calcmate.kr/four-insurances/">
+<link rel="stylesheet" href="style.css">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "2026년 4대보험 근로자 부담 요율은 얼마인가요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "국민연금 4.5%, 건강보험 3.545%, 장기요양보험(건강보험료의 12.96%), 고용보험 0.9%입니다. 사업주도 동일하거나 더 높은 요율로 부담합니다."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "국민연금에 상한액·하한액이 있나요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "기준소득월액 상한은 6,170,000원, 하한은 390,000원입니다(국민연금법 제88조). 월급이 상한을 초과해도 국민연금은 최대 277,650원만 공제됩니다."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "산재보험은 왜 이 계산기에 없나요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "산재보험료는 사업주가 전액 부담합니다. 근로자 급여에서 공제되지 않으므로 이 계산기에서도 제외됩니다(산업재해보상보험법 제13조)."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "실제 공제액과 계산기 결과가 다를 수 있나요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "이 계산기는 참고용 예상치입니다. 국민연금 기준소득 결정 방식, 회사별 정산 방식에 따라 실제 공제액이 소폭 다를 수 있습니다."
+      }
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "CalcMate",
+  "url": "https://calcmate.kr",
+  "description": "급여·노무 계산기 모음 — 퇴직금·주휴수당·실업급여·4대보험·연말정산·육아휴직"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "CalcMate",
+      "item": "https://calcmate.kr"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "고용/보험",
+      "item": "https://calcmate.kr/#calculators"
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "name": "4대보험 계산기",
+      "item": "https://calcmate.kr/four-insurances/"
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<div class="sm-wrap">
+
+  <!-- ① Hero -->
+  <header class="sm-hero">
+    <div class="sm-hero-badge">🏢 고용/보험</div>
+    <h1>4대보험 계산기</h1>
+    <p class="sm-hero-sub">월 급여를 입력하면 국민연금·건강보험·장기요양보험·고용보험 근로자 부담분을 2026년 요율로 자동 계산합니다.</p>
+  </header>
+
+  <!-- ② 계산 입력 -->
+  <section class="sm-card" aria-label="계산 입력">
+    <h2 class="sm-card-title">계산 입력</h2>
+    <div class="sm-field"><label class="sm-label" for="in_monthly_salary">월급</label><div class="sm-input-wrap"><input class="sm-input" type="text" inputmode="numeric" data-comma id="in_monthly_salary" name="in_monthly_salary" placeholder="예) 3000000"><span class="sm-unit">원</span></div></div>
+    <button class="sm-btn" type="button" onclick="calculate()">4대보험 계산하기</button>
+  </section>
+
+  <!-- ③ 결과 카드 -->
+  <div class="sm-result-card" id="result-card" role="region" aria-label="계산 결과" aria-live="polite">
+    <div class="sm-result-label">예상 국민연금</div>
+    <div>
+      <span class="sm-result-value" id="out_national_pension">-</span>
+      <span class="sm-result-unit">원</span>
+    </div>
+    <div class="sm-result-sub" id="result-formula"></div>
+    <!-- ③-CTA: 결과 하단 CTA (정적, Phase D에서 개인화) -->
+        <div id="sm-result-cta" class="sm-result-cta">
+      <p class="sm-result-cta-text">더 알아보기</p>
+      <div class="sm-result-cta-links"><a class="sm-result-cta-link" href="https://calcmate.kr/">전체 계산기 보기</a><a class="sm-result-cta-link" href="https://calcmate.kr/">CalcMate 홈</a></div>
+    </div>
+  </div>
+
+  <!-- ④ 결과 액션 버튼 (계산 후에만 표시) -->
+  <div class="sm-result-actions" id="result-actions">
+    <button class="sm-action-btn" type="button" data-action="result_save" onclick="saveResultPng()">
+      <span class="sm-action-icon" aria-hidden="true">📄</span>결과 저장
+    </button>
+    <button class="sm-action-btn" type="button" data-action="share" onclick="kakaoShare()">
+      <span class="sm-action-icon" aria-hidden="true">💬</span>카카오 공유
+    </button>
+    <button class="sm-action-btn" type="button" data-action="pwa" id="pwa-btn" onclick="pwaInstall()">
+      <span class="sm-action-icon" aria-hidden="true">📱</span>홈 화면 추가
+    </button>
+  </div>
+
+  <!-- ⑤ Notices: 계산 결과 안내 메시지 (JS가 동적으로 채움) -->
+  <div class="sm-notices" id="notices-container" role="status" aria-label="계산 결과 안내"></div>
+
+  <!-- ⑥ 계산 과정 보기 (Phase C: step accordion, JS가 채움) -->
+  <section class="sm-card" id="steps-card" style="display:none" aria-label="계산 과정">
+    <h2 class="sm-card-title">계산 과정 보기</h2>
+    <div id="steps-list"></div>
+  </section>
+
+  <!-- ⑦ 기존 계산 상세 (steps-card 없는 계산기 폴백) -->
+  <section class="sm-card" id="detail-card" style="display:none" aria-label="계산 상세">
+    <h2 class="sm-card-title">계산 상세</h2>
+    <div id="detail-rows"></div>
+  </section>
+
+  <!-- ⑧ 안내사항 -->
+  <div class="sm-notice" role="note">
+    <span class="sm-notice-icon" aria-hidden="true">⚠️</span>
+    <span>본 계산 결과는 참고용이며, 실제 지급액은 근로계약·관련 법령에 따라 달라질 수 있습니다.</span>
+  </div>
+
+
+
+  <!-- ⑧ 본문 -->
+  <section class="sm-card sm-article">
+    <h2>4대보험이란</h2>
+<p>4대보험은 국민연금·건강보험·고용보험·산재보험으로 구성된 사회보험 체계입니다. 근로자와 사업주가 정해진 요율로 각각 납부하며, 산재보험만 사업주가 전액 부담합니다(산업재해보상보험법 제13조). 이 계산기는 매월 급여에서 공제되는 근로자 부담분을 산출합니다.</p>
+<p>4대보험 요율은 보건복지부·고용노동부·국민연금공단 고시로 매년 조정됩니다. 이 계산기는 2026년 현행 요율을 기준으로 합니다. 정확한 적용 요율은 각 공단 홈페이지(건강보험: nhis.or.kr, 국민연금: nps.or.kr, 고용보험: ei.go.kr)에서 확인하세요.</p>
+
+<h2>2026년 요율 (근로자 부담분)</h2>
+<p>국민연금 4.5% (기준소득월액 상한 6,170,000원 / 하한 390,000원)<br>
+건강보험 3.545% (보수월액 기준)<br>
+장기요양보험: 건강보험료의 12.96%<br>
+고용보험 0.9% (150인 미만 사업장 기준)<br>
+산재보험 — 사업주 전액 부담, 근로자 공제 없음</p>
+
+<h2>계산 예시</h2>
+<h3>예시 1 — 월급 300만 원 근로자</h3>
+<p>국민연금 = 3,000,000 × 4.5% = 135,000원<br>
+건강보험 = 3,000,000 × 3.545% = 106,350원<br>
+장기요양 = 106,350 × 12.96% = 13,783원<br>
+고용보험 = 3,000,000 × 0.9% = 27,000원<br>
+<strong>총 공제액 282,133원</strong> | 세전 300만 원 → 4대보험만 빠져도 실수령 2,717,867원(소득세 별도)</p>
+
+<h3>예시 2 — 월급 700만 원 고소득자 (국민연금 상한 적용)</h3>
+<p>국민연금: 기준소득월액 상한 6,170,000원 적용 → 6,170,000 × 4.5% = 277,650원<br>
+건강보험 = 7,000,000 × 3.545% = 248,150원<br>
+장기요양 = 248,150 × 12.96% = 32,161원<br>
+고용보험 = 7,000,000 × 0.9% = 63,000원<br>
+<strong>총 공제액 620,961원</strong> — 월급이 두 배 이상이어도 국민연금은 상한이 있어 고소득자의 실질 부담률은 낮아집니다.</p>
+
+<h3>예시 3 — 월급 200만 원 (국민연금 하한 이상)</h3>
+<p>기준소득월액 하한 390,000원 이상이므로 실제 소득 적용<br>
+국민연금 = 2,000,000 × 4.5% = 90,000원<br>
+건강보험 = 2,000,000 × 3.545% = 70,900원<br>
+장기요양 = 70,900 × 12.96% = 9,189원<br>
+고용보험 = 2,000,000 × 0.9% = 18,000원<br>
+<strong>총 공제액 188,089원</strong> | 실수령 약 1,811,911원(소득세 별도)</p>
+
+<h2>실수하기 쉬운 사례</h2>
+<ul>
+<li><strong>장기요양보험료를 빠뜨립니다.</strong> 건강보험료만 계산하고 장기요양보험료(건강보험료의 12.96%)를 별도 합산하지 않으면 실수령액 계산이 틀어집니다. 이 계산기는 장기요양보험까지 자동 반영합니다.</li>
+<li><strong>사업주 부담분까지 내 공제액으로 착각합니다.</strong> 사업주도 국민연금·건강보험·고용보험을 동률(또는 그 이상)로 납부하지만, 그 금액은 내 월급에서 빠지지 않습니다.</li>
+<li><strong>국민연금 상한을 모릅니다.</strong> 월 급여가 6,170,000원을 초과해도 국민연금은 상한 기준으로 고정됩니다. 고소득자가 이 사실을 모르면 공제액을 과다 계산합니다.</li>
+<li><strong>4대보험에 소득세를 포함합니다.</strong> 4대보험은 사회보험료이고, 근로소득세(갑종 원천징수)와 지방소득세는 별도입니다. 실수령액 계산 시 소득세도 추가로 빼야 합니다.</li>
+</ul>
+
+
+<h2>보험료 정산(건강보험 연말 정산)</h2>
+<p>건강보험료는 매년 4월에 전년도 보수총액을 기준으로 정산합니다. 전년도 실제 보수가 당초 신고 보수보다 높으면 추가 납부, 낮으면 반환이 이루어집니다. 연봉 인상이나 성과급이 많았던 해에는 4월에 건강보험료가 예상보다 크게 나올 수 있습니다. 사전에 보수 변동을 신고해 두면 일시적 충격을 줄일 수 있습니다.</p>
+<h2>지역가입자와 직장가입자 차이</h2>
+<p>직장가입자는 급여(보수월액)를 기준으로 보험료가 산정되지만, 지역가입자는 소득·재산·자동차를 모두 고려합니다. 퇴직 후 지역가입자로 전환되면 건강보험료가 크게 오를 수 있습니다. 이 경우 임의계속가입 제도를 활용해 직장가입자 자격을 최대 36개월 유지하거나, 부양가족으로 피부양자 등록하는 방법을 검토하세요(건강보험법 제110조).</p>
+<h2>관련 계산기</h2>
+<p>4대보험 공제 후에도 근로소득세가 원천징수됩니다. 연간 납부 세액 및 예상 환급액이 궁금하다면 <a href="/연말정산_환급액_계산기/">연말정산 환급액 계산기</a>를 활용하세요. 고용보험 납입 이력은 이직 시 실업급여 수급 자격과도 연결됩니다 — <a href="/unemployment-benefit/">실업급여 계산기</a>도 함께 확인하세요.</p>
+  </section>
+
+  <!-- Phase C: 본문 중간 CTA -->
+  <div class="sm-inline-cta">
+    <p class="sm-inline-cta-title">지금 바로 4대보험 계산해 보세요</p>
+    <p class="sm-inline-cta-sub">무료 · 회원가입 불필요 · 결과 즉시 확인</p>
+    <a class="sm-inline-cta-btn" href="#" onclick="window.scrollTo({top:0,behavior:'smooth'});return false;">계산 바로 하기 ↑</a>
+  </div>
+
+
+
+  <!-- ⑨ FAQ -->
+  <section class="sm-card" id="faq-card">
+    <h2 class="sm-card-title">자주 묻는 질문</h2>
+    <div id="sm-dynamic-faq"></div>
+    <div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">2026년 4대보험 근로자 부담 요율은 얼마인가요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">국민연금 4.5%, 건강보험 3.545%, 장기요양보험(건강보험료의 12.96%), 고용보험 0.9%입니다. 사업주도 동일하거나 더 높은 요율로 부담합니다.</div></div>
+<div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">국민연금에 상한액·하한액이 있나요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">기준소득월액 상한은 6,170,000원, 하한은 390,000원입니다(국민연금법 제88조). 월급이 상한을 초과해도 국민연금은 최대 277,650원만 공제됩니다.</div></div>
+<div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">산재보험은 왜 이 계산기에 없나요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">산재보험료는 사업주가 전액 부담합니다. 근로자 급여에서 공제되지 않으므로 이 계산기에서도 제외됩니다(산업재해보상보험법 제13조).</div></div>
+<div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">실제 공제액과 계산기 결과가 다를 수 있나요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">이 계산기는 참고용 예상치입니다. 국민연금 기준소득 결정 방식, 회사별 정산 방식에 따라 실제 공제액이 소폭 다를 수 있습니다.</div></div>
+  </section>
+
+  <!-- ⑩ 관련 계산기 -->
+  <section class="sm-card" id="related-card">
+    <h2 class="sm-card-title">관련 계산기</h2>
+    <div class="sm-related-grid">
+      <a class="sm-related-item" href="../weekly-holiday-allowance/" target="_self"><span class="sm-related-emoji">💰</span><span class="sm-related-name">주휴수당 계산기</span></a>
+<a class="sm-related-item" href="../severance-pay/" target="_self"><span class="sm-related-emoji">💼</span><span class="sm-related-name">퇴직금 계산기</span></a>
+<a class="sm-related-item" href="../annual-leave-allowance/" target="_self"><span class="sm-related-emoji">📅</span><span class="sm-related-name">연차수당 계산기</span></a>
+<a class="sm-related-item" href="../unemployment-benefit/" target="_self"><span class="sm-related-emoji">📋</span><span class="sm-related-name">실업급여 계산기</span></a>
+<a class="sm-related-item" href="../연말정산_환급액_계산기/" target="_self"><span class="sm-related-emoji">🧾</span><span class="sm-related-name">연말정산 계산기</span></a>
+<a class="sm-related-item" href="../육아휴직_급여_계산기/" target="_self"><span class="sm-related-emoji">👶</span><span class="sm-related-name">육아휴직 급여 계산기</span></a>
+    </div>
+  </section>
+
+  <!-- Phase C: 관련 글 -->
+  <section class="sm-card" id="related-posts-card">
+    <h2 class="sm-card-title">관련 글</h2>
+    <div class="sm-posts-grid">
+      <a class="sm-post-card" href="/blog/four-insurance-rates-2025/">
+        <span class="sm-post-tag">4대보험</span>
+        <p class="sm-post-title">4대보험 요율 완벽 정리 — 2025년 국민연금·건강·고용·산재</p>
+        <p class="sm-post-desc">2025년 기준 4대보험 각 요율과 근로자·사업주 부담 비율을 상세히 설명합니다.</p>
+      </a>
+      <a class="sm-post-card" href="/blog/four-insurance-obligation/">
+        <span class="sm-post-tag">4대보험</span>
+        <p class="sm-post-title">4대보험 가입 의무와 미가입 시 불이익 — 법적 안내</p>
+        <p class="sm-post-desc">4대보험 가입 의무와 미가입 시 사업주에게 부과되는 과태료를 안내합니다.</p>
+      </a>
+    </div>
+  </section>
+
+
+
+  <!-- Phase C: 페이지 하단 CTA -->
+  <div class="sm-footer-cta">
+    <p class="sm-footer-cta-title">CalcMate — 급여·노무 계산기 모음</p>
+    <p class="sm-footer-cta-sub">퇴직금·주휴수당·실업급여·4대보험·연말정산·육아휴직까지</p>
+    <div class="sm-footer-cta-links">
+      <a class="sm-footer-cta-link" href="https://calcmate.kr">전체 계산기</a>
+      <a class="sm-footer-cta-link" href="https://calcmate.kr/blog/">블로그</a>
+      <a class="sm-footer-cta-link" href="https://calcmate.kr">다른 계산기 보기</a>
+    </div>
+  </div>
+
+
+  <!-- ⑫ Footer -->
+  <footer style="text-align:center;padding-top:var(--sp-3);border-top:1px solid var(--c-border);margin-top:var(--sp-3)">
+    <p style="font-size:13px;color:var(--c-text-light);margin-bottom:var(--sp-1)">본 계산기는 참고용이며 실제 지급액과 다를 수 있습니다.</p>
+    <div style="font-size:16px;font-weight:800;color:var(--c-primary);margin-bottom:var(--sp-1)">CalcMate</div>
+    <nav style="display:flex;gap:var(--sp-2);justify-content:center;flex-wrap:wrap;margin-bottom:var(--sp-1)"><a href="https://calcmate.kr/about/" style="font-size:13px;color:var(--c-text-sub);text-decoration:none">소개</a><a href="https://calcmate.kr/privacy/" style="font-size:13px;color:var(--c-text-sub);text-decoration:none">개인정보처리방침</a><a href="https://calcmate.kr/terms/" style="font-size:13px;color:var(--c-text-sub);text-decoration:none">이용약관</a><a href="https://calcmate.kr/contact/" style="font-size:13px;color:var(--c-text-sub);text-decoration:none">문의하기</a></nav>
+    <p style="font-size:12px;color:var(--c-text-light)">© 2026 CalcMate. All rights reserved.</p>
+  </footer>
+
+</div>
+
+<!-- Mobile Fixed CTA -->
+<div class="sm-mobile-cta">
+  <button class="sm-btn" type="button" onclick="calculate();setTimeout(function(){var c=document.getElementById('result-card');if(c)c.scrollIntoView({behavior:'smooth',block:'center'});},100)">
+    지금 계산하기
+  </button>
+</div>
+
+<!-- 계산기 설정(파라미터) — app_generator가 주입 -->
+<script>window.SM_CONFIG = {"name": "4대보험 계산기", "slug": "four-insurances", "primaryOutput": "national_pension", "resultUnit": "원", "inputs": [{"name": "monthly_salary", "label": "월급", "type": "number", "unit": "원"}], "outputs": [{"key": "national_pension", "label": "국민연금", "unit": "원"}, {"key": "health_insurance", "label": "건강보험", "unit": "원"}, {"key": "employment_insurance", "label": "고용보험", "unit": "원"}, {"key": "total", "label": "합계", "unit": "원"}], "show_adsense": false, "show_cpa": false, "show_share": true, "show_pwa": false, "show_result_save": true, "show_faq": true, "show_notice": true, "show_related": true, "show_detail": true, "show_article": true, "site_mode": "pre_adsense", "result_export_type": "png", "kakao_js_key": "", "calculator_version": "2.0.0", "law_version": "2026-07", "ga4_id": ""};</script>
+<script src="script.js"></script>
+</body>
+</html>

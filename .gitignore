@@ -16,4 +16,5 @@ data/logs/*.log
 data/logs/*.json
 data/schedule/
 data/legal/
-data/workspace/
+data/workspace/*
+!data/workspace/_site/
