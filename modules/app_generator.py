@@ -1370,11 +1370,11 @@ def render_result_cta(calc: dict, cfg: dict = None) -> str:
     def _u(path): return f"{_base}{path}" if _base else path
     # default 폴백 (JS 없는 환경 + SM_CTA_RULES 미적용 케이스)
     if "세금" in category or "연말정산" in slug:
-        text, links = "절세 방법이 궁금하다면", [("연말정산 공제 가이드", _u("/blog/yearend-tax-refund-maximize/")), ("전체 계산기 보기", _u("/"))]
+        text, links = "절세 방법이 궁금하다면", [("육아휴직 급여 계산하기", _u("/육아휴직_급여_계산기/")), ("전체 계산기 보기", _u("/"))]
     elif "육아" in slug or "parental" in slug:
-        text, links = "육아휴직 관련 정보", [("6+6 특례 자세히 보기", _u("/blog/6plus6-parental-leave-guide/")), ("전체 계산기 보기", _u("/"))]
+        text, links = "육아휴직 관련 계산기", [("실업급여도 확인해 보기", _u("/unemployment-benefit/")), ("전체 계산기 보기", _u("/"))]
     elif "실업" in slug or "unemployment" in slug:
-        text, links = "실업급여 더 알아보기", [("신청 가이드 보기", _u("/blog/unemployment-benefit-guide/")), ("전체 계산기 보기", _u("/"))]
+        text, links = "실업급여 더 알아보기", [("퇴직금도 계산해 보기", _u("/severance-pay/")), ("전체 계산기 보기", _u("/"))]
     elif "퇴직" in slug or "severance" in slug:
         text, links = "퇴직 관련 계산기", [("실업급여도 계산해 보기", _u("/unemployment-benefit/")), ("전체 계산기 보기", _u("/"))]
     else:
@@ -1412,8 +1412,9 @@ def render_inline_cta(calc: dict, cfg: dict = None) -> str:
 
 
 def render_related_posts(calc: dict, cfg: dict = None) -> str:
-    """관련 글 카드 섹션 (계산기 지원용 블로그 연결, 정부정책 Set 1 제외)."""
-    slug = str(calc.get("slug", ""))
+    """관련 글 카드 섹션 — V1: 블로그 미운영, 섹션 비활성."""
+    return ""
+    slug = str(calc.get("slug", ""))  # noqa: F401 — V2 활성화 시 아래 로직 복원
     posts = _RELATED_POSTS.get(slug, [])
     if not posts:
         return ""
@@ -1440,7 +1441,6 @@ def render_footer_cta(calc: dict, cfg: dict = None) -> str:
     """페이지 하단 CTA (전체 계산기 목록 및 주요 링크)."""
     site_url = str((cfg or {}).get("SITE_URL", "")).rstrip("/")
     home_url = site_url or "/"
-    blog_url = f"{site_url}/blog/" if site_url else "/blog/"
     return (
         '  <!-- Phase C: 페이지 하단 CTA -->\n'
         '  <div class="sm-footer-cta">\n'
@@ -1448,7 +1448,6 @@ def render_footer_cta(calc: dict, cfg: dict = None) -> str:
         '    <p class="sm-footer-cta-sub">퇴직금·주휴수당·실업급여·4대보험·연말정산·육아휴직까지</p>\n'
         '    <div class="sm-footer-cta-links">\n'
         f'      <a class="sm-footer-cta-link" href="{home_url}">전체 계산기</a>\n'
-        f'      <a class="sm-footer-cta-link" href="{blog_url}">블로그</a>\n'
         f'      <a class="sm-footer-cta-link" href="{home_url}">다른 계산기 보기</a>\n'
         '    </div>\n'
         '  </div>'
