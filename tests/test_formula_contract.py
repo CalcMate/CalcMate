@@ -34,8 +34,8 @@ from modules.formula_engine import (
 FORMULA_CONTRACTS = [
     (
         "weekly-holiday-allowance",
-        "(weekly_work_hours / 40) * hourly_wage * 8",
-        {"weekly_work_hours": "number", "hourly_wage": "number"},
+        "hourly_wage * (weekly_hours / 40) * 8",
+        {"weekly_hours": "number", "hourly_wage": "number"},
     ),
     (
         "severance-pay",

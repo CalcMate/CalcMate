@@ -37,7 +37,7 @@ RUN_MODE: wordpress
 SQLITE_PATH: data/blog_auto.db
 SITE_NAME: CalcMate
 SITE_URL: https://calcmate.kr
-GITHUB_REPO: calcmate-calculators
+GITHUB_REPO: calcmate
 GITHUB_USER: calcmate
 STORAGE_ADAPTER: drive
 TELEGRAM_CHAT_ID: 'REDACTED'

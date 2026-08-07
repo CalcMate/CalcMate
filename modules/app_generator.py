@@ -36,6 +36,17 @@ _LABELS = {
     "employment_insurance": "고용보험", "total": "합계", "severance_pay": "퇴직금",
     "weekly_allowance": "주휴수당", "annual_leave_allowance": "연차수당",
     "daily_benefit": "1일 구직급여", "total_benefit": "예상 총액",
+    # 퇴직금
+    "start_date": "입사일", "end_date": "퇴사일",
+    # 연말정산
+    "total_salary": "연간 총급여(원)", "family_count": "부양가족 수(인)",
+    "paid_tax": "기납부 세액(원)", "estimated_refund": "예상 환급액(원)",
+    # 육아휴직
+    "monthly_wage": "월 통상임금(원)", "insured_days": "피보험단위기간(일)",
+    "use_6plus6": "6+6 특례(1=적용, 0=일반)", "leave_month": "육아휴직 개월 차",
+    "monthly_allowance": "예상 월 지급액(원)",
+    # 주휴수당 출력
+    "weekly_holiday_pay": "주휴수당(원)",
 }
 _JS_FUNCS = {"min": "Math.min", "max": "Math.max", "round": "Math.round",
              "abs": "Math.abs", "int": "Math.trunc", "float": "Number"}
