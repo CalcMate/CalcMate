@@ -1,0 +1,12 @@
+docs(roadmap): MASTER_ROADMAP Phase A~F 공식 로드맵으로 전면 재작성
+
+- Phase A: Calculator Quality Verification (6/7 Verified, 연말정산 대기)
+- Phase B: Stability & Regression (공통 Minor 일괄 정리 + QA Standard 확정)
+- Phase C: Calculator UX/UI V2 (정적 UI 통일 - C1~C5)
+- Phase D: Dynamic Content Engine (계산 결과 본문 실시간 반영)
+- Phase E: SEO & Monetization
+- Phase F: New Calculator Pipeline (표준 제작 프로세스)
+- 운영 원칙 7개 순서 명문화 (정확성>안정성>UX>동적>SEO>수익화>신규)
+- 현재 시스템 현황 테이블 추가 (2026-07-19 기준)
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>

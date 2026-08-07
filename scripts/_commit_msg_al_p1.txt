@@ -1,0 +1,10 @@
+fix(annual-leave): AL-1/2/3 Critical 오류 수정 — 입력 검증 + 통상임금 정의 + 지급 의무 정정
+
+AL-1: daily_wage/unused_days <= 0 입력 시 null 반환 (음수 결과 방지)
+AL-2 [Critical]: faq[3]+article_content "기본 일급" → 통상임금(기본급+고정수당) 정정
+  근거: 근로기준법 시행령 제6조
+AL-3 [Critical]: faq[1]+article_content "지급 안 될 수 있다" → 퇴직 시 의무 지급 원칙 정정
+  근거: 근로기준법 제36조(금품 청산), 제61조(촉진제도 시만 예외)
+표준 문서: 권리·의무 안내 오류 심각도 기준(Critical급 준용) 추가
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>

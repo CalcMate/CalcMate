@@ -1,0 +1,11 @@
+feat(annual-leave): AL-4~7 완료 + C-13 표준 추가 — 연차수당 Verified
+
+AL-4: faq[1] 원칙-예외 구조 확립 + 제61조 촉진제도 면제 요건 구체화
+      (6개월 전 서면 통지 + 사용 시기 서면 지정 두 절차 모두 이행 시만 면제)
+AL-5: notices — unused_days > 25 법정 상한 초과 경고 (제60조제4항)
+AL-6: _formula — "통상임금(일급) N원 × M일 = Y원"
+AL-7: FAQ/article_content 전위치 "일급" → "통상임금(일급)" 병기
+C-13: 원칙-예외 일관성 체크리스트 (FAQ/HTML/본문 3곳 동일 구조)
+원칙-예외 3곳 전수 확인 PASS, 금지 문구 잔존 0건, 87테스트 ALL PASS
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>

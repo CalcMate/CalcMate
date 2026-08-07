@@ -210,7 +210,8 @@
       "Bash(.venv/Scripts/python.exe -m scripts._check_snapshot)",
       "Bash(.venv/Scripts/python.exe -m tests.snapshot_calculators save)",
       "Bash(.venv/Scripts/python.exe -m pytest tests/ -q)",
-      "Bash(.venv/Scripts/python.exe -m pytest tests/ -x -q)"
+      "Bash(.venv/Scripts/python.exe -m pytest tests/ -x -q)",
+      "Skill(claude-in-chrome)"
     ]
   }
 }

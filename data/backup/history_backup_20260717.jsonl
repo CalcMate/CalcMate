@@ -1,0 +1,100 @@
+{"date": "2026-07-04", "post_no": 3, "scheduled_time": "즉시실행", "actual_time": "12:14", "delay_min": 0, "status": "failed", "result": "미생산(no_items)", "attempts": 1}
+{"date": "2026-07-04", "post_no": 4, "scheduled_time": "즉시실행", "actual_time": "13:03", "delay_min": 0, "status": "failed", "result": "미생산(no_items)", "attempts": 1}
+{"date": "2026-07-04", "post_no": 1, "scheduled_time": "즉시실행", "actual_time": "13:05", "delay_min": 0, "status": "failed", "result": "즉시(미생산(no_items))", "attempts": 1}
+{"date": "2026-07-04", "post_no": 1, "scheduled_time": "09:22", "actual_time": "13:07", "delay_min": 225, "status": "failed", "result": "미생산(no_items)", "attempts": 2}
+{"date": "2026-07-04", "post_no": 1, "scheduled_time": "09:22", "actual_time": "14:53", "delay_min": 331, "status": "failed", "result": "미생산(no_items)", "attempts": 3}
+{"date": "2026-07-07", "post_no": 1, "scheduled_time": "19:35", "actual_time": "19:53", "delay_min": 18, "status": "failed", "result": "미생산(no_items)", "attempts": 1}
+{"date": "2026-07-07", "post_no": 1, "scheduled_time": "19:36", "actual_time": "19:55", "delay_min": 19, "status": "failed", "result": "미생산(no_items)", "attempts": 1}
+{"date": "2026-07-07", "post_no": 2, "scheduled_time": "19:59", "actual_time": "19:59", "delay_min": 0, "status": "failed", "result": "미생산(no_items)", "attempts": 1}
+{"date": "2026-07-07", "post_no": 1, "scheduled_time": "19:35", "actual_time": "21:22", "delay_min": 107, "status": "failed", "result": "미생산(모든후보HOLD)", "attempts": 1}
+{"date": "2026-07-07", "post_no": 2, "scheduled_time": "19:56", "actual_time": "21:29", "delay_min": 93, "status": "completed", "result": "성공", "attempts": 1}
+{"date": "2026-07-07", "post_no": 1, "scheduled_time": "06:01", "actual_time": "21:40", "delay_min": 939, "status": "failed", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-07", "post_no": 2, "scheduled_time": "11:41", "actual_time": "21:41", "delay_min": 600, "status": "failed", "result": "오류:APIError: [429]: Quota exceeded for quota metric 'Read requests' and limit 'Read", "attempts": 1}
+{"date": "2026-07-07", "post_no": 3, "scheduled_time": "18:57", "actual_time": "21:41", "delay_min": 164, "status": "failed", "result": "미생산(no_calculators)", "attempts": 1}
+{"date": "2026-07-07", "post_no": 1, "scheduled_time": "06:05", "actual_time": "23:06", "delay_min": 1021, "status": "failed", "result": "오류:APIError: [429]: Quota exceeded for quota metric 'Read requests' and limit 'Read", "attempts": 1}
+{"date": "2026-07-07", "post_no": 2, "scheduled_time": "11:53", "actual_time": "23:07", "delay_min": 674, "status": "failed", "result": "미생산(no_calculators)", "attempts": 1}
+{"date": "2026-07-07", "post_no": 3, "scheduled_time": "18:31", "actual_time": "23:07", "delay_min": 276, "status": "failed", "result": "미생산(no_calculators)", "attempts": 1}
+{"date": "2026-07-08", "post_no": 1, "scheduled_time": "06:26", "actual_time": "06:04", "delay_min": 0, "status": "retry", "result": "오류:APIError: [429]: Quota exceeded for quota metric 'Read requests' and limit 'Read", "attempts": 1}
+{"date": "2026-07-08", "post_no": 1, "scheduled_time": "06:29", "actual_time": "06:26", "delay_min": 0, "status": "retry", "result": "오류:APIError: [429]: Quota exceeded for quota metric 'Read requests' and limit 'Read", "attempts": 2}
+{"date": "2026-07-08", "post_no": 1, "scheduled_time": "06:29", "actual_time": "06:29", "delay_min": 0, "status": "failed", "result": "오류:APIError: [429]: Quota exceeded for quota metric 'Read requests' and limit 'Read", "attempts": 3}
+{"date": "2026-07-08", "post_no": 2, "scheduled_time": "11:51", "actual_time": "11:47", "delay_min": 0, "status": "retry", "result": "오류:APIError: [429]: Quota exceeded for quota metric 'Read requests' and limit 'Read", "attempts": 1}
+{"date": "2026-07-08", "post_no": 2, "scheduled_time": "11:59", "actual_time": "11:51", "delay_min": 0, "status": "retry", "result": "오류:APIError: [429]: Quota exceeded for quota metric 'Read requests' and limit 'Read", "attempts": 2}
+{"date": "2026-07-08", "post_no": 2, "scheduled_time": "11:59", "actual_time": "11:59", "delay_min": 0, "status": "failed", "result": "오류:APIError: [429]: Quota exceeded for quota metric 'Read requests' and limit 'Read", "attempts": 3}
+{"date": "2026-07-08", "post_no": 3, "scheduled_time": "18:58", "actual_time": "18:54", "delay_min": 0, "status": "retry", "result": "오류:APIError: [429]: Quota exceeded for quota metric 'Read requests' and limit 'Read", "attempts": 1}
+{"date": "2026-07-08", "post_no": 3, "scheduled_time": "18:59", "actual_time": "18:58", "delay_min": 0, "status": "retry", "result": "오류:APIError: [429]: Quota exceeded for quota metric 'Read requests' and limit 'Read", "attempts": 2}
+{"date": "2026-07-08", "post_no": 3, "scheduled_time": "18:59", "actual_time": "18:59", "delay_min": 0, "status": "failed", "result": "오류:APIError: [429]: Quota exceeded for quota metric 'Read requests' and limit 'Read", "attempts": 3}
+{"date": "2026-07-08", "post_no": 1, "scheduled_time": "06:19", "actual_time": "19:32", "delay_min": 793, "status": "failed", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-08", "post_no": 2, "scheduled_time": "11:46", "actual_time": "19:33", "delay_min": 467, "status": "failed", "result": "미생산(no_calculators)", "attempts": 1}
+{"date": "2026-07-08", "post_no": 3, "scheduled_time": "18:59", "actual_time": "19:33", "delay_min": 34, "status": "failed", "result": "미생산(no_calculators)", "attempts": 1}
+{"date": "2026-07-08", "post_no": 1, "scheduled_time": "06:10", "actual_time": "19:37", "delay_min": 807, "status": "failed", "result": "오류:APIError: [429]: Quota exceeded for quota metric 'Read requests' and limit 'Read", "attempts": 1}
+{"date": "2026-07-08", "post_no": 2, "scheduled_time": "11:33", "actual_time": "19:37", "delay_min": 484, "status": "failed", "result": "미생산(no_calculators)", "attempts": 1}
+{"date": "2026-07-08", "post_no": 3, "scheduled_time": "19:39", "actual_time": "19:37", "delay_min": 1, "status": "retry", "result": "미생산(no_calculators)", "attempts": 1}
+{"date": "2026-07-08", "post_no": 3, "scheduled_time": "19:39", "actual_time": "19:39", "delay_min": 0, "status": "failed", "result": "오류:APIError: [429]: Quota exceeded for quota metric 'Read requests' and limit 'Read", "attempts": 2}
+{"date": "2026-07-08", "post_no": 1, "scheduled_time": "06:22", "actual_time": "19:45", "delay_min": 803, "status": "failed", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-08", "post_no": 2, "scheduled_time": "11:35", "actual_time": "19:46", "delay_min": 491, "status": "failed", "result": "오류:APIError: [429]: Quota exceeded for quota metric 'Read requests' and limit 'Read", "attempts": 1}
+{"date": "2026-07-08", "post_no": 3, "scheduled_time": "19:49", "actual_time": "19:49", "delay_min": 0, "status": "failed", "result": "오류:APIError: [429]: Quota exceeded for quota metric 'Read requests' and limit 'Read", "attempts": 1}
+{"date": "2026-07-08", "post_no": 1, "scheduled_time": "06:12", "actual_time": "19:49", "delay_min": 817, "status": "failed", "result": "미생산(no_calculators)", "attempts": 1}
+{"date": "2026-07-08", "post_no": 2, "scheduled_time": "11:52", "actual_time": "19:49", "delay_min": 477, "status": "failed", "result": "미생산(no_calculators)", "attempts": 1}
+{"date": "2026-07-08", "post_no": 3, "scheduled_time": "19:48", "actual_time": "19:50", "delay_min": 2, "status": "failed", "result": "미생산(no_calculators)", "attempts": 1}
+{"date": "2026-07-08", "post_no": 1, "scheduled_time": "06:26", "actual_time": "19:50", "delay_min": 804, "status": "failed", "result": "미생산(no_calculators)", "attempts": 1}
+{"date": "2026-07-08", "post_no": 2, "scheduled_time": "11:54", "actual_time": "19:50", "delay_min": 476, "status": "failed", "result": "미생산(no_calculators)", "attempts": 1}
+{"date": "2026-07-08", "post_no": 3, "scheduled_time": "19:45", "actual_time": "19:50", "delay_min": 5, "status": "failed", "result": "미생산(no_calculators)", "attempts": 1}
+{"date": "2026-07-08", "post_no": 1, "scheduled_time": "06:13", "actual_time": "20:57", "delay_min": 884, "status": "failed", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-08", "post_no": 2, "scheduled_time": "11:44", "actual_time": "20:58", "delay_min": 554, "status": "failed", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-08", "post_no": 3, "scheduled_time": "19:48", "actual_time": "20:58", "delay_min": 70, "status": "failed", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-08", "post_no": 1, "scheduled_time": "06:10", "actual_time": "20:59", "delay_min": 889, "status": "failed", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-08", "post_no": 2, "scheduled_time": "11:48", "actual_time": "20:59", "delay_min": 551, "status": "failed", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-08", "post_no": 3, "scheduled_time": "20:55", "actual_time": "20:59", "delay_min": 4, "status": "failed", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-08", "post_no": 1, "scheduled_time": "06:25", "actual_time": "21:03", "delay_min": 878, "status": "failed", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-08", "post_no": 2, "scheduled_time": "11:59", "actual_time": "21:03", "delay_min": 544, "status": "failed", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-08", "post_no": 3, "scheduled_time": "21:09", "actual_time": "21:09", "delay_min": 0, "status": "failed", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-08", "post_no": 1, "scheduled_time": "06:07", "actual_time": "21:55", "delay_min": 948, "status": "failed", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-08", "post_no": 2, "scheduled_time": "11:56", "actual_time": "21:55", "delay_min": 599, "status": "failed", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-08", "post_no": 3, "scheduled_time": "18:30", "actual_time": "21:56", "delay_min": 206, "status": "failed", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-08", "post_no": 1, "scheduled_time": "06:01", "actual_time": "23:18", "delay_min": 1037, "status": "completed", "result": "성공", "attempts": 1}
+{"date": "2026-07-08", "post_no": 2, "scheduled_time": "11:30", "actual_time": "23:21", "delay_min": 711, "status": "failed", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-09", "post_no": 1, "scheduled_time": "06:12", "actual_time": "06:11", "delay_min": 0, "status": "retry", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-09", "post_no": 1, "scheduled_time": "06:18", "actual_time": "06:12", "delay_min": 0, "status": "retry", "result": "미생산(후보소진)", "attempts": 2}
+{"date": "2026-07-09", "post_no": 1, "scheduled_time": "06:23", "actual_time": "06:18", "delay_min": 0, "status": "retry", "result": "미생산(후보소진)", "attempts": 3}
+{"date": "2026-07-09", "post_no": 1, "scheduled_time": "06:24", "actual_time": "06:23", "delay_min": 0, "status": "retry", "result": "미생산(후보소진)", "attempts": 4}
+{"date": "2026-07-09", "post_no": 1, "scheduled_time": "06:25", "actual_time": "06:24", "delay_min": 0, "status": "retry", "result": "미생산(후보소진)", "attempts": 5}
+{"date": "2026-07-09", "post_no": 1, "scheduled_time": "06:26", "actual_time": "06:25", "delay_min": 0, "status": "retry", "result": "미생산(후보소진)", "attempts": 6}
+{"date": "2026-07-09", "post_no": 1, "scheduled_time": "06:29", "actual_time": "06:26", "delay_min": 0, "status": "retry", "result": "미생산(후보소진)", "attempts": 7}
+{"date": "2026-07-09", "post_no": 1, "scheduled_time": "06:29", "actual_time": "06:29", "delay_min": 0, "status": "failed", "result": "미생산(후보소진)", "attempts": 8}
+{"date": "2026-07-09", "post_no": 2, "scheduled_time": "11:52", "actual_time": "11:44", "delay_min": 0, "status": "retry", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-09", "post_no": 2, "scheduled_time": "11:59", "actual_time": "11:52", "delay_min": 0, "status": "retry", "result": "미생산(후보소진)", "attempts": 2}
+{"date": "2026-07-09", "post_no": 2, "scheduled_time": "11:59", "actual_time": "11:59", "delay_min": 0, "status": "failed", "result": "미생산(후보소진)", "attempts": 3}
+{"date": "2026-07-10", "post_no": 1, "scheduled_time": "06:01", "actual_time": "21:32", "delay_min": 931, "status": "failed", "result": "미생산(no_calculators)", "attempts": 1}
+{"date": "2026-07-10", "post_no": 2, "scheduled_time": "11:54", "actual_time": "21:32", "delay_min": 578, "status": "failed", "result": "미생산(no_calculators)", "attempts": 1}
+{"date": "2026-07-11", "post_no": 1, "scheduled_time": "09:49", "actual_time": "15:43", "delay_min": 354, "status": "failed", "result": "미생산(no_calculators)", "attempts": 1}
+{"date": "2026-07-11", "post_no": 2, "scheduled_time": "13:21", "actual_time": "15:43", "delay_min": 142, "status": "failed", "result": "미생산(no_calculators)", "attempts": 1}
+{"date": "2026-07-11", "post_no": 3, "scheduled_time": "19:41", "actual_time": "19:33", "delay_min": 0, "status": "retry", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-11", "post_no": 1, "scheduled_time": "22:05", "actual_time": "22:05", "delay_min": 0, "status": "failed", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-11", "post_no": 2, "scheduled_time": "22:56", "actual_time": "22:56", "delay_min": 0, "status": "failed", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-12", "post_no": 1, "scheduled_time": "09:41", "actual_time": "09:41", "delay_min": 0, "status": "failed", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-12", "post_no": 2, "scheduled_time": "13:29", "actual_time": "13:29", "delay_min": 0, "status": "completed", "result": "성공", "attempts": 1}
+{"date": "2026-07-12", "post_no": 1, "scheduled_time": "09:41", "actual_time": "13:43", "delay_min": 242, "status": "failed", "result": "미생산(no_items)", "attempts": 2}
+{"date": "2026-07-12", "post_no": 1, "scheduled_time": "09:41", "actual_time": "13:45", "delay_min": 244, "status": "failed", "result": "미생산(no_items)", "attempts": 3}
+{"date": "2026-07-12", "post_no": 3, "scheduled_time": "즉시실행", "actual_time": "13:46", "delay_min": 0, "status": "failed", "result": "미생산(no_items)", "attempts": 1}
+{"date": "2026-07-12", "post_no": 1, "scheduled_time": "09:41", "actual_time": "13:47", "delay_min": 246, "status": "failed", "result": "미생산(no_items)", "attempts": 4}
+{"date": "2026-07-12", "post_no": 1, "scheduled_time": "16:20", "actual_time": "16:20", "delay_min": 0, "status": "completed", "result": "성공", "attempts": 1}
+{"date": "2026-07-12", "post_no": 2, "scheduled_time": "16:52", "actual_time": "16:52", "delay_min": 0, "status": "completed", "result": "성공", "attempts": 1}
+{"date": "2026-07-12", "post_no": 3, "scheduled_time": "17:35", "actual_time": "17:35", "delay_min": 0, "status": "completed", "result": "성공", "attempts": 1}
+{"date": "2026-07-14", "post_no": 1, "scheduled_time": "06:26", "actual_time": "06:26", "delay_min": 0, "status": "completed", "result": "성공", "attempts": 1}
+{"date": "2026-07-14", "post_no": 2, "scheduled_time": "20:08", "actual_time": "20:08", "delay_min": 0, "status": "completed", "result": "성공", "attempts": 1}
+{"date": "2026-07-14", "post_no": 1, "scheduled_time": "즉시실행", "actual_time": "22:13", "delay_min": 0, "status": "completed", "result": "성공", "attempts": 1}
+{"date": "2026-07-15", "post_no": 1, "scheduled_time": "06:14", "actual_time": "06:14", "delay_min": 0, "status": "completed", "result": "성공", "attempts": 1}
+{"date": "2026-07-15", "post_no": 1, "scheduled_time": "11:44", "actual_time": "11:44", "delay_min": 0, "status": "completed", "result": "성공", "attempts": 1}
+{"date": "2026-07-15", "post_no": 2, "scheduled_time": "18:05", "actual_time": "18:05", "delay_min": 0, "status": "completed", "result": "성공", "attempts": 1}
+{"date": "2026-07-15", "post_no": 3, "scheduled_time": "즉시실행", "actual_time": "20:36", "delay_min": 0, "status": "failed", "result": "미생산(모든후보HOLD)", "attempts": 1}
+{"date": "2026-07-15", "post_no": 1, "scheduled_time": "21:01", "actual_time": "21:01", "delay_min": 0, "status": "completed", "result": "성공", "attempts": 1}
+{"date": "2026-07-16", "post_no": 1, "scheduled_time": "06:25", "actual_time": "06:25", "delay_min": 0, "status": "failed", "result": "미생산(모든후보HOLD)", "attempts": 1}
+{"date": "2026-07-16", "post_no": 2, "scheduled_time": "11:51", "actual_time": "11:51", "delay_min": 0, "status": "failed", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-16", "post_no": 3, "scheduled_time": "18:45", "actual_time": "18:45", "delay_min": 0, "status": "failed", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-17", "post_no": 1, "scheduled_time": "06:08", "actual_time": "06:08", "delay_min": 0, "status": "failed", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-17", "post_no": 2, "scheduled_time": "08:03", "actual_time": "08:03", "delay_min": 0, "status": "failed", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-17", "post_no": 3, "scheduled_time": "09:02", "actual_time": "09:02", "delay_min": 0, "status": "completed", "result": "성공", "attempts": 1}
+{"date": "2026-07-17", "post_no": 1, "scheduled_time": "14:19", "actual_time": "14:19", "delay_min": 0, "status": "failed", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-17", "post_no": 2, "scheduled_time": "14:37", "actual_time": "14:37", "delay_min": 0, "status": "failed", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-17", "post_no": 3, "scheduled_time": "14:50", "actual_time": "14:50", "delay_min": 0, "status": "failed", "result": "미생산(후보소진)", "attempts": 1}
+{"date": "2026-07-17", "post_no": 1, "scheduled_time": "18:32", "actual_time": "18:32", "delay_min": 0, "status": "failed", "result": "미생산(후보소진)", "attempts": 1}

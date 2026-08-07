@@ -1,0 +1,32 @@
+{
+  "openai": {
+    "status": "OK",
+    "level": "CRITICAL"
+  },
+  "claude": {
+    "status": "OK",
+    "level": "CRITICAL"
+  },
+  "gemini": {
+    "status": "OK",
+    "level": "CRITICAL"
+  },
+  "google_sheet": {
+    "status": "OK",
+    "level": "CRITICAL"
+  },
+  "google_drive": {
+    "status": "OK",
+    "level": "CRITICAL"
+  },
+  "service_account": {
+    "status": "OK",
+    "level": "CRITICAL",
+    "info": "project_id=blog-499303, client_email=blog-982@blog-499303.iam.gserviceaccount.com"
+  },
+  "wordpress": {
+    "status": "OK",
+    "level": "WARNING"
+  },
+  "timestamp": "2026-08-05T14:40:01.294856"
+}

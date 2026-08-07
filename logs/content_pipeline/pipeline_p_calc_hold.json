@@ -1,0 +1,85 @@
+{
+  "pipeline_id": "p_calc_hold",
+  "calculator": "calc_hold",
+  "current_stage": "H4A_QUALITY",
+  "status": "FAILED",
+  "results": {
+    "H4B_COMPETITIVE": {
+      "status": "PASS",
+      "data": {
+        "tasks": {
+          "tasks": [
+            {
+              "topic": "\uc9c0\uae09 \uc870\uac74",
+              "priority": "HIGH",
+              "action": "\ub300\uc0c1 \uc870\uac74 \uc124\uba85 \ucd94\uac00",
+              "reason": "\uc218\uae09 \uc870\uac74 \uad6c\uccb4\ud654"
+            },
+            {
+              "topic": "FAQ",
+              "priority": "HIGH",
+              "action": "FAQ \uc139\uc158 \ucd94\uac00",
+              "reason": "\uc8fc\uc694 \uc0ac\uc6a9\uc790 \uc9c8\ubb38 \ubcf4\uc644"
+            },
+            {
+              "topic": "\uacc4\uc0b0 \ubc29\ubc95",
+              "priority": "HIGH",
+              "action": "\uc124\uba85 \ud655\uc7a5",
+              "reason": "\ubb38\uc7a5 \ub2e4\ub4ec\uae30"
+            },
+            {
+              "topic": "\uc608\uc2dc",
+              "priority": "HIGH",
+              "action": "\uacc4\uc0b0 \uc608\uc2dc \ucd94\uac00",
+              "reason": "\uc2e4\uc81c \ub370\uc774\ud130 \uae30\ubc18 \uc0ac\ub840 \uc81c\uacf5"
+            },
+            {
+              "topic": "\ubc95\uc801 \uae30\uc900",
+              "priority": "HIGH",
+              "action": "\ubc95\uc801 \uae30\uc900 \uc124\uba85 \ucd94\uac00",
+              "reason": "\ucd5c\uc2e0 \ubc95\ub839 \uba85\uc2dc"
+            }
+          ]
+        },
+        "example_context": {}
+      }
+    },
+    "CONTENT_GENERATION": {
+      "status": "PASS",
+      "data": {
+        "metadata": {
+          "title": "\uc8fc\ud734\uc218\ub2f9 \uacc4\uc0b0\uae30 | \uc9c0\uae09\uc870\uac74\uacfc \uacc4\uc0b0\ubc29\ubc95 \ud655\uc778",
+          "content": "<h1>\uc8fc\ud734\uc218\ub2f9 \uacc4\uc0b0\uae30</h1><p>\uc11c\ub860: \uc8fc\ud734\uc218\ub2f9\uc5d0 \ub300\ud574 \uc54c\uc544\ubd05\ub2c8\ub2e4. \uc9c0\uae09\uc870\uac74\uc744 \ud655\uc778\ud569\ub2c8\ub2e4.</p><p>\uc694\uc57d: \uc8fc\ud734\uc218\ub2f9\uc744 \uacc4\uc0b0\uae30 \ubaa9\uc801\uc73c\ub85c \uc548\ub0b4\ud569\ub2c8\ub2e4. \uc815\ud655\ud55c \uacc4\uc0b0\uc774 \uc911\uc694\ud569\ub2c8\ub2e4.</p><h2>\uacc4\uc0b0\uae30 \uc5f0\uacb0</h2><p>\uc5ec\uae30\uc11c \uacc4\uc0b0\ud558\uc138\uc694: [\uacc4\uc0b0\uae30 \ub9c1\ud06c]</p><h2>\uacc4\uc0b0 \ubc29\ubc95</h2><p>\uc2dc\uae09\uacfc \uc8fc\ub2f9 \uc2dc\uac04\uc744 \uacf1\ud569\ub2c8\ub2e4. \uc8fc\ub2f9 40\uc2dc\uac04 \uc774\uc0c1 \uadfc\ubb34 \uc2dc \uc8fc\ud734\uc218\ub2f9\uc774 \ubc1c\uc0dd\ud558\uba70, \uacc4\uc0b0 \uae30\uc900\uc740 \uba85\ud655\ud569\ub2c8\ub2e4. \ubc95\ub839 \uadfc\uac70\ub294 \uadfc\ub85c\uae30\uc900\ubc95 \uc81c55\uc870\uc785\ub2c8\ub2e4.</p><h2>\uc9c0\uae09 \uc870\uac74</h2><p>15\uc2dc\uac04 \uc774\uc0c1 \uadfc\ubb34\uc790\uac00 \ub300\uc0c1\uc785\ub2c8\ub2e4. \uc8fc 5\uc77c \uadfc\ubb34\uac00 \uc6d0\uce59\uc774\uba70, \uc9c0\uae09\uc870\uac74\uc744 \ucda9\uc871\ud574\uc57c \ud569\ub2c8\ub2e4.</p><table><caption>\uc8fc\ud734\uc218\ub2f9 \uc9c0\uae09 \uc870\uac74</caption><thead><tr><th>\uadfc\ubb34\uc2dc\uac04</th><th>\uc9c0\uae09\uc5ec\ubd80</th></tr></thead><tbody><tr><td>15\uc2dc\uac04 \uc774\uc0c1</td><td>\uac00\ub2a5</td></tr><tr><td>15\uc2dc\uac04 \ubbf8\ub9cc</td><td>\ubd88\uac00</td></tr></tbody></table><h2>\uacc4\uc0b0 \uc608\uc2dc</h2><p>\uac80\uc99d\ub41c \ub370\uc774\ud130: {}</p>\n\n<!-- wp:image -->\n<figure class=\"wp-block-image\">\n<img src=\"https://placeholder.invalid/inline-image-example.webp\" alt=\"\uc8fc\ud734\uc218\ub2f9 \uacc4\uc0b0\uae30 \uacc4\uc0b0 \uc608\uc2dc\">\n</figure>\n<!-- /wp:image -->\n\n<p>\uc704 \ub370\uc774\ud130\ub97c \ubc14\ud0d5\uc73c\ub85c \uacc4\uc0b0\ubc29\ubc95\uc744 \uc801\uc6a9\ud558\uba74 \uc815\ud655\ud55c \uc218\uce58\uac00 \ub098\uc635\ub2c8\ub2e4.</p><h2>\uc8fc\uc758\uc0ac\ud56d</h2><p>15\uc2dc\uac04 \ubbf8\ub9cc\uc740 \ub300\uc0c1 \uc81c\uc678\uc785\ub2c8\ub2e4. \uacc4\uc0b0 \uc2dc \uc624\ub958\ub97c \ubc94\ud558\uc9c0 \uc54a\ub3c4\ub85d \uc8fc\uc758\ud558\uc138\uc694.</p><h2>FAQ</h2><p>\uc8fc\ud734\uc218\ub2f9 \ub300\uc0c1\uc740? 15\uc2dc\uac04 \uc774\uc0c1 \uadfc\ub85c\uc790\uc785\ub2c8\ub2e4.</p><h2>\ucd9c\ucc98</h2><p>\uadfc\ub85c\uae30\uc900\ubc95 \uc81c55\uc870, \uace0\uc6a9\ub178\ub3d9\ubd80 \uacf5\uc2dd \uc548\ub0b4</p><br/><a href=\"/calculator/weekly-holiday-allowance\">\uacc4\uc0b0\uae30 \ubc14\ub85c\uac00\uae30</a>",
+          "excerpt": "\uc8fc\ud734\uc218\ub2f9 \uacc4\uc0b0\uae30\uc758 \uc9c0\uae09 \uc870\uac74\uacfc \uacc4\uc0b0 \ubc29\ubc95\uc744 \ud655\uc778\ud558\uace0, \uadfc\ubb34\uc2dc\uac04 \uae30\uc900\uc5d0 \ub530\ub978 \uc608\uc0c1 \uae08\uc561\uc744 \uc9c0\uae08 \ubc14\ub85c \uacc4\uc0b0\ud574\ubcf4\uc138\uc694.",
+          "categories": [
+            "\ub178\ub3d9",
+            "\uae09\uc5ec\uacc4\uc0b0"
+          ],
+          "tags": [
+            "\uc8fc\ud734\uc218\ub2f9",
+            "\uae09\uc5ec\uacc4\uc0b0",
+            "\uc54c\ubc14"
+          ],
+          "images": [
+            {
+              "section": "\uacc4\uc0b0\ubc29\ubc95",
+              "status": "inserted",
+              "placeholder_url": "https://placeholder.invalid/inline-image-method.webp"
+            }
+          ],
+          "featured_media": "999"
+        },
+        "example_context": {}
+      }
+    },
+    "H3_FAQ": {
+      "status": "PASS",
+      "data": {
+        "faq": "\uc8fc\ud734\uc218\ub2f9 \uacc4\uc0b0\uae30\uc758 \ubc95\uc801 \uadfc\uac70\ub294 \uadfc\ub85c\uae30\uc900\ubc95 \uc81c55\uc870\uc785\ub2c8\ub2e4."
+      }
+    }
+  },
+  "errors": [
+    "Stage H4A_QUALITY returned HOLD"
+  ]
+}

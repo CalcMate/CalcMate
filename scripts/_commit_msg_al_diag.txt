@@ -1,0 +1,24 @@
+diag(annual-leave-allowance): 10개 항목 진단 보고서 + 설계 범위 규정
+
+설계 범위 확정:
+  미사용 연차수당 금액 계산기 (daily_wage x unused_days)
+  연차 발생 개수 계산 없음 — 사용자 직접 입력 방식
+
+발견 문제 (AL-1~8):
+  AL-1 [Critical]: 입력 검증 없음 (음수/0 -> null 미처리)
+  AL-2 [Major]: faq[3] 통상임금 오류 ("기본 일급만" -> 통상임금=기본급+고정수당)
+  AL-3 [Major]: faq[1] 퇴직 후 미사용 연차 오류 (의무지급인데 "안 될 수 있다")
+  AL-4 [Major]: 제61조 연차 사용 촉진제도 예외 미언급 (reviewer_expectation 위반)
+  AL-5 [Minor]: notices 없음 (25일 초과 경고 등)
+  AL-6 [Minor]: _formula 없음
+  AL-7 [Minor]: "일급" 표현 (법적 용어 "통상임금" 미사용)
+  AL-8 [설계]: 연차 발생 개수 미구현 (근속연수 -> 연차 개수 자동 계산 없음)
+
+연차 발생 계단 구조 전체 대조표 작성 (1~25일 도달 구간):
+  20년=24일, 21년=25일(상한), 22년=25일(유지) — 핵심 엣지 케이스 기록
+
+CALCULATOR_QUALITY_STANDARD_V1.0.md 신규 공통 체크 항목 추가:
+  C-11: 발생 기준과 사용 가능 기준 혼동 여부
+  C-12: 계단형 규칙 전 구간 정확성 (상한 도달 이후 정체 구간)
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>

@@ -1,0 +1,25 @@
+fix(content): 육아휴직 Phase 3 — 코드 변수명/구 Form/구 예시 제거 + 퇴직금 SP-8 동시 해결
+
+[육아휴직_급여_계산기]
+- faq[2].answer: 코드 변수명 4종(avg_monthly_wage 등) 자연어 + Phase 2 엔진 예시로 교체
+  (통상임금 80%/100%, 상한 적용, compute_pl 결과 직접 인용)
+- article_content 구 HTML Form 제거 (avg_monthly_wage/leave_months/
+  government_support_percentage/company_policy_support_percentage 4종)
+- article_content 구 계산 원리(14,400,000원) 제거 후 새 계산 원리 + 예시 4케이스 삽입
+- article_content FAQ[2]: 구 방식 설명 Phase 2 기반 자연어로 교체 (C-13 일관성 PASS)
+- FORBIDDEN 패턴 0건 확인 / C-13(faq article 80%/100%) PASS
+
+[severance-pay SP-8 동시 해결]
+- faq[2].answer: avg_monthly_wage * (total_days / 365) 자연어 + 예시로 교체
+- article_content 구 HTML Form + 결과 섹션 제거
+
+[검증]
+- fix_pl_phase3.py: Python mirror 계산 assert PASS + FORBIDDEN 0건
+- _verify_phase3.py: FORBIDDEN / C-13 / 예시 대조 ALL PASS
+- 141 회귀 테스트 ALL PASS
+
+[문서]
+- KNOWN_ISSUES.md: PL-6/15 해결 이력, SP-8 퇴직금 동시 해결 기록
+- CALCULATOR_QUALITY_STANDARD_V1.0.md: 육아휴직 Verified 전환, 퇴직금 SP-8 해결
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>

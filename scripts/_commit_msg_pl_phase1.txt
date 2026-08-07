@@ -1,0 +1,16 @@
+fix(parental-leave): Phase 1 콘텐츠 오류 교정 — PL-3/4/5/13
+
+수정 범위 (계산 로직 무수정):
+  PL-3: FAQ[0] + article HTML 자녀 연령 교정 (만 8세 이하/초등 2학년 이하)
+  PL-4: FAQ[1] + article HTML 피보험단위기간 180일 명시, C-13 원칙-예외 구조
+  PL-5: FAQ[6] + article HTML 육아휴직 법적 권리 명시 (남녀고용평등법 제19조)
+  PL-13: FAQ[7] + article HTML 복귀 의사 사전 표명 법적 요건 아님 정정
+  article 주의사항 전면 교체 (최저임금/기업 정책 오류 제거)
+
+법령 역할 분리 전수 검증:
+  남녀고용평등과 일·가정 양립 지원에 관한 법률 제19조 — 사용 권리 서술에만
+  고용보험법 제70조 — 급여 요건 서술에만 (역할 혼용 0건)
+
+검증: 구 오류 문구 6종 잔존 0건, C-13 3곳 PASS, 87 회귀 테스트 ALL PASS
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>

@@ -1,0 +1,25 @@
+feat(four-insurances): Phase 3 완료 — FI-8/9 강화 + Verified 선언
+
+FI-8 강화: _formula 5단계 순서 고정 — 장기요양 단계에 건강보험료 금액 명시
+  "장기요양 건강보험료 N원 x 12.96% = Y원" 형태
+  test_formula_stage_order: 4단계 파이프 + 인덱스 순서 검증
+  test_formula_ltc_shows_health_insurance_amount: 건강보험료 금액 포함 검증
+
+FI-9 강화: notices 명시적 우선순위 구조
+  _np_notices + _si_notices 별도 배열 + [].concat() 으로 순서 확정
+  산재보험 notice(산업재해보상보험법 제13조) 모든 케이스에서 항상 마지막 위치
+  동시 발생 테스트: test_notices_order_np_ceiling/floor_with_sangjae
+  parametrize 5개 급여 수준별 notices 개수 검증
+
+FI-10 확인: JS 하드코딩 잔존 없음
+  script.js 수치(0.045/0.03545/0.1296/0.009/390000/6170000)는
+  app_generator.py에서 YAML 로드 후 f-string 삽입 — 외부화됨
+
+테스트: 43케이스 ALL PASS (기존 31 + Phase3 신규 12)
+회귀: 전체 87케이스 ALL PASS
+Golden snapshot: four-insurances/index.html, script.js 갱신
+
+4대보험 계산기 Verified 선언 (FI-1~10 전체 해결)
+CALCULATOR_QUALITY_STANDARD_V1.0.md 4대보험 섹션 추가 + 트래커 갱신
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
