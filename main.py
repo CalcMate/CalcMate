@@ -54,6 +54,9 @@ def parse_args():
                    help="--reevaluate-hold와 함께: 특정 계산기(slug)만 재평가/재생성 대상으로 한정")
     p.add_argument("--detect-revisions", action="store_true",
                    help="법령 변경 감지(Detect Only): 공식 소스 hash 비교 → 변경 시 Telegram. 자동 수정 없음")
+    p.add_argument("--rewrite", action="store_true",
+                   help="P2-3 자동 리라이트: RMS/time-based 후보 수집 후 content+excerpt 갱신. "
+                        "title/permalink 변경 없음. --dry-run 으로 후보 확인만 가능. 스케줄러 자동 연결 없음")
     return p.parse_args()
 
 # ─────────────────────────────────────────────────────────────
@@ -383,7 +386,7 @@ def main():
         sys.exit(1)
     LOG.info("헬스체크 통과")
 
-    if args.dry_run:
+    if args.dry_run and not args.rewrite:
         LOG.info("[dry-run] 설정 검증 완료. 실제 실행 없이 종료.")
         return
 
@@ -424,6 +427,69 @@ def main():
         LOG.info("법령 변경 감지(Detect Only) 실행")
         res = detect_revisions(cfg)
         print(json.dumps(res, ensure_ascii=False, indent=2))
+        return
+
+    if args.rewrite:
+        # P2-3 자동 리라이트 — CLI 명시적 실행 전용. 스케줄러 자동 연결 없음.
+        # --dry-run: 후보 목록만 출력하고 실제 rewrite 미실행 (WP 갱신 없음).
+        # --only-slug: 특정 계산기(slug)만 대상으로 한정.
+        from modules.rewrite_pipeline import collect_rewrite_candidates, run_calculator_rewrite
+        from repositories.article_repository import ArticleRepository
+        from repositories.calculator_repository import CalculatorRepository
+        from adapters.db.factory import get_db_adapter
+
+        LOG.info("P2-3 리라이트 파이프라인 — dry-run=%s only-slug=%s",
+                 args.dry_run, args.only_slug or "all")
+
+        candidates = collect_rewrite_candidates(cfg)
+
+        if args.only_slug:
+            calc_repo = CalculatorRepository(get_db_adapter(cfg))
+            target_calc = next(
+                (c for c in calc_repo.get_all()
+                 if str(c.get("slug", "")) == args.only_slug),
+                None,
+            )
+            if target_calc:
+                candidates = [c for c in candidates
+                              if c["calculator_id"] == str(target_calc.get("id", ""))]
+            else:
+                LOG.warning("[rewrite] --only-slug %r 에 해당하는 계산기 없음", args.only_slug)
+                candidates = []
+
+        print(f"[rewrite] 후보 {len(candidates)}건")
+        for i, c in enumerate(candidates):
+            r = c["reason"]
+            print(
+                f"  [{i+1}] article_id={c['article_id']}\n"
+                f"       calculator_id={c['calculator_id']} | slug={c.get('slug', '')}\n"
+                f"       wp_post_id={c['wp_post_id']}\n"
+                f"       trigger={r['type']} | source={r.get('source', '')} "
+                f"| severity={r['severity']} | priority_rank={c['severity_rank']}\n"
+                f"       detected_at={r.get('detected_at', '')} "
+                f"| affected_fields={r.get('affected_fields', [])}\n"
+                f"       [DRY-RUN: 실제 rewrite/WP 갱신 없음]"
+            )
+
+        if args.dry_run:
+            print("[rewrite] --dry-run: 후보 확인 완료. 실제 rewrite/WordPress 갱신 없음.")
+            return
+
+        art_repo = ArticleRepository(get_db_adapter(cfg))
+        calc_repo = CalculatorRepository(get_db_adapter(cfg))
+        results = []
+        for c in candidates:
+            article_row = art_repo.get_by_id(c["article_id"])
+            calc = calc_repo.get_by_id(c["calculator_id"])
+            if not article_row or not calc:
+                LOG.warning("[rewrite] 데이터 누락 SKIP: article_id=%s", c["article_id"])
+                continue
+            res = run_calculator_rewrite(cfg, article_row, calc, c["reason"])
+            results.append(res)
+            LOG.info("[rewrite] %s — article_id=%s", res["result"], c["article_id"])
+
+        print(json.dumps({"candidates": len(candidates), "results": results},
+                         ensure_ascii=False, indent=2))
         return
 
     # 단발 실행 (run_pipeline.bat 등 하위호환)

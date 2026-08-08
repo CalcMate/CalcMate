@@ -243,6 +243,12 @@ def _write_article(cfg: dict, calc: dict, keyword: str, seo: dict, faq: list,
     return body, tokens
 
 
+def write_article_for_rewrite(cfg: dict, calc: dict, keyword: str, seo: dict, faq: list,
+                               failed_rules=None, intent: str = None) -> tuple:
+    """rewrite_pipeline이 사용하는 외부 진입점. _write_article에 위임."""
+    return _write_article(cfg, calc, keyword, seo, faq, failed_rules, intent)
+
+
 def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None, allow_duplicate: bool = False, skip_quality: bool = False, intent: str = None) -> dict:
     """활성 계산기 키워드로 SEO 글을 생산/발행. max_count 미지정 시 DAILY_POST_COUNT.
     only_cid 지정 시 그 계산기 후보만 대상(재평가 재도전 등 특정 계산기만 재생성용).
