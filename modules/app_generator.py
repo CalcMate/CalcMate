@@ -761,6 +761,22 @@ def _compute_js(calc) -> str:
             '  return out;\n};\n'
             )
         )
+    if str(calc.get("slug", "")) == "freelancer-tax-3p3":
+        # 소득세법 제127조: 원천징수세액 = gross × 3.3%, 실수령액 = gross × 96.7%
+        # 원천징수는 선납(최종 세액 아님) — notice로 안내
+        return (
+            _js_open()
+            + _js_read("gross_income")
+            + '  if (gross_income <= 0) { return null; }\n'
+            + _js_init_out()
+            + '  var withholding = Math.round(gross_income * 0.033);\n'
+            + '  var net = gross_income - withholding;\n'
+            + '  out["withholding_tax"] = withholding;\n'
+            + '  out["net_income"] = net;\n'
+            + '  out.notices.push("원천징수액은 최종 세액이 아닙니다. 매년 5월 종합소득세 신고 시 실제 세액으로 정산됩니다 (소득세법 제127조).");\n'
+            + '  out._formula = "총수입 " + gross_income.toLocaleString() + "원 × 3.3% = 원천징수 " + withholding.toLocaleString() + "원 | 실수령액 " + net.toLocaleString() + "원";\n'
+            + '  return out;\n};\n'
+        )
     if _compute_type(calc) == "date_based":   # 날짜 기반(입사일/퇴사일 → total_days)
         return (
             _js_open()

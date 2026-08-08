@@ -41,3 +41,42 @@
     - 1인가구, 연금저축 납입 케이스
     calculation_story:
     - 환급액은 결정세액과 기납부세액의 차이
+
+freelancer-tax-3p3:
+  name: 프리랜서 3.3% 원천징수 계산기
+  slug: freelancer-tax-3p3
+  category: 세금/정부혜택
+  emoji: 🧮
+  card_label: 프리랜서 원천징수 계산기
+  compute_type: single
+  date_fields: []
+  validation_mode: formula
+  field_labels:
+    gross_income: "총 수입(원)"
+    withholding_tax: "원천징수세액(원)"
+    net_income: "실수령액(원)"
+  display_order: 8
+  card_desc: "프리랜서·강사·작가 수입에서 3.3% 원천징수 세액과 실수령액을 계산해보세요"
+  difficulty: simple
+  difficulty_status: provisional
+  content:
+    evergreen: true
+    update_cycle: null
+    content_caveat: null
+  related_slugs:
+  - 연말정산_환급액_계산기
+  - four-insurances
+  - weekly-holiday-allowance
+  legal_refs:
+  - income_tax_act_127
+  writer_context:
+    emphasize:
+    - "3.3% = 소득세 3% + 지방소득세 0.3% (소득세법 제127조)"
+    - "이 금액은 원천징수액이며 최종 세액이 아님 — 매년 5월 종합소득세 신고로 정산"
+    - "인적용역 소득(사업소득)에 한정 — 근로소득·기타소득 해당 없음"
+    example_patterns:
+    - "월 200만원 수입 프리랜서 강사 케이스"
+    - "투잡 직장인 + 프리랜서 겸업, 연간 수입 합산 케이스"
+    - "계약금·잔금 분할 수령 케이스 (건당 원천징수)"
+    calculation_story:
+    - "원천징수 3.3% = 소득세 3% + 지방소득세 0.3%. 실수령액은 총 수입의 96.7%"

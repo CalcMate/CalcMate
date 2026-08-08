@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2563EB">
+<meta name="naver-site-verification" content="de4ad3f1575284b5a8ea58baab7bc7a77b7cf07e">
+<meta name="description" content="프리랜서·강사·작가 인적용역 수입의 원천징수세액(3.3%)과 실수령액을 자동 계산합니다. 소득세 3% + 지방소득세 0.3%">
+<title>2026 프리랜서 3.3% 원천징수 계산기 | 실수령액 자동 계산</title>
+<link rel="canonical" href="https://calcmate.kr/freelancer-tax-3p3/">
+<link rel="stylesheet" href="style.css">
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-EP2Q8035VF"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag("js",new Date());gtag("config","G-EP2Q8035VF");</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "3.3%는 어디서 나온 숫자인가요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "소득세법 제127조에 따른 원천징수세율 3%(소득세)에 지방소득세 0.3%를 더한 값입니다."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "원천징수를 하면 세금 신고를 안 해도 되나요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "아닙니다. 원천징수는 선납 개념이며, 이 금액은 최종 세액이 아닙니다. 매년 5월 종합소득세 신고를 통해 정산해야 합니다. 과납이면 환급, 부족이면 추가 납부합니다."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "125만원 미만 용역비는 원천징수가 면제된다는데 사실인가요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "개인에게 지급하는 인적용역비(사업소득)는 금액 무관하게 3.3% 원천징수 대상입니다. 125만원 면제 기준은 일부 기타소득에 적용되며 프리랜서 사업소득과는 다릅니다."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "부가가치세(VAT)는 이 계산에 포함되나요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "포함되지 않습니다. 부가가치세 과세 사업자라면 공급가(본 계산기 입력값)에 VAT 10%를 별도로 청구합니다. 원천징수는 VAT 제외 공급가 기준으로 계산합니다."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "직장인이 프리랜서 부업을 하면 어떻게 되나요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "근로소득과 합산하여 다음 해 5월에 종합소득세 신고를 해야 합니다. 부업 수입에서 원천징수된 3.3%는 기납부세액으로 차감됩니다."
+      }
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "CalcMate",
+  "url": "https://calcmate.kr",
+  "description": "급여·노무 계산기 모음 — 퇴직금·주휴수당·실업급여·4대보험·연말정산·육아휴직"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "CalcMate",
+      "item": "https://calcmate.kr"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "세금/정부혜택",
+      "item": "https://calcmate.kr/#calculators"
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "name": "프리랜서 3.3% 원천징수 계산기",
+      "item": "https://calcmate.kr/freelancer-tax-3p3/"
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<div class="sm-wrap">
+
+  <!-- ① Hero -->
+  <header class="sm-hero">
+    <div class="sm-hero-badge">🧮 세금/정부혜택</div>
+    <h1>프리랜서 3.3% 원천징수 계산기</h1>
+    <p class="sm-hero-sub">프리랜서·강사·작가 인적용역 수입의 원천징수세액(3.3%)과 실수령액을 자동 계산합니다. 소득세 3% + 지방소득세 0.3%</p>
+  </header>
+
+  <!-- ② 계산 입력 -->
+  <section class="sm-card" aria-label="계산 입력">
+    <h2 class="sm-card-title">계산 입력</h2>
+    <div class="sm-field"><label class="sm-label" for="in_gross_income">총 수입</label><div class="sm-input-wrap"><input class="sm-input" type="text" inputmode="numeric" data-comma id="in_gross_income" name="in_gross_income" placeholder="예) 0"><span class="sm-unit">원</span></div></div>
+    <button class="sm-btn" type="button" onclick="calculate()">프리랜서 3.3% 원천징수 계산하기</button>
+  </section>
+
+  <!-- ③ 결과 카드 -->
+  <div class="sm-result-card" id="result-card" role="region" aria-label="계산 결과" aria-live="polite">
+    <div class="sm-result-label">예상 원천징수세액</div>
+    <div>
+      <span class="sm-result-value" id="out_withholding_tax">-</span>
+      <span class="sm-result-unit">원</span>
+    </div>
+    <div class="sm-result-sub" id="result-formula"></div>
+    <!-- ③-CTA: 결과 하단 CTA (정적, Phase D에서 개인화) -->
+        <div id="sm-result-cta" class="sm-result-cta">
+      <p class="sm-result-cta-text">절세 방법이 궁금하다면</p>
+      <div class="sm-result-cta-links"><a class="sm-result-cta-link" href="https://calcmate.kr/육아휴직_급여_계산기/">육아휴직 급여 계산하기</a><a class="sm-result-cta-link" href="https://calcmate.kr/">전체 계산기 보기</a></div>
+    </div>
+  </div>
+
+  <!-- ④ 결과 액션 버튼 (계산 후에만 표시) -->
+  <div class="sm-result-actions" id="result-actions">
+    <button class="sm-action-btn" type="button" data-action="result_save" onclick="saveResultPng()">
+      <span class="sm-action-icon" aria-hidden="true">📄</span>결과 저장
+    </button>
+    <button class="sm-action-btn" type="button" data-action="share" onclick="kakaoShare()">
+      <span class="sm-action-icon" aria-hidden="true">💬</span>카카오 공유
+    </button>
+    <button class="sm-action-btn" type="button" data-action="pwa" id="pwa-btn" onclick="pwaInstall()">
+      <span class="sm-action-icon" aria-hidden="true">📱</span>홈 화면 추가
+    </button>
+  </div>
+
+  <!-- ⑤ Notices: 계산 결과 안내 메시지 (JS가 동적으로 채움) -->
+  <div class="sm-notices" id="notices-container" role="status" aria-label="계산 결과 안내"></div>
+
+  <!-- ⑥ 계산 과정 보기 (Phase C: step accordion, JS가 채움) -->
+  <section class="sm-card" id="steps-card" style="display:none" aria-label="계산 과정">
+    <h2 class="sm-card-title">계산 과정 보기</h2>
+    <div id="steps-list"></div>
+  </section>
+
+  <!-- ⑦ 기존 계산 상세 (steps-card 없는 계산기 폴백) -->
+  <section class="sm-card" id="detail-card" style="display:none" aria-label="계산 상세">
+    <h2 class="sm-card-title">계산 상세</h2>
+    <div id="detail-rows"></div>
+  </section>
+
+  <!-- ⑧ 안내사항 -->
+  <div class="sm-notice" role="note">
+    <span class="sm-notice-icon" aria-hidden="true">⚠️</span>
+    <span>본 계산 결과는 참고용이며, 실제 지급액은 근로계약·관련 법령에 따라 달라질 수 있습니다.</span>
+  </div>
+
+
+
+  <!-- ⑧ 본문 -->
+  <section class="sm-card sm-article">
+    <h2>프리랜서 3.3% 원천징수 계산기</h2><p>프리랜서·강사·작가 인적용역 수입의 원천징수세액(3.3%)과 실수령액을 자동 계산합니다. 소득세 3% + 지방소득세 0.3%</p>
+  </section>
+
+  <!-- Phase C: 본문 중간 CTA -->
+  <div class="sm-inline-cta">
+    <p class="sm-inline-cta-title">지금 바로 프리랜서 3.3% 원천징수 계산해 보세요</p>
+    <p class="sm-inline-cta-sub">무료 · 회원가입 불필요 · 결과 즉시 확인</p>
+    <a class="sm-inline-cta-btn" href="#" onclick="window.scrollTo({top:0,behavior:'smooth'});return false;">계산 바로 하기 ↑</a>
+  </div>
+
+
+
+  <!-- ⑨ FAQ -->
+  <section class="sm-card" id="faq-card">
+    <h2 class="sm-card-title">자주 묻는 질문</h2>
+    <div id="sm-dynamic-faq"></div>
+    <div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">3.3%는 어디서 나온 숫자인가요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">소득세법 제127조에 따른 원천징수세율 3%(소득세)에 지방소득세 0.3%를 더한 값입니다.</div></div>
+<div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">원천징수를 하면 세금 신고를 안 해도 되나요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">아닙니다. 원천징수는 선납 개념이며, 이 금액은 최종 세액이 아닙니다. 매년 5월 종합소득세 신고를 통해 정산해야 합니다. 과납이면 환급, 부족이면 추가 납부합니다.</div></div>
+<div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">125만원 미만 용역비는 원천징수가 면제된다는데 사실인가요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">개인에게 지급하는 인적용역비(사업소득)는 금액 무관하게 3.3% 원천징수 대상입니다. 125만원 면제 기준은 일부 기타소득에 적용되며 프리랜서 사업소득과는 다릅니다.</div></div>
+<div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">부가가치세(VAT)는 이 계산에 포함되나요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">포함되지 않습니다. 부가가치세 과세 사업자라면 공급가(본 계산기 입력값)에 VAT 10%를 별도로 청구합니다. 원천징수는 VAT 제외 공급가 기준으로 계산합니다.</div></div>
+<div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">직장인이 프리랜서 부업을 하면 어떻게 되나요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">근로소득과 합산하여 다음 해 5월에 종합소득세 신고를 해야 합니다. 부업 수입에서 원천징수된 3.3%는 기납부세액으로 차감됩니다.</div></div>
+  </section>
+
+  <!-- ⑩ 관련 계산기 -->
+  <section class="sm-card" id="related-card">
+    <h2 class="sm-card-title">관련 계산기</h2>
+    <div class="sm-related-grid">
+      <a class="sm-related-item" href="../연말정산_환급액_계산기/" target="_self"><span class="sm-related-emoji">🧾</span><span class="sm-related-name">연말정산 계산기</span></a>
+<a class="sm-related-item" href="../four-insurances/" target="_self"><span class="sm-related-emoji">🏢</span><span class="sm-related-name">4대보험 계산기</span></a>
+<a class="sm-related-item" href="../weekly-holiday-allowance/" target="_self"><span class="sm-related-emoji">💰</span><span class="sm-related-name">주휴수당 계산기</span></a>
+    </div>
+  </section>
+
+
+
+
+
+  <!-- Phase C: 페이지 하단 CTA -->
+  <div class="sm-footer-cta">
+    <p class="sm-footer-cta-title">CalcMate — 급여·노무 계산기 모음</p>
+    <p class="sm-footer-cta-sub">퇴직금·주휴수당·실업급여·4대보험·연말정산·육아휴직까지</p>
+    <div class="sm-footer-cta-links">
+      <a class="sm-footer-cta-link" href="https://calcmate.kr">전체 계산기</a>
+      <a class="sm-footer-cta-link" href="https://calcmate.kr">다른 계산기 보기</a>
+    </div>
+  </div>
+
+
+  <!-- ⑫ Footer -->
+  <footer style="text-align:center;padding-top:var(--sp-3);border-top:1px solid var(--c-border);margin-top:var(--sp-3)">
+    <p style="font-size:13px;color:var(--c-text-light);margin-bottom:var(--sp-1)">본 계산기는 참고용이며 실제 지급액과 다를 수 있습니다.</p>
+    <div style="font-size:16px;font-weight:800;color:var(--c-primary);margin-bottom:var(--sp-1)">CalcMate</div>
+    <nav style="display:flex;gap:var(--sp-2);justify-content:center;flex-wrap:wrap;margin-bottom:var(--sp-1)"><a href="https://calcmate.kr/about/" style="font-size:13px;color:var(--c-text-sub);text-decoration:none">소개</a><a href="https://calcmate.kr/privacy/" style="font-size:13px;color:var(--c-text-sub);text-decoration:none">개인정보처리방침</a><a href="https://calcmate.kr/terms/" style="font-size:13px;color:var(--c-text-sub);text-decoration:none">이용약관</a><a href="https://calcmate.kr/contact/" style="font-size:13px;color:var(--c-text-sub);text-decoration:none">문의하기</a></nav>
+    <p style="font-size:12px;color:var(--c-text-light)">© 2026 CalcMate. All rights reserved.</p>
+  </footer>
+
+</div>
+
+<!-- Mobile Fixed CTA -->
+<div class="sm-mobile-cta">
+  <button class="sm-btn" type="button" onclick="calculate();setTimeout(function(){var c=document.getElementById('result-card');if(c)c.scrollIntoView({behavior:'smooth',block:'center'});},100)">
+    지금 계산하기
+  </button>
+</div>
+
+<!-- 계산기 설정(파라미터) — app_generator가 주입 -->
+<script>window.SM_CONFIG = {"name": "프리랜서 3.3% 원천징수 계산기", "slug": "freelancer-tax-3p3", "primaryOutput": "withholding_tax", "resultUnit": "원", "inputs": [{"name": "gross_income", "label": "총 수입", "type": "number", "unit": "원"}], "outputs": [{"key": "withholding_tax", "label": "원천징수세액", "unit": "원"}, {"key": "net_income", "label": "실수령액", "unit": "원"}], "show_adsense": false, "show_cpa": false, "show_share": true, "show_pwa": false, "show_result_save": true, "show_faq": true, "show_notice": true, "show_related": true, "show_detail": true, "show_article": true, "site_mode": "pre_adsense", "result_export_type": "png", "kakao_js_key": "", "calculator_version": "2.0.0", "law_version": "2026-07", "ga4_id": "G-EP2Q8035VF"};</script>
+<script src="script.js"></script>
+</body>
+</html>

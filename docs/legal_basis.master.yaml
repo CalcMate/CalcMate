@@ -418,5 +418,52 @@ four-insurances:
         - 4000000               # 5개월: 400만원
         - 4500000               # 6개월: 450만원
 
+freelancer-tax-3p3:
+  name: 프리랜서 3.3% 원천징수 계산기
+  law: 소득세법
+  article: 제127조
+  related_articles:
+    - 소득세법 시행령 제184조의2
+  authority: 국세청
+  confidence: high
+  last_verified: 2026-08-08
+  verification_source: [law.go.kr, nts.go.kr]
+  writer_note: >
+    소득세법 제127조에 따라 인적용역 소득에 대한 원천징수세율은 소득세 3% +
+    지방소득세 0.3% = 3.3%이다. 원천징수액은 최종 세액이 아니며(선납 개념),
+    매년 5월 종합소득세 신고를 통해 정산된다는 점을 반드시 언급한다.
+    이 계산기는 인적용역 소득(사업소득)에만 적용되며 근로소득·기타소득은 해당하지 않는다.
+  reviewer_expectation:
+    - 소득세법 제127조 조항 언급
+    - 3.3% 구성(소득세 3% + 지방소득세 0.3%) 설명
+    - 원천징수액은 최종 세액이 아님(선납) 명시
+    - 종합소득세 신고 의무 언급
+    - 참고용 예상치 면책 문구 포함
+  forbidden_articles: []
+  forbidden_phrases:
+    - 원천징수로 납세 완료
+    - 종합소득세 신고 불필요
+  needs_human_legal: false
+  # --- registry v2 미러 ---
+  slug: freelancer-tax-3p3
+  category: 세금/정부혜택
+  emoji: "🧮"
+  card_label: 프리랜서 원천징수 계산기
+  compute_type: single
+  date_fields: []
+  validation_mode: formula
+  field_labels: {}
+  difficulty: simple
+  difficulty_status: provisional
+  content:
+    evergreen: true
+    update_cycle: null
+    content_caveat: null
+  related_slugs: [연말정산_환급액_계산기, four-insurances, weekly-holiday-allowance]
+  # 코드정합: input(gross_income) / output(withholding_tax, net_income)
+  # slug 전용 _compute_js 분기 사용 (2-output)
+  compute_rules:
+    positive_inputs: [gross_income]
+
 
 

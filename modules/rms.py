@@ -84,6 +84,8 @@ IMPACT_MAP: dict[str, list[str]] = {
     "per_person": ["연말정산_환급액_계산기"],
     # 육아휴직 급여 상/하한
     "parental_leave_benefit": ["육아휴직_급여_계산기"],
+    # 소득세법 제127조 원천징수세율(3.3%) — 세율 변경 시 freelancer-tax-3p3 영향
+    "income_tax_act_127": ["freelancer-tax-3p3"],
 }
 
 
