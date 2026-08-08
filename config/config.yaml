@@ -67,7 +67,7 @@ AI_ROLES:
 OPERATION_MODE: scheduled
 PUBLISH_MODE: calculator
 PUBLISH_SCHEDULE:
-  enabled: true
+  enabled: false
   failure_mode: retry_in_slot
   weekday:
   - start: 06:00
