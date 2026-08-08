@@ -20,6 +20,11 @@ labor_standards_act_55:
   forbidden_articles: []
   forbidden_phrases: []
   needs_human_legal: true
+  calculation_flow:
+  - "적용 여부 확인: 4주 평균 주당 소정근로시간 ≥ 15시간"
+  - "1일 소정근로시간 = 주당 근로시간 ÷ 5"
+  - "주휴수당 = 1일 소정근로시간 × 시급"
+  - "주 15시간 미만 단시간 근로자는 지급 대상 제외(근로기준법 제18조제3항)"
 worker_retirement_benefit_act_8:
   law: 근로자퇴직급여 보장법
   article: 제8조
@@ -41,6 +46,12 @@ worker_retirement_benefit_act_8:
   - 근로기준법 제34조
   forbidden_phrases: []
   needs_human_legal: true
+  calculation_flow:
+  - "계속근로기간 계산: 퇴직일 - 입사일 (역일수)"
+  - "계속근로 1년 미만이면 지급 대상 아님"
+  - "평균임금 일액 = 직전 3개월간 임금총액 ÷ 3개월 역일수"
+  - "퇴직금 = 평균임금 일액 × 30 × (계속근로일수 ÷ 365)"
+  - "※ 이 계산기는 avg_monthly_wage(평균 월임금) × (총근속일수 ÷ 365) 간이 방식 사용"
 labor_standards_act_60:
   law: 근로기준법
   article: 제60조
@@ -63,3 +74,8 @@ labor_standards_act_60:
   forbidden_articles: []
   forbidden_phrases: []
   needs_human_legal: true
+  calculation_flow:
+  - "1년 80% 이상 출근 시 15일 유급휴가 발생(근로기준법 제60조제1항)"
+  - "3년 이상 계속근로: 2년마다 1일 추가(최대 25일 한도)"
+  - "연차수당 = 1일 통상임금(일급) × 미사용 연차일수"
+  - "연차사용촉진 적법 시행 시 수당 지급의무 면제 가능(제61조)"

@@ -8,7 +8,12 @@ weekly-holiday-allowance:
   compute_type: single
   date_fields: []
   validation_mode: formula
-  field_labels: {}
+  field_labels:
+    hourly_wage: "시급(원)"
+    weekly_hours: "주당 근로시간"
+    weekly_allowance: "주휴수당"
+  display_order: 1
+  card_desc: "주 15시간 이상 근무했다면 꼭 확인하세요"
   difficulty: simple
   difficulty_status: provisional
   content:
@@ -24,6 +29,16 @@ weekly-holiday-allowance:
   - 육아휴직_급여_계산기
   legal_refs:
   - labor_standards_act_55
+  writer_context:
+    emphasize:
+    - 주 15시간 이상 조건
+    - 단시간 근로자 제외 예외(4주 평균 15시간 미만)
+    - 4주 평균 계산 방식
+    example_patterns:
+    - 시간제 알바가 주 15시간 이상 근무하는 케이스
+    - 소정근로시간이 불규칙한 근로자 케이스
+    calculation_story:
+    - 주휴수당은 주 15시간 이상 근무하고 소정근로일을 개근했을 때 1일분 임금을 추가 지급하는 제도
 severance-pay:
   name: 퇴직금 계산기
   slug: severance-pay
@@ -35,7 +50,13 @@ severance-pay:
   - start_date
   - end_date
   validation_mode: skip
-  field_labels: {}
+  field_labels:
+    avg_monthly_wage: "평균 월임금(원)"
+    start_date: "입사일"
+    end_date: "퇴사일"
+    severance_pay: "퇴직금"
+  display_order: 2
+  card_desc: "근속기간과 평균임금으로 퇴직금을 계산해보세요"
   difficulty: date_based
   difficulty_status: provisional
   content:
@@ -51,6 +72,16 @@ severance-pay:
   - 육아휴직_급여_계산기
   legal_refs:
   - worker_retirement_benefit_act_8
+  writer_context:
+    emphasize:
+    - 계속근로기간 1년 이상 조건
+    - 평균임금 3개월 계산 방식
+    - IRP 의무이전(2022년 이후)
+    example_patterns:
+    - 3년 근무 후 퇴직하는 직장인 케이스
+    - 계약직 1년 만료 후 퇴직 케이스
+    calculation_story:
+    - 퇴직금은 1년에 30일분 평균임금으로 계산되며 근속기간에 비례해 누적됨
 annual-leave-allowance:
   name: 연차수당 계산기
   slug: annual-leave-allowance
@@ -60,7 +91,12 @@ annual-leave-allowance:
   compute_type: single
   date_fields: []
   validation_mode: formula
-  field_labels: {}
+  field_labels:
+    daily_wage: "일급(원)"
+    unused_days: "미사용 연차(일)"
+    annual_leave_allowance: "연차수당"
+  display_order: 3
+  card_desc: "미사용 연차를 수당으로 환산해보세요"
   difficulty: simple
   difficulty_status: provisional
   content:
@@ -76,3 +112,13 @@ annual-leave-allowance:
   - 육아휴직_급여_계산기
   legal_refs:
   - labor_standards_act_60
+  writer_context:
+    emphasize:
+    - 80% 이상 출근 조건
+    - 연차 사용촉진제도 예외(제61조)
+    - 1일 통상임금 기준
+    example_patterns:
+    - 퇴직 시 미사용 연차 정산 케이스
+    - 연도 말 미사용 연차 소멸 방지 확인 케이스
+    calculation_story:
+    - 연차수당은 사용하지 못한 연차 1일당 하루치 통상임금으로 정산되는 제도

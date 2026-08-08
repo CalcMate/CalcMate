@@ -8,7 +8,13 @@
   compute_type: single
   date_fields: []
   validation_mode: formula
-  field_labels: {}
+  field_labels:
+    total_salary: "연간 총급여(원)"
+    family_count: "부양가족 수(인)"
+    paid_tax: "기납부 세액(원)"
+    estimated_refund: "예상 환급액(원)"
+  display_order: 6
+  card_desc: "연간 납부 세금과 공제 항목으로 환급액을 계산해보세요"
   difficulty: simple
   difficulty_status: provisional
   content:

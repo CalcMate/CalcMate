@@ -8,7 +8,14 @@ unemployment-benefit:
   compute_type: single
   date_fields: []
   validation_mode: formula
-  field_labels: {}
+  field_labels:
+    avg_daily_wage: "평균 일임금(원)"
+    age: "나이"
+    employment_months: "고용 개월수"
+    daily_benefit: "1일 구직급여"
+    total_benefit: "예상 총액"
+  display_order: 4
+  card_desc: "고용보험 가입기간 기준 예상 수급액을 확인하세요"
   difficulty: complex
   difficulty_status: provisional
   content:
@@ -24,6 +31,16 @@ unemployment-benefit:
   - 육아휴직_급여_계산기
   legal_refs:
   - employment_insurance_act_40
+  writer_context:
+    emphasize:
+    - 비자발적 이직 요건
+    - 피보험단위기간 180일 이상
+    - 수급 여부 확정 표현 금지
+    example_patterns:
+    - 권고사직 후 실업급여를 신청하는 케이스
+    - 계약만료 후 미갱신으로 이직한 케이스
+    calculation_story:
+    - 실업급여는 비자발적 이직자의 구직활동을 지원하는 제도로 평균임금 60%를 최대 270일간 지급
 육아휴직_급여_계산기:
   name: 육아휴직 급여 계산기
   slug: 육아휴직_급여_계산기
@@ -33,7 +50,14 @@ unemployment-benefit:
   compute_type: single
   date_fields: []
   validation_mode: formula
-  field_labels: {}
+  field_labels:
+    monthly_wage: "월 통상임금(원)"
+    insured_days: "피보험단위기간(일)"
+    use_6plus6: "6+6 특례(1=적용, 0=일반)"
+    leave_month: "육아휴직 개월 차"
+    monthly_allowance: "예상 월 지급액(원)"
+  display_order: 7
+  card_desc: "육아휴직 기간별 예상 급여를 확인해보세요"
   difficulty: simple
   difficulty_status: provisional
   content:
@@ -49,3 +73,13 @@ unemployment-benefit:
   - 연말정산_환급액_계산기
   legal_refs:
   - employment_insurance_act_70
+  writer_context:
+    emphasize:
+    - 6+6 특례 요건(부모 모두 사용)
+    - 상·하한액 매년 변경
+    - 피보험단위기간 180일 이상
+    example_patterns:
+    - 엄마·아빠 모두 육아휴직을 사용하는 6+6 특례 케이스
+    - 한쪽 부모만 육아휴직 사용하는 일반 케이스
+    calculation_story:
+    - 육아휴직 급여는 월 통상임금의 80%를 기본으로 6+6 특례 시 최초 6개월은 100%까지 상향

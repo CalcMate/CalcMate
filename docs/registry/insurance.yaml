@@ -8,7 +8,14 @@ four-insurances:
   compute_type: dict
   date_fields: []
   validation_mode: formula
-  field_labels: {}
+  field_labels:
+    monthly_salary: "월급(원)"
+    national_pension: "국민연금"
+    health_insurance: "건강보험"
+    employment_insurance: "고용보험"
+    total: "합계"
+  display_order: 5
+  card_desc: "국민연금·건강보험·고용보험·산재보험 공제액 확인"
   difficulty: multi_output
   difficulty_status: provisional
   content:
@@ -24,3 +31,13 @@ four-insurances:
   - 육아휴직_급여_계산기
   legal_refs:
   - four_major_insurances
+  writer_context:
+    emphasize:
+    - 산재보험은 사업주 전액 부담(근로자 공제 없음)
+    - 보험요율은 매년 변경
+    - 실수령액 계산 시 4대보험 공제 후 금액 안내
+    example_patterns:
+    - 신입사원이 첫 월급에서 4대보험 얼마 빠지는지 확인하는 케이스
+    - 월급에서 실수령액을 역산하는 케이스
+    calculation_story:
+    - 4대보험은 근로자 급여에서 공제되는 3종(국민연금·건강보험·고용보험)과 사업주 전액부담 산재보험으로 구성
