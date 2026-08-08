@@ -1759,7 +1759,10 @@ elif tab == "🧮 계산기 관리":
     from adapters.db.factory import get_db_adapter
     from repositories.calculator_repository import CalculatorRepository
     from modules import app_generator as AG, github_deployer as GH, formula_engine as FE
+    from modules import app_factory as AF_CM
+    from modules.registry_loader import load_registry_v3 as _load_v3
     repo = CalculatorRepository(get_db_adapter(cfg))
+    _v3_reg = _load_v3(force=True)
 
     if st.button("🌱 기본 계산기 5종 시드"):
         from modules.calculator_seeder import seed_default_calculators
@@ -1790,10 +1793,25 @@ elif tab == "🧮 계산기 관리":
         url = c.get("published_url", "")
         status_icon = "🟢" if str(c.get("status")).lower() == "active" else "⚪"
         _auto_expand = bool(_just_saved) and c.get("name") == _just_saved
-        with st.expander(f"{status_icon} {c.get('name','(이름없음)')} — {c.get('status','')}"
+        _v3e = _v3_reg.get(c.get("slug", "")) or {}
+        _is_hold = _v3e.get("source") == "app_factory" and _v3e.get("status") == "HOLD"
+        _hold_badge = " 🔴 LEGAL HOLD" if _is_hold else ""
+        with st.expander(f"{status_icon} {c.get('name','(이름없음)')} — {c.get('status','')}{_hold_badge}"
                          + (f" · 배포됨" if url else ""), expanded=_auto_expand):
             if url:
                 st.markdown(f"**배포 URL:** [{url}]({url})")
+            # App Factory HOLD 계산기 — READY 전환 버튼
+            if _is_hold:
+                st.warning(
+                    f"⚠️ **LEGAL HOLD** — Tier{_v3e.get('tier','?')} 계산기. "
+                    "legal 검증(법령 근거/계산 공식) 완료 후 READY 전환하세요. "
+                    "READY 전환 전까지 index/sitemap/정적사이트에서 비노출."
+                )
+                if st.button(f"✅ READY 전환 (legal 검증 완료)", key=f"cm_ready_{cid}", type="primary"):
+                    _ok_r, _msg_r = AF_CM.promote_to_ready(c.get("slug", ""))
+                    (st.success if _ok_r else st.error)(_msg_r)
+                    if _ok_r:
+                        st.rerun()
             # 수식 편집(검증 후 저장)
             cur_formula = c.get("formula", "")
             new_formula = st.text_input("수식(formula)", value=str(cur_formula), key=f"cm_f_{cid}")
@@ -1978,8 +1996,7 @@ elif tab == "🏭 App Factory":
             except Exception as e:
                 st.warning(f"AI 제안 실패(직접 입력해주세요): {e}")
 
-    # 💡 AI 아이디어 제안(수동 버튼) — 클릭 시에만 입력칸 자동채움. 위젯 키를 직접 세팅해야
-    # 재클릭 시에도 갱신됨(text_input의 value= 방식은 위젯 생성 후 무시되는 Streamlit 제약 회피).
+    # 💡 AI 아이디어 제안(수동 버튼)
     if st.button("💡 AI 아이디어 제안", key="af_suggest"):
         with st.spinner("AI가 새 계산기 아이디어를 찾는 중..."):
             try:
@@ -1989,6 +2006,23 @@ elif tab == "🏭 App Factory":
                 st.session_state["af_desc"] = idea.get("desc", "")
             except Exception as e:
                 st.warning(f"AI 제안 실패(직접 입력해주세요): {e}")
+
+    # Tier 선택 (필수) — 계산 로직 복잡도 및 legal 검증 수준 결정
+    af_tier = st.radio(
+        "Tier * (필수)",
+        options=[2, 1],
+        format_func=lambda t: (
+            "Tier2 — 단순 산술/일반 공식 (수식으로 표현 가능한 계산)"
+            if t == 2 else
+            "Tier1 — 법령/조건분기/복잡 계산 (날짜 기반, 다단계 조건, 법령 요율 적용)"
+        ),
+        horizontal=True,
+        key="af_tier",
+    )
+    if af_tier == 1:
+        st.info("ℹ️ Tier1은 생성 후 계산 로직 + legal 근거 모두 사람이 검증해야 합니다. READY 전환 전까지 index/sitemap 비노출.")
+    else:
+        st.info("ℹ️ Tier2는 생성 후 계산 정확성 검증 + legal 검증 완료 시 READY 전환 가능.")
 
     c1, c2 = st.columns(2)
     af_name = c1.text_input("계산기명 *", placeholder="퇴직금 계산기", key="af_name")
@@ -2000,20 +2034,23 @@ elif tab == "🏭 App Factory":
         else:
             with st.spinner("AI가 계산기를 생성 중입니다... (수십 초)"):
                 try:
-                    st.session_state["af_result"] = AF.generate_app(cfg, af_name, af_cat, af_desc)
+                    st.session_state["af_result"] = AF.generate_app(
+                        cfg, af_name, af_cat, af_desc, tier=af_tier)
                 except Exception as e:
                     st.session_state["af_result"] = None
                     st.error(f"생성 실패: {e}")
     app = st.session_state.get("af_result")
     if app:
-        st.success(f"생성 완료 — 토큰 {app['_tokens']}")
+        _tier_label = "Tier2 (단순)" if app.get("tier", 2) == 2 else "Tier1 (복잡)"
+        st.success(f"생성 완료 — 토큰 {app['_tokens']} | {_tier_label}")
         if not app.get("_formula_valid", True):
             st.error(f"⚠️ 수식 검증 실패: {app.get('_formula_msg', '')}\n\n(저장은 가능하나 생성물 계산이 정상 동작하지 않을 수 있습니다. 운영자 확인 필요.)")
         st.write("**단계:** " + " → ".join(f"{s[0]}({s[1]})" for s in app["_steps"]))
-        m = st.columns(3)
+        m = st.columns(4)
         m[0].metric("HTML 길이", len(app["html"]))
         m[1].metric("FAQ 수", len(app["faq"]) if isinstance(app["faq"], list) else 0)
         m[2].metric("계산기 유형", app["calculator_type"])
+        m[3].metric("formula 타입", "dict(복수출력)" if isinstance(app.get("formula"), dict) else "str(단일)")
         st.text_input("SEO 제목", app["seo_title"], disabled=True, key="af_seo")
         with st.expander("입력/출력 스키마"):
             st.json({"input": app["input_schema"], "output": app["output_schema"]})

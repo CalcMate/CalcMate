@@ -4,6 +4,7 @@ modules/app_factory.py — 계산기 자동 생성 (v12.0)
 
 흐름: GPT(총괄 spec) → Claude(코드 HTML/CSS/JS) → GPT(SEO/FAQ/블로그초안)
       → Gemini(이미지 프롬프트) → calculators + app_templates 저장
+      → v3 Registry 즉시 기록(status=HOLD) → legal 검증 → READY 전환
 
 모든 AI 호출은 ai_roles(=ai_provider) 경유, 데이터 저장은 Repository 경유.
 gspread/Drive 직접 호출 없음.
@@ -12,6 +13,17 @@ import json
 import re
 from datetime import datetime
 from pathlib import Path
+
+# v3 Registry 경로 (docs/registry/*.yaml SSOT)
+_REG_DIR = Path(__file__).resolve().parent.parent / "docs" / "registry"
+
+# category → _af yaml 파일명(확장자 제외). 미매핑은 labor_af 폴백.
+_CATEGORY_AF_YAML_MAP: dict[str, str] = {
+    "세금/정부혜택": "tax_af",
+    "노무/급여": "labor_af",
+    "고용/보험": "employment_af",
+    "노무/급여/보험": "insurance_af",
+}
 
 from adapters.db.factory import get_db_adapter
 from repositories.calculator_repository import CalculatorRepository
@@ -56,7 +68,136 @@ def _chat(cfg, role, system, user, max_tokens=1200):
     return text, model, tokens
 
 
-def generate_app(cfg: dict, name: str, category: str = "", desc: str = "") -> dict:
+def _category_to_af_yaml(category: str) -> str:
+    """category → _af yaml 파일명(확장자 제외). 미매핑 시 labor_af 폴백."""
+    return _CATEGORY_AF_YAML_MAP.get(str(category).strip(), "labor_af")
+
+
+def _next_display_order() -> int:
+    """v3 registry 전체(기존+_af 파일 포함) 최대 display_order + 1. 없으면 10."""
+    from .registry_loader import load_registry_v3, invalidate
+    invalidate()
+    v3 = load_registry_v3(force=True)
+    orders = [e.get("display_order", 0) for e in v3.values()
+              if isinstance(e.get("display_order"), int)]
+    return max(orders, default=9) + 1
+
+
+def _build_v3_entry(app: dict, slug: str, tier: int = 2) -> dict:
+    """v3 Registry(docs/registry/*_af.yaml)에 기록할 엔트리 생성.
+    기존 8개 계산기 형식과 동일 스키마 + status/tier/source 추가."""
+    ins = app.get("input_schema", {}) or {}
+    outs = app.get("output_schema", {}) or {}
+    date_fields, compute_type, validation_mode, difficulty = _infer_registry_meta(
+        ins, outs, app.get("formula", ""))
+    name = app.get("name", "")
+    desc = (app.get("description", "") or app.get("seo_desc", "") or "").strip()
+    card_desc = (desc[:45] + "…") if len(desc) > 45 else desc
+    return {
+        "name": name,
+        "slug": slug,
+        "category": app.get("category", ""),
+        "emoji": "🧮",
+        "card_label": name,
+        "compute_type": compute_type,
+        "date_fields": date_fields,
+        "validation_mode": validation_mode,
+        "field_labels": app.get("labels", {}) or {},
+        "display_order": _next_display_order(),
+        "card_desc": card_desc,
+        "difficulty": difficulty,
+        "difficulty_status": "provisional",
+        "status": "HOLD",
+        "tier": tier,
+        "source": "app_factory",
+        "content": {"evergreen": True, "update_cycle": None, "content_caveat": None},
+        "related_slugs": [],
+        "legal_refs": [],
+        "writer_context": {
+            "emphasize": [],
+            "example_patterns": [desc[:60]] if desc else [],
+            "calculation_story": [],
+        },
+    }
+
+
+def _write_registry_v3(slug: str, entry: dict, category: str) -> None:
+    """docs/registry/<category>_af.yaml에 slug 엔트리를 추가.
+    _af.yaml은 App Factory 전용 — 기존 registry/*.yaml은 절대 수정하지 않음.
+    기존 v3 slug(기존 8개 포함)와 중복 시 ValueError."""
+    import yaml
+    from .registry_loader import load_registry_v3, invalidate
+
+    # 기존 v3 slug 보호 — 기존 8개 + 이미 등록된 _af 엔트리 모두 포함
+    existing_v3 = load_registry_v3(force=True)
+    if slug in existing_v3:
+        raise ValueError(f"v3 Registry에 이미 존재하는 slug: '{slug}'")
+
+    yaml_name = _category_to_af_yaml(category)
+    yaml_file = _REG_DIR / f"{yaml_name}.yaml"
+
+    # 기존 _af 파일 로드 (없으면 빈 dict)
+    try:
+        existing = yaml.safe_load(yaml_file.read_text(encoding="utf-8")) or {}
+        if not isinstance(existing, dict):
+            existing = {}
+    except FileNotFoundError:
+        existing = {}
+
+    existing[slug] = entry
+    _AF_HEADER = (
+        f"# registry/{yaml_name}.yaml — App Factory 자동생성 계산기 (v3 SSOT)\n"
+        "# ⚠️ 이 파일은 App Factory(modules/app_factory)가 자동으로 씁니다. 직접 편집 주의.\n"
+        "# status: HOLD = legal 검증 대기 중 (index/sitemap 비노출)\n"
+        "# status: READY = 공개 (index/sitemap 포함, CalcMate 정적 사이트 빌드 대상)\n"
+    )
+    body = yaml.dump(existing, allow_unicode=True, sort_keys=False, default_flow_style=False)
+    yaml_file.write_text(_AF_HEADER + "\n" + body, encoding="utf-8")
+    invalidate()
+    LOG.info("v3 Registry 기록(HOLD): %s → %s", slug, yaml_file.name)
+
+
+def promote_to_ready(slug: str) -> tuple:
+    """App Factory 계산기의 v3 status를 HOLD → READY로 전환.
+    legal 검증 완료 후 호출. 기존 8개 계산기(source != app_factory)에는 동작 거부."""
+    import yaml
+    from .registry_loader import load_registry_v3, invalidate
+
+    v3 = load_registry_v3(force=True)
+    entry = v3.get(slug)
+    if entry is None:
+        return False, f"v3 Registry에 '{slug}' 없음"
+    if entry.get("source") != "app_factory":
+        return False, f"'{slug}'은 App Factory 생성 계산기가 아닙니다 (기존 계산기 수정 금지)"
+    if entry.get("status") == "READY":
+        return True, f"'{slug}'은 이미 READY 상태입니다"
+
+    category = entry.get("category", "")
+    yaml_name = _category_to_af_yaml(category)
+    yaml_file = _REG_DIR / f"{yaml_name}.yaml"
+
+    try:
+        data = yaml.safe_load(yaml_file.read_text(encoding="utf-8")) or {}
+    except Exception as e:
+        return False, f"Registry 파일 읽기 실패: {e}"
+    if not isinstance(data, dict) or slug not in data:
+        return False, f"'{slug}'이 {yaml_file.name}에 없음"
+
+    data[slug]["status"] = "READY"
+    _AF_HEADER = (
+        f"# registry/{yaml_name}.yaml — App Factory 자동생성 계산기 (v3 SSOT)\n"
+        "# ⚠️ 이 파일은 App Factory(modules/app_factory)가 자동으로 씁니다. 직접 편집 주의.\n"
+        "# status: HOLD = legal 검증 대기 중 (index/sitemap 비노출)\n"
+        "# status: READY = 공개 (index/sitemap 포함, CalcMate 정적 사이트 빌드 대상)\n"
+    )
+    body = yaml.dump(data, allow_unicode=True, sort_keys=False, default_flow_style=False)
+    yaml_file.write_text(_AF_HEADER + "\n" + body, encoding="utf-8")
+    invalidate()
+    LOG.info("v3 Registry HOLD→READY: %s", slug)
+    return True, f"✅ '{slug}' HOLD → READY 전환 완료. 사이트 재빌드 후 index/sitemap에 반영됩니다."
+
+
+def generate_app(cfg: dict, name: str, category: str = "", desc: str = "", tier: int = 2) -> dict:
     """계산기 1종을 AI로 생성하여 dict 반환(저장은 save_app)."""
     name = (name or "").strip()
     if not name:
@@ -74,17 +215,25 @@ def generate_app(cfg: dict, name: str, category: str = "", desc: str = "") -> di
     ) or "(없음)"
 
     # 1) 총괄(GPT): 스펙 설계 (입력/출력 스키마 + 산식)
+    _tier_note = (
+        "[Tier2 — 단순 산술/일반 공식] 복잡한 조건분기·날짜 계산 최소화. 수식으로 표현 가능한 계산 위주."
+        if tier == 2 else
+        "[Tier1 — 법령/조건분기/복잡 계산] 다단계 조건, 날짜 기반, 법령 규정 적용이 필요한 계산."
+    )
     sys1 = (
-        "너는 웹 계산기 기획자다. 주어진 계산기에 대해 입력/출력 스키마와 산식을 설계하라.\n"
+        f"너는 웹 계산기 기획자다. 주어진 계산기에 대해 입력/출력 스키마와 산식을 설계하라.\n"
+        f"계산기 Tier: {_tier_note}\n"
         "요구사항:\n"
-        "1. formula는 반드시 input_schema의 변수명만 사용한 '단일 산술 표현식'이어야 한다. "
-        "대입문(=), 세미콜론(;), 함수 정의, 정의되지 않은 함수 호출 금지. "
-        "허용 함수: min, max, round, abs, int, float 만 사용 가능. "
-        "여러 단계 계산이 필요하면 하나의 표현식 안에 괄호로 중첩해서 표현하라.\n"
+        "1. formula 규칙:\n"
+        "   - 단일 출력: input_schema 변수만 사용한 단일 산술 표현식(문자열).\n"
+        "   - 복수 출력: {출력키: 산술식} JSON 객체. 각 식은 반드시 input_schema 변수만 사용.\n"
+        "     (다른 출력키 참조 절대 금지. 예: net_income = gross * 0.967, gross - withholding 방식 금지)\n"
+        "   대입문(=), 세미콜론(;), 함수 정의, 미정의 함수 호출 금지.\n"
+        "   허용 함수: min, max, round, abs, int, float 만 사용 가능.\n"
         "2. input_schema/output_schema의 모든 키는 반드시 한국어 라벨을 'labels' 필드에 매핑하라 "
         '(예: {"monthly_salary": "월급"}).\n'
         "3. 순수 JSON만 반환: "
-        '{"calculator_type":"","input_schema":{},"output_schema":{},"formula":"","labels":{}}\n'
+        '{"calculator_type":"","input_schema":{},"output_schema":{},"formula":"또는{}","labels":{}}\n'
         f"다음은 이미 등록된 계산기 목록이다:\n{existing_summary}\n"
         "위 목록과 기능·입력항목이 실질적으로 겹치지 않도록 설계하라."
     )
@@ -161,6 +310,7 @@ def generate_app(cfg: dict, name: str, category: str = "", desc: str = "") -> di
         "_formula_msg": spec.get("_formula_msg", ""),
         "_steps": steps,
         "_tokens": sum(s[2] for s in steps),
+        "tier": tier,
     }
 
 
@@ -282,11 +432,17 @@ def save_app(cfg: dict, app: dict, site_id: str = "", slug: str = None) -> tuple
         # 중복 체크(이름)
         if any(str(c.get("name", "")).strip().lower() == name.lower() for c in _all):
             return False, f"중복 계산기명: '{name}' 이미 등록됨"
-        # 중복 체크(slug) — 기존 '저장된 slug'와 비교(배포 폴더/링크 충돌 방지)
+        # 중복 체크(slug) — DB + v3 Registry 모두 확인(기존 8개 포함)
         if any(str(c.get("slug", "")).strip().lower() == new_slug for c in _all):
-            return False, f"중복 슬러그: '{new_slug}' 이미 등록됨"
+            return False, f"중복 슬러그: '{new_slug}' 이미 등록됨 (DB)"
     except Exception as e:
         return False, f"기존 계산기 조회 실패(시트 권한 확인): {e}"
+    try:
+        from .registry_loader import load_registry_v3
+        if new_slug in load_registry_v3(force=True):
+            return False, f"중복 슬러그: '{new_slug}' 이미 v3 Registry에 존재"
+    except Exception:
+        pass
 
     try:
         # 템플릿 먼저 저장 → template_id 확보
@@ -300,11 +456,14 @@ def save_app(cfg: dict, app: dict, site_id: str = "", slug: str = None) -> tuple
             "faq_template": json.dumps(app.get("faq", []), ensure_ascii=False),
             "status": "active",
         })
+        _formula = app.get("formula", "")
+        _formula_stored = (json.dumps(_formula, ensure_ascii=False)
+                           if isinstance(_formula, dict) else (_formula or ""))
         calc_repo.save({
             "name": name, "slug": new_slug, "category": app.get("category", ""),
             "calculator_type": app.get("calculator_type", "general"),
             "template_id": tpl_id, "site_id": site_id,
-            "formula": app.get("formula", ""),
+            "formula": _formula_stored,
             "labels": json.dumps(app.get("labels", {}), ensure_ascii=False),
             "faq": json.dumps(app.get("faq", []), ensure_ascii=False),
             "input_schema": json.dumps(app.get("input_schema", {}), ensure_ascii=False),
@@ -314,17 +473,30 @@ def save_app(cfg: dict, app: dict, site_id: str = "", slug: str = None) -> tuple
         })
     except Exception as e:
         return False, f"저장 실패(시트 권한 확인): {e}"
-    # registry_auto.yaml에 자동 엔트리 기록(§3) — 실패해도 계산기 저장 자체는 유효(경고만).
+    # [Step A] registry_auto.yaml — 스테이징 레이어(기존 경로 유지)
+    _v3_warn = ""
     try:
         from .registry_loader import add_auto_entry
         add_auto_entry(new_slug, _build_registry_entry(app, new_slug))
-        LOG.info("registry_auto 엔트리 기록: %s", new_slug)
+        LOG.info("registry_auto 엔트리 기록(스테이징): %s", new_slug)
     except Exception as _re:
-        LOG.warning("registry_auto 기록 실패(무시, 계산기 저장은 완료됨): %s", _re)
-    # calculator_index.json 갱신(slug↔한글 name 매핑, 개발 편의용 — 기존 로직은 이 파일을 읽지 않음).
+        LOG.warning("registry_auto 기록 실패(무시): %s", _re)
+    # [Step B] v3 Registry 즉시 기록 — 프로덕션 SSOT(Plan A: save_app() 즉시)
+    # 실패해도 계산기 DB 저장은 유효(경고 반환)
+    try:
+        _tier = app.get("tier", 2)
+        _v3_entry = _build_v3_entry(app, new_slug, tier=_tier)
+        _write_registry_v3(new_slug, _v3_entry, app.get("category", ""))
+        LOG.info("v3 Registry 기록(HOLD): %s", new_slug)
+    except Exception as _v3e:
+        _v3_warn = f" ⚠️ v3 Registry 기록 실패({_v3e}) — 사이트 관리 탭에서 수동 확인 필요"
+        LOG.warning("v3 Registry 기록 실패(계산기 저장은 완료됨): %s", _v3e)
+    # calculator_index.json 갱신(개발 편의용)
     try:
         _write_calculator_index(cfg)
     except Exception as _ie:
         LOG.warning("calculator_index 갱신 실패(무시): %s", _ie)
     LOG.info("App Factory 저장 완료: %s (tpl=%s)", name, tpl_id)
-    return True, f"✅ '{name}' 계산기 + 템플릿 저장 완료 (template_id={tpl_id})"
+    _msg = f"✅ '{name}' 계산기 + 템플릿 저장 완료 (template_id={tpl_id})"
+    _msg += " | v3 Registry HOLD 등록 완료. legal 검증 후 READY 전환 필요." if not _v3_warn else _v3_warn
+    return True, _msg

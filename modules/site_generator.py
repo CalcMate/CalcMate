@@ -270,8 +270,10 @@ def generate_index(cfg: dict) -> str:
     from modules.registry_loader import load_registry_v3
     reg = _registry()
     _v3 = load_registry_v3()
+    # status=HOLD(App Factory 생성 후 legal 미검증)는 공개 카드 제외
     _slugs = [s for s, _ in sorted(
-        [(s, e.get("display_order", 999)) for s, e in _v3.items() if reg.get(s)],
+        [(s, e.get("display_order", 999)) for s, e in _v3.items()
+         if reg.get(s) and e.get("status") != "HOLD"],
         key=lambda x: x[1],
     )]
     calc_cards = "\n".join(
@@ -574,8 +576,10 @@ def generate_sitemap(cfg: dict) -> str:
     today = datetime.date.today().isoformat()
 
     _v3 = load_registry_v3()
+    # status=HOLD는 사이트맵 제외
     _sitemap_slugs = [s for s, _ in sorted(
-        _v3.items(), key=lambda x: x[1].get("display_order", 999)
+        [(s, e) for s, e in _v3.items() if e.get("status") != "HOLD"],
+        key=lambda x: x[1].get("display_order", 999),
     )]
     static_pages = [
         ("", "1.0", "weekly"),
