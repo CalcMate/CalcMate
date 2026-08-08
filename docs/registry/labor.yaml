@@ -11,7 +11,7 @@ weekly-holiday-allowance:
   field_labels:
     hourly_wage: "시급(원)"
     weekly_hours: "주당 근로시간"
-    weekly_allowance: "주휴수당"
+    weekly_holiday_pay: "주휴수당(원)"
   display_order: 1
   card_desc: "주 15시간 이상 근무했다면 꼭 확인하세요"
   difficulty: simple

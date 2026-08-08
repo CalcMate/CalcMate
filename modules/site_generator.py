@@ -17,16 +17,7 @@ from __future__ import annotations
 import html as _html
 import datetime
 
-# ── 계산기 설명 (registry에 없는 사이트 카피 — 슬러그별 fallback) ──
-_CALC_DESCS: dict[str, str] = {
-    "severance-pay":            "근속기간과 평균임금으로 퇴직금을 계산해보세요",
-    "weekly-holiday-allowance": "주 15시간 이상 근무했다면 꼭 확인하세요",
-    "unemployment-benefit":     "고용보험 가입기간 기준 예상 수급액을 확인하세요",
-    "annual-leave-allowance":   "미사용 연차를 수당으로 환산해보세요",
-    "four-insurances":          "국민연금·건강보험·고용보험·산재보험 공제액 확인",
-    "연말정산_환급액_계산기":    "연간 납부 세금과 공제 항목으로 환급액을 계산해보세요",
-    "육아휴직_급여_계산기":      "육아휴직 기간별 예상 급여를 확인해보세요",
-}
+# _CALC_DESCS 제거 (P2-2-C) — card_desc는 registry v3에서 공급됨.
 
 _CONTACT_EMAIL = "contact@calcmate.kr"
 _EFFECTIVE_DATE = "2026년 8월 6일"
@@ -274,16 +265,22 @@ def generate_index(cfg: dict) -> str:
     site_name = cfg.get("SITE_NAME", "CalcMate")
     ga4_id = cfg.get("GA4_MEASUREMENT_ID", "") or ""
 
-    # 계산기 목록을 registry에서 동적 조회 (새 계산기 추가 시 자동 반영)
-    from modules.app_generator import _registry, _SLUG_ORDER  # lazy import (circular 방지)
+    # 계산기 목록: registry v3 display_order 기준 정렬, card_desc는 v3 단일 소스
+    from modules.app_generator import _registry
+    from modules.registry_loader import load_registry_v3
     reg = _registry()
+    _v3 = load_registry_v3()
+    _slugs = [s for s, _ in sorted(
+        [(s, e.get("display_order", 999)) for s, e in _v3.items() if reg.get(s)],
+        key=lambda x: x[1],
+    )]
     calc_cards = "\n".join(
         f'<a class="cm-calc-card" href="{u}/{slug}/" aria-label="{_esc(calc.get("name", slug))}">'
         f'<span class="cm-calc-emoji" aria-hidden="true">{_esc(calc.get("emoji", "🧮"))}</span>'
         f'<div class="cm-calc-name">{_esc(calc.get("name", slug))}</div>'
-        f'<div class="cm-calc-desc">{_esc(_CALC_DESCS.get(slug, ""))}</div>'
+        f'<div class="cm-calc-desc">{_esc((_v3.get(slug) or {}).get("card_desc") or "")}</div>'
         f'</a>'
-        for slug in _SLUG_ORDER
+        for slug in _slugs
         if (calc := reg.get(slug))
     )
 
@@ -573,9 +570,13 @@ def generate_404(cfg: dict) -> str:
 
 def generate_sitemap(cfg: dict) -> str:
     u = cfg.get("SITE_URL", "https://calcmate.kr").rstrip("/")
-    from modules.app_generator import _SLUG_ORDER
+    from modules.registry_loader import load_registry_v3
     today = datetime.date.today().isoformat()
 
+    _v3 = load_registry_v3()
+    _sitemap_slugs = [s for s, _ in sorted(
+        _v3.items(), key=lambda x: x[1].get("display_order", 999)
+    )]
     static_pages = [
         ("", "1.0", "weekly"),
         ("/about/", "0.6", "monthly"),
@@ -583,7 +584,7 @@ def generate_sitemap(cfg: dict) -> str:
         ("/terms/", "0.4", "monthly"),
         ("/contact/", "0.5", "monthly"),
     ]
-    calc_entries = [(f"/{slug}/", "0.8", "weekly") for slug in _SLUG_ORDER]
+    calc_entries = [(f"/{slug}/", "0.8", "weekly") for slug in _sitemap_slugs]
     all_entries = static_pages + calc_entries
 
     items = "\n".join(

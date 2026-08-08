@@ -26,28 +26,7 @@ _DOCS_DIR = Path(__file__).resolve().parent.parent / "docs"
 
 _TPL = Path(__file__).resolve().parent.parent / "templates" / "calculators" / "calculator_v1.html"
 
-_LABELS = {
-    "monthly_salary": "월급(원)", "salary": "급여(원)", "years": "근속연수",
-    "months": "근속개월수", "hourly_wage": "시급(원)", "weekly_hours": "주당 근로시간",
-    "daily_wage": "일급(원)", "unused_days": "미사용 연차(일)",
-    "avg_monthly_wage": "평균 월임금(원)", "avg_daily_wage": "평균 일임금(원)",
-    "age": "나이", "employment_months": "고용 개월수", "amount": "금액(원)",
-    "national_pension": "국민연금", "health_insurance": "건강보험",
-    "employment_insurance": "고용보험", "total": "합계", "severance_pay": "퇴직금",
-    "weekly_allowance": "주휴수당", "annual_leave_allowance": "연차수당",
-    "daily_benefit": "1일 구직급여", "total_benefit": "예상 총액",
-    # 퇴직금
-    "start_date": "입사일", "end_date": "퇴사일",
-    # 연말정산
-    "total_salary": "연간 총급여(원)", "family_count": "부양가족 수(인)",
-    "paid_tax": "기납부 세액(원)", "estimated_refund": "예상 환급액(원)",
-    # 육아휴직
-    "monthly_wage": "월 통상임금(원)", "insured_days": "피보험단위기간(일)",
-    "use_6plus6": "6+6 특례(1=적용, 0=일반)", "leave_month": "육아휴직 개월 차",
-    "monthly_allowance": "예상 월 지급액(원)",
-    # 주휴수당 출력
-    "weekly_holiday_pay": "주휴수당(원)",
-}
+# _LABELS 제거 (P2-2-C) — 모든 레이블은 registry v3 field_labels에서 공급됨.
 _JS_FUNCS = {"min": "Math.min", "max": "Math.max", "round": "Math.round",
              "abs": "Math.abs", "int": "Math.trunc", "float": "Number"}
 
@@ -133,10 +112,20 @@ def _pj(v, default):
 
 
 def _label(k, labels=None):
-    # 계산기별 labels(예: {"monthly_salary":"월급"}) 우선, 없으면 기존 _LABELS fallback
+    # registry field_labels 병합 결과 우선, 없으면 키 이름 변환 fallback
     if labels and k in labels and str(labels[k]).strip():
         return str(labels[k])
-    return _LABELS.get(k, str(k).replace("_", " "))
+    return str(k).replace("_", " ")
+
+
+def _effective_labels(calc: dict) -> dict:
+    """registry v3 field_labels(primary) + DB labels(override) 병합.
+    미매핑 키는 _label()에서 str(k).replace('_',' ')로 변환."""
+    from .registry_loader import load_registry_v3
+    slug = str(calc.get("slug", ""))
+    reg_fl = (load_registry_v3().get(slug) or {}).get("field_labels") or {}
+    db_labels = _pj(calc.get("labels"), {})
+    return {**reg_fl, **db_labels}  # DB가 registry보다 우선
 
 
 def _to_js(expr: str) -> str:
@@ -177,7 +166,7 @@ def _validation_mode(calc) -> str:
 
 
 def _split_label(k, labels=None):
-    """_LABELS의 '시급(원)' → ('시급','원'). 괄호 없으면 (label,''). labels(계산기별) 우선."""
+    """'시급(원)' → ('시급','원'). 괄호 없으면 (label,''). labels(registry 병합 결과) 우선."""
     lab = _label(k, labels)
     m = re.match(r"^(.*)\((.+)\)\s*$", lab)
     return (m.group(1).strip(), m.group(2).strip()) if m else (lab, "")
@@ -277,7 +266,7 @@ def _show_flags(cfg) -> dict:
 def _sm_config(calc, cfg) -> dict:
     ins = _pj(calc.get("input_schema"), {})
     outs = _pj(calc.get("output_schema"), {})
-    labels = _pj(calc.get("labels"), {})
+    labels = _effective_labels(calc)  # registry v3 field_labels primary, _LABELS fallback
     inputs = []
     for k, spec in ins.items():
         label, unit = _split_label(k, labels)
@@ -1198,8 +1187,7 @@ _KW_SLUG = [
     ("퇴직금", "severance-pay"),
 ]
 
-# 앵커 텍스트 다양화: 소스 계산기 인덱스 기반 회전
-_SLUG_ORDER = [k for k in _INTERNAL_LINK_MAP]
+# _SLUG_ORDER 제거 (P2-2-C) — _auto_internal_links가 _INTERNAL_LINK_MAP에서 직접 도출.
 
 
 def _auto_internal_links(html: str, cur_slug: str, site_url: str = "") -> str:
@@ -1211,7 +1199,7 @@ def _auto_internal_links(html: str, cur_slug: str, site_url: str = "") -> str:
       - 기존 <a>…</a> 내부 텍스트는 건드리지 않음
       - 앵커 텍스트는 소스 슬러그 인덱스 기반으로 다양화
     """
-    src_idx = _SLUG_ORDER.index(cur_slug) if cur_slug in _SLUG_ORDER else 0
+    src_idx = list(_INTERNAL_LINK_MAP).index(cur_slug) if cur_slug in _INTERNAL_LINK_MAP else 0
     linked: set = set()
     in_anchor = 0
     base = site_url.rstrip("/") if site_url else ""
@@ -1516,7 +1504,7 @@ def generate_html(calc: dict, cfg: dict = None) -> str:
     desc = calc.get("seo_description") or calc.get("seo_desc") or f"{name} 자동 계산"
     ins = _pj(calc.get("input_schema"), {})
     outs = _pj(calc.get("output_schema"), {})
-    labels = _pj(calc.get("labels"), {})
+    labels = _effective_labels(calc)  # registry v3 field_labels primary, _LABELS fallback
     primary = list(outs.keys())[0] if outs else "result"
     plabel, punit = _split_label(primary, labels)
     category = calc.get("category", "") or "계산기"
