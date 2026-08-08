@@ -1,0 +1,43 @@
+# registry/realty_af.yaml — App Factory 자동생성 계산기 (v3 SSOT)
+# ⚠️ 이 파일은 App Factory(modules/app_factory)가 자동으로 씁니다. 직접 편집 주의.
+# status: HOLD = legal 검증 대기 중 (index/sitemap 비노출)
+# status: READY = 공개 (index/sitemap 포함, CalcMate 정적 사이트 빌드 대상)
+
+jeonse-vs-monthly:
+  name: 전세 vs 월세 비교 계산기
+  slug: jeonse-vs-monthly
+  category: 부동산/임대
+  emoji: 🧮
+  card_label: 전세 vs 월세 비교 계산기
+  compute_type: dict
+  date_fields: []
+  validation_mode: formula
+  field_labels:
+    jeonse_deposit: 전세보증금
+    wolse_deposit: 월세보증금
+    wolse_amount: 월세금액
+    rate: 전월세전환율
+    jeonse_opp_cost: 전세 월 기회비용
+    wolse_to_jeonse_equiv: 월세→전세 환산금액
+    monthly_savings: 월 비용 우위
+  display_order: 9
+  card_desc: 전세보증금과 월세 조건을 입력하면 전세 월 기회비용, 월세→전세 환산금액, 월 비…
+  difficulty: multi_output
+  difficulty_status: provisional
+  status: READY
+  tier: 2
+  source: app_factory
+  content:
+    evergreen: true
+    update_cycle: null
+    content_caveat: null
+  related_slugs: []
+  legal_refs: []
+  writer_context:
+    emphasize: []
+    example_patterns:
+    - 전세보증금과 월세 조건을 입력하면 전세 월 기회비용, 월세→전세 환산금액, 월 비용 우위를 즉시 비교합니다.
+    calculation_story: []
+  compute_rules:
+    positive_inputs:
+    - rate

@@ -23,6 +23,7 @@ _CATEGORY_AF_YAML_MAP: dict[str, str] = {
     "노무/급여": "labor_af",
     "고용/보험": "employment_af",
     "노무/급여/보험": "insurance_af",
+    "부동산/임대": "realty_af",
 }
 
 from adapters.db.factory import get_db_adapter
@@ -93,7 +94,7 @@ def _build_v3_entry(app: dict, slug: str, tier: int = 2) -> dict:
     name = app.get("name", "")
     desc = (app.get("description", "") or app.get("seo_desc", "") or "").strip()
     card_desc = (desc[:45] + "…") if len(desc) > 45 else desc
-    return {
+    entry = {
         "name": name,
         "slug": slug,
         "category": app.get("category", ""),
@@ -119,6 +120,9 @@ def _build_v3_entry(app: dict, slug: str, tier: int = 2) -> dict:
             "calculation_story": [],
         },
     }
+    if app.get("compute_rules"):
+        entry["compute_rules"] = app["compute_rules"]
+    return entry
 
 
 def _write_registry_v3(slug: str, entry: dict, category: str) -> None:
@@ -373,7 +377,7 @@ def _build_registry_entry(app: dict, slug: str) -> dict:
     date_fields, compute_type, validation_mode, difficulty = _infer_registry_meta(
         ins, outs, app.get("formula", ""))
     name = app.get("name", "")
-    return {
+    entry = {
         "slug": slug,
         "name": name,
         "category": app.get("category", ""),
@@ -399,6 +403,9 @@ def _build_registry_entry(app: dict, slug: str) -> dict:
         "content": {"evergreen": None, "update_cycle": None},
         "related_slugs": [],
     }
+    if app.get("compute_rules"):
+        entry["compute_rules"] = app["compute_rules"]
+    return entry
 
 
 _CALC_INDEX_PATH = Path(__file__).resolve().parent.parent / "docs" / "calculator_index.json"

@@ -4,3 +4,42 @@
 # 자동생성 엔트리는 legal(law/article/authority 등) 전부 null + needs_human_legal: true 입니다.
 # 정식 legal 검증이 끝나면 rms_promote.py 워크플로를 통해 docs/legal_basis.master.yaml 에 승격하세요
 # (동일 slug는 master.yaml 이 우선하므로, 승격 후 이 파일의 항목은 자동으로 무시됩니다).
+
+jeonse-vs-monthly:
+  slug: jeonse-vs-monthly
+  name: 전세 vs 월세 비교 계산기
+  category: 부동산/임대
+  emoji: 🧮
+  card_label: 전세 vs 월세 비교 계산기
+  compute_type: dict
+  date_fields: []
+  validation_mode: formula
+  field_labels:
+    jeonse_deposit: 전세보증금
+    wolse_deposit: 월세보증금
+    wolse_amount: 월세금액
+    rate: 전월세전환율
+    jeonse_opp_cost: 전세 월 기회비용
+    wolse_to_jeonse_equiv: 월세→전세 환산금액
+    monthly_savings: 월 비용 우위
+  difficulty: multi_output
+  difficulty_status: provisional
+  needs_human_legal: true
+  law: null
+  article: null
+  authority: null
+  related_articles: []
+  writer_note: null
+  reviewer_expectation: []
+  forbidden_articles: []
+  forbidden_phrases: []
+  confidence: null
+  last_verified: null
+  verification_source: []
+  content:
+    evergreen: null
+    update_cycle: null
+  related_slugs: []
+  compute_rules:
+    positive_inputs:
+    - rate
