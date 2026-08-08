@@ -37,6 +37,7 @@ RUN_MODE: wordpress
 SQLITE_PATH: data/blog_auto.db
 SITE_NAME: CalcMate
 SITE_URL: https://calcmate.kr
+GA4_MEASUREMENT_ID: G-EP2Q8035VF
 GITHUB_REPO: calcmate
 GITHUB_USER: calcmate
 STORAGE_ADAPTER: drive
