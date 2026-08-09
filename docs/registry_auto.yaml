@@ -43,3 +43,35 @@ jeonse-vs-monthly:
   compute_rules:
     positive_inputs:
     - rate
+annual-leave-remaining:
+  slug: annual-leave-remaining
+  name: 연차 잔여일 계산기
+  category: 노동/고용법
+  emoji: 🧮
+  card_label: 연차 잔여일 계산기
+  compute_type: dict
+  date_fields: []
+  validation_mode: formula
+  field_labels:
+    years_of_service: 근속연수
+    used_days: 이미 사용한 연차일수
+    total_days: 올해 총 연차일수
+    remaining_days: 잔여 연차일수
+  difficulty: multi_output
+  difficulty_status: provisional
+  needs_human_legal: true
+  law: null
+  article: null
+  authority: null
+  related_articles: []
+  writer_note: null
+  reviewer_expectation: []
+  forbidden_articles: []
+  forbidden_phrases: []
+  confidence: null
+  last_verified: null
+  verification_source: []
+  content:
+    evergreen: null
+    update_cycle: null
+  related_slugs: []

@@ -2205,6 +2205,7 @@ elif tab == "🏭 App Factory":
         st.info("ℹ️ Tier1은 생성 후 계산 로직 + legal 근거 모두 사람이 검증해야 합니다. READY 전환 전까지 index/sitemap 비노출.")
     else:
         st.info("ℹ️ Tier2는 생성 후 계산 정확성 검증 + legal 검증 완료 시 READY 전환 가능.")
+    # ── Mode A: 자동 생성 ──────────────────────────────────────────────
     if st.button("🏭 자동 생성", type="primary", key="af_gen"):
         if not af_name.strip():
             st.error("계산기명은 필수입니다.")
@@ -2213,9 +2214,102 @@ elif tab == "🏭 App Factory":
                 try:
                     st.session_state["af_result"] = AF.generate_app(
                         cfg, af_name, af_cat, af_desc, tier=af_tier)
+                    st.session_state.pop("af_contract", None)
                 except Exception as e:
                     st.session_state["af_result"] = None
                     st.error(f"생성 실패: {e}")
+
+    st.divider()
+
+    # ── Mode B: Contract 기반 생성 ─────────────────────────────────────
+    with st.expander("📋 Contract 확정 스펙 입력 (법령 기반 계산기 — 선택)"):
+        st.caption(
+            "법령·취업규칙 등으로 필드명·수식이 이미 확정된 계산기에만 사용하세요. "
+            "Contract는 AI 호출 전에 확정되어야 합니다. "
+            "AI 결과를 보고 나서 Contract를 채우는 것은 검증 의미가 없습니다."
+        )
+        _bc1, _bc2 = st.columns(2)
+        _af_slug_pre = _bc1.text_input(
+            "확정 slug *", placeholder="annual-leave-remaining",
+            key="af_contract_slug_pre",
+            help="생성 전 확정 URL 식별자. 영문 소문자·숫자·하이픈만.")
+        _af_input_fields = _bc2.text_input(
+            "입력 필드 (쉼표 구분) *", placeholder="years_of_service, used_days",
+            key="af_contract_input_fields",
+            help="법령에서 확정한 입력 필드명(영문). 예: years_of_service, used_days")
+        _af_output_fields = st.text_input(
+            "출력 필드 (쉼표 구분) *", placeholder="total_days, remaining_days",
+            key="af_contract_output_fields",
+            help="법령에서 확정한 출력 필드명(영문). 예: total_days, remaining_days")
+        _af_formula = st.text_area(
+            "확정 Formula (선택 — str 또는 JSON dict)",
+            placeholder='{"total_days": "15 + min(max(0, (years_of_service-1)//2), 10)", ...}',
+            height=90,
+            key="af_contract_formula",
+            help="수식이 법령으로 확정된 경우만 입력. 입력 시 AI 결과 수식과 비교합니다.")
+        _af_test_cases = st.text_area(
+            "테스트 케이스 (선택 — JSON 배열)",
+            placeholder='[{"input": {"years_of_service": 1, "used_days": 0}, "expected": {"total_days": 15.0}}]',
+            height=90,
+            key="af_contract_test_cases",
+            help="예상 입출력 쌍. 있으면 Contract 기반 생성 후 수식 샘플 검증도 수행합니다.")
+
+        if st.button("📋 Contract 기반 생성", key="af_gen_contract"):
+            if not af_name.strip():
+                st.error("계산기명은 필수입니다.")
+            elif not _af_slug_pre.strip():
+                st.error("Contract 모드에서는 확정 slug가 필수입니다.")
+            elif not _af_input_fields.strip() or not _af_output_fields.strip():
+                st.error("Contract 모드에서는 입력 필드와 출력 필드가 필수입니다.")
+            else:
+                import re as _re_contract
+                _slug_clean = _af_slug_pre.strip().lower()
+                if not _re_contract.match(r"^[a-z0-9][a-z0-9-]*$", _slug_clean):
+                    st.error("slug는 영문 소문자·숫자·하이픈만 허용됩니다.")
+                else:
+                    _input_list = [f.strip() for f in _af_input_fields.split(",") if f.strip()]
+                    _output_list = [f.strip() for f in _af_output_fields.split(",") if f.strip()]
+
+                    _formula_val = None
+                    _formula_raw = (_af_formula or "").strip()
+                    if _formula_raw:
+                        try:
+                            _formula_val = json.loads(_formula_raw)
+                        except Exception:
+                            _formula_val = _formula_raw
+
+                    _test_cases_val = []
+                    _test_raw = (_af_test_cases or "").strip()
+                    if _test_raw:
+                        try:
+                            _test_cases_val = json.loads(_test_raw)
+                            if not isinstance(_test_cases_val, list):
+                                st.error("테스트 케이스는 JSON 배열이어야 합니다.")
+                                _test_cases_val = []
+                        except Exception as _te:
+                            st.error(f"테스트 케이스 파싱 실패: {_te}")
+                            _test_cases_val = []
+
+                    _contract = AF.build_contract(
+                        slug=_slug_clean,
+                        name=af_name.strip(),
+                        category=af_cat or "",
+                        tier=_tier_map_int_to_str.get(af_tier, "Tier2-A"),
+                        input_fields=_input_list,
+                        output_fields=_output_list,
+                        formula=_formula_val,
+                        test_cases=_test_cases_val,
+                    )
+                    st.session_state["af_contract"] = _contract
+
+                    with st.spinner("Contract 기반으로 AI가 계산기를 생성 중입니다... (수십 초)"):
+                        try:
+                            st.session_state["af_result"] = AF.generate_app_with_contract(cfg, _contract)
+                        except Exception as e:
+                            st.session_state["af_result"] = None
+                            st.session_state.pop("af_contract", None)
+                            st.error(f"생성 실패: {e}")
+
     app = st.session_state.get("af_result")
     if app:
         _tier_label = "Tier2 (단순)" if app.get("tier", 2) == 2 else "Tier1 (복잡)"
@@ -2239,8 +2333,95 @@ elif tab == "🏭 App Factory":
             with st.expander("🔎 실제 렌더 미리보기"):
                 import streamlit.components.v1 as components
                 components.html(app["html"], height=420, scrolling=True)
+
+        # ── Contract 검증 결과 패널 (Mode B에서만 표시) ─────────────────
+        _cv = app.get("_contract_validation")
+        if _cv is not None:
+            _contract_obj = app.get("_contract", {})
+            st.markdown("---")
+            st.subheader("📋 Contract 검증 결과")
+            if _cv.get("valid"):
+                st.success("✅ Contract 검증 통과 — slug / schema / formula 모두 일치합니다.")
+            else:
+                st.error(
+                    "⛔ Contract 불일치 — 저장이 차단됩니다.\n\n"
+                    "아래 내용을 확인하고 Contract를 수정하거나 재생성하세요."
+                )
+
+            _cv_col1, _cv_col2 = st.columns(2)
+            with _cv_col1:
+                # Slug 비교
+                _slug_icon = "✅" if not _cv.get("slug_mismatch") else "❌"
+                st.markdown(f"**{_slug_icon} Slug**")
+                st.markdown(
+                    f"- Contract: `{_cv.get('slug_contract', '')}`  \n"
+                    f"- AI 결과: `{_cv.get('slug_ai') or '(AI가 slug 미반환)'}`"
+                )
+
+                # Formula 비교
+                _form_icon = "✅" if not _cv.get("formula_changed") else "❌"
+                st.markdown(f"**{_form_icon} Formula**")
+                if _cv.get("formula_changed"):
+                    st.markdown("- AI가 Contract 확정 formula를 변경했습니다.")
+                elif _contract_obj.get("formula") is None:
+                    st.markdown("- _(Formula Contract 미지정 — 비교 생략)_")
+                else:
+                    st.markdown("- AI가 Contract formula를 그대로 유지했습니다.")
+
+            with _cv_col2:
+                # Schema 비교
+                _drift = _cv.get("schema_drift", {})
+                _schema_icon = "✅" if not _drift.get("drifted") else "❌"
+                st.markdown(f"**{_schema_icon} Schema (입력/출력 필드)**")
+                if _drift.get("drifted"):
+                    for _ch in (_drift.get("changes") or []):
+                        _t = _ch.get("type", "")
+                        if "missing" in _t:
+                            st.markdown(f"- ❌ 누락: `{_ch.get('contract')}`")
+                        elif "extra" in _t:
+                            st.markdown(f"- ⚠️ 추가: `{_ch.get('ai')}`")
+                else:
+                    _in_cnt = len(_contract_obj.get("input_fields") or [])
+                    _out_cnt = len(_contract_obj.get("output_fields") or [])
+                    st.markdown(f"- 입력 {_in_cnt}개 / 출력 {_out_cnt}개 모두 일치")
+
+            # 테스트 케이스 샘플 검증 (test_cases 있을 때)
+            # validate_formula_with_samples() → {"valid": bool, "message": str, "sample_results": [...]}
+            _test_cases = _contract_obj.get("test_cases") or []
+            if _test_cases and app.get("formula"):
+                from modules.formula_engine import validate_formula_with_samples
+                _tc_result = validate_formula_with_samples(
+                    app.get("formula", ""),
+                    app.get("input_schema", {}),
+                    _test_cases,
+                )
+                _tc_valid = _tc_result.get("valid", False)
+                _tc_samples = _tc_result.get("sample_results", [])
+                _tc_failed = [s for s in _tc_samples if s.get("match") is False]
+                _tc_passed_all = _tc_valid and len(_tc_failed) == 0
+                _tc_icon = "✅" if _tc_passed_all else "❌"
+                st.markdown(f"**{_tc_icon} 테스트 케이스 ({len(_test_cases)}개)**")
+                if _tc_passed_all:
+                    st.markdown(f"- {len(_test_cases)}개 모두 통과")
+                elif not _tc_valid:
+                    st.markdown(f"- formula 검증 실패: {_tc_result.get('message', '')}")
+                else:
+                    st.markdown(f"- {len(_tc_failed)}개 불일치")
+                    for _s in _tc_failed:
+                        st.markdown(
+                            f"  - 입력 `{_s.get('input')}` → "
+                            f"예상 `{_s.get('expected')}` / 실제 `{_s.get('output')}`"
+                        )
+
+            if _cv.get("messages"):
+                with st.expander("상세 불일치 내용"):
+                    for _m in _cv["messages"]:
+                        st.markdown(f"- {_m}")
+
         # Slug 자동생성: 새 앱 생성 시 또는 af_slug 공백이면 자동완성
-        _af_auto_slug = generate_slug(app.get("name", ""))
+        # Mode B에서는 Contract 확정 slug를 우선 사용
+        _contract_slug_pre = (st.session_state.get("af_contract") or {}).get("slug", "")
+        _af_auto_slug = _contract_slug_pre or generate_slug(app.get("name", ""))
         if app.get("name") != st.session_state.get("_af_last_slug_for"):
             st.session_state["af_slug"] = _af_auto_slug
             st.session_state["_af_last_slug_for"] = app.get("name", "")
@@ -2262,7 +2443,25 @@ elif tab == "🏭 App Factory":
                     st.success(f"✅ 슬러그 사용 가능: '{_slug_to_check}'")
             else:
                 st.warning("영문 소문자·숫자·하이픈만 사용 가능합니다.")
-        if st.button("💾 calculators + app_templates 저장", type="primary", key="af_save"):
+
+        # ── Contract 저장 차단 상태 사전 판정 ────────────────────────
+        _cv_for_save = app.get("_contract_validation")
+        _contract_save_blocked = (
+            _cv_for_save is not None and not _cv_for_save.get("valid", True)
+        )
+
+        # ── 액션 버튼: 저장 / 폐기 ──────────────────────────────────
+        _btn_save_col, _btn_discard_col = st.columns([3, 2])
+        if _btn_save_col.button(
+            "💾 calculators + app_templates 저장",
+            type="primary",
+            key="af_save",
+            disabled=_contract_save_blocked,
+            help=(
+                "Contract 불일치로 저장이 차단됩니다. "
+                "Contract를 수정하거나 재생성하세요."
+            ) if _contract_save_blocked else None,
+        ):
             import re as _re_slug
             slug_in = (af_slug or "").strip().lower()
             if not _re_slug.match(r"^[a-z0-9][a-z0-9-]*$", slug_in):
@@ -2272,6 +2471,7 @@ elif tab == "🏭 App Factory":
                 ok, msg = AF.save_app(cfg, app, slug=slug_in)
                 if ok:
                     st.session_state["af_result"] = None
+                    st.session_state.pop("af_contract", None)
                     st.session_state["af_just_saved_name"] = app.get("name", "")
                     st.session_state["nav_group"] = "🧮 Calculator"
                     st.session_state["sub_🧮 Calculator"] = "🧮 계산기 관리"
@@ -2279,6 +2479,33 @@ elif tab == "🏭 App Factory":
                     st.rerun()
                 else:
                     st.error(msg)
+
+        if _contract_save_blocked:
+            st.error(
+                "⛔ Contract 불일치로 저장이 차단됩니다. "
+                "Contract 폼을 수정하고 [📋 Contract 기반 생성]을 다시 실행하세요."
+            )
+
+        if _btn_discard_col.button("🗑️ 생성 결과 폐기 & 초기화", key="af_discard"):
+            st.session_state["af_discard_confirm"] = True
+            st.rerun()
+
+        # ── 폐기 확인 대화창 ─────────────────────────────────────────
+        if st.session_state.get("af_discard_confirm"):
+            st.warning(
+                "⚠️ 현재 생성된 계산기 결과를 폐기하고 입력 화면을 초기화합니다.\n\n"
+                "저장하지 않은 AI 생성 결과, Formula, Schema, Contract 확정 스펙 및 "
+                "검증 결과가 초기화됩니다.\n\n"
+                "계속하시겠습니까?"
+            )
+            _dc1, _dc2, _dc_rest = st.columns([2, 1, 4])
+            if _dc1.button("⚠️ 폐기하고 초기화", type="primary", key="af_discard_ok"):
+                for _dk in AF.AF_SESSION_DISCARD_KEYS:
+                    st.session_state.pop(_dk, None)
+                st.rerun()
+            if _dc2.button("취소", key="af_discard_cancel"):
+                st.session_state.pop("af_discard_confirm", None)
+                st.rerun()
 
 # ══════════════════════════════════════════════════════════════
 # 탭: 💬 AI Workspace (대시보드 내 AI 대화 + 파일/데이터 도구)

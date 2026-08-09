@@ -94,6 +94,21 @@ def extract_checklist(app: dict, tier: str = "Tier2-A", category: str = "") -> l
         "checked": False, "checked_by": None, "checked_at": None,
     })
 
+    # ─ formula_cap: formula에 min()/max() cap 함수가 포함된 경우 (법정 상한/하한 유지 확인)
+    if formula and not is_date_based:
+        formula_str_for_cap = (json.dumps(formula, ensure_ascii=False)
+                               if isinstance(formula, dict) else str(formula))
+        if re.search(r'\bmin\s*\(|\bmax\s*\(', formula_str_for_cap):
+            items.append({
+                "id": "formula_cap",
+                "severity": "critical",
+                "label": "공식 상한/하한(cap) 유지 확인",
+                "display_value": (f"cap 함수 감지 — 아래 공식에서 min()/max() 적용 범위를 직접 확인:\n"
+                                  f"{formula_str_for_cap[:400]}"),
+                "auto_source": "formula_cap_detected",
+                "checked": False, "checked_by": None, "checked_at": None,
+            })
+
     # ─ rate_constant: formula에 소수점 상수 포함 시
     if formula and not is_date_based:
         constants = re.findall(r'\b\d+\.\d+\b', str(formula))
@@ -139,6 +154,47 @@ def extract_checklist(app: dict, tier: str = "Tier2-A", category: str = "") -> l
             "label": "예외조건 처리 확인",
             "display_value": str(compute_rules)[:300],
             "auto_source": "compute_rules",
+            "checked": False, "checked_by": None, "checked_at": None,
+        })
+
+    # ─ schema_match: Contract vs AI 생성 결과 필드명 비교 결과가 있을 때 (🔴 필수)
+    # generate_app_with_contract()가 embed한 _schema_drift가 있는 경우에만 발생.
+    # 드리프트 있으면 변경 내역을 표시, 없으면 일치 확인 메시지 표시.
+    schema_drift = app.get("_schema_drift")
+    if schema_drift is not None:
+        if schema_drift.get("drifted"):
+            change_lines = []
+            for c in schema_drift.get("changes", []):
+                t = c.get("type", "")
+                if "input_missing" in t:
+                    change_lines.append(f"입력 필드 누락: Contract의 {c['contract']!r}")
+                elif "input_extra" in t:
+                    change_lines.append(f"입력 필드 추가: AI의 {c['ai']!r} (Contract에 없음)")
+                elif "output_missing" in t:
+                    change_lines.append(f"출력 필드 누락: Contract의 {c['contract']!r}")
+                elif "output_extra" in t:
+                    change_lines.append(f"출력 필드 추가: AI의 {c['ai']!r} (Contract에 없음)")
+            disp_drift = "⚠️ AI가 필드명을 변경했습니다:\n" + "\n".join(change_lines)
+        else:
+            disp_drift = "✅ Schema 일치 — Contract 확정 필드명과 동일"
+        items.append({
+            "id": "schema_match",
+            "severity": "critical",
+            "label": "Schema 일치 확인 (Contract vs AI 생성)",
+            "display_value": disp_drift,
+            "auto_source": "contract_schema_drift",
+            "checked": False, "checked_by": None, "checked_at": None,
+        })
+
+    # ─ 🟡 권장: 화면 안내문 확인 (description / seo_desc)
+    desc_text = (app.get("description") or app.get("desc") or app.get("seo_desc") or "")
+    if desc_text:
+        items.append({
+            "id": "description_text",
+            "severity": "advisory",
+            "label": "화면 안내문 확인",
+            "display_value": str(desc_text)[:200],
+            "auto_source": "description_field",
             "checked": False, "checked_by": None, "checked_at": None,
         })
 

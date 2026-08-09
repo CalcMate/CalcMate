@@ -130,7 +130,9 @@ def validate_formula(formula, inputs_schema=None, slug: str | None = None) -> tu
             tree = ast.parse(str(expr), mode="eval")
             for node in ast.walk(tree):
                 if isinstance(node, ast.Name) and allowed and node.id not in allowed:
-                    return False, f"input_schema에 없는 변수: {node.id}"
+                    # 허용된 내장 함수명(min, max, abs 등)은 변수 검증 대상에서 제외
+                    if node.id not in _FUNCS:
+                        return False, f"input_schema에 없는 변수: {node.id}"
                 if isinstance(node, (ast.Attribute, ast.Subscript, ast.Lambda,
                                      ast.ListComp, ast.comprehension)):
                     return False, f"허용되지 않은 구문: {type(node).__name__}"
@@ -153,6 +155,89 @@ def validate_compute_handler(slug: str) -> tuple:
         return False, f"compute handler 빈 응답: {slug}"
     except Exception as e:
         return False, f"compute handler 오류: {e}"
+
+
+# ── Contract 검증 지원 ────────────────────────────────────────────
+
+def detect_schema_drift(contract: dict, ai_app: dict) -> dict:
+    """Contract 확정 필드명 vs AI 생성 결과 필드명 비교.
+
+    contract: build_contract() 반환 dict — input_fields/output_fields 리스트
+    ai_app:   generate_app() 반환 dict — input_schema/output_schema dict
+    반환: {
+        "drifted": bool,
+        "input_changes":  [{"type": "input_missing"|"input_extra",  "contract": str|None, "ai": str|None}],
+        "output_changes": [{"type": "output_missing"|"output_extra", "contract": str|None, "ai": str|None}],
+        "changes": (input_changes + output_changes 합산),
+    }
+    """
+    contract_inputs = set(contract.get("input_fields") or [])
+    contract_outputs = set(contract.get("output_fields") or [])
+
+    raw_in = ai_app.get("input_schema") or {}
+    raw_out = ai_app.get("output_schema") or {}
+    ai_inputs = set(raw_in.keys()) if isinstance(raw_in, dict) else set()
+    ai_outputs = set(raw_out.keys()) if isinstance(raw_out, dict) else set()
+
+    input_changes = []
+    for f in sorted(contract_inputs - ai_inputs):
+        input_changes.append({"type": "input_missing", "contract": f, "ai": None})
+    if contract_inputs:  # Contract에 필드 명세가 있을 때만 extra 감지
+        for f in sorted(ai_inputs - contract_inputs):
+            input_changes.append({"type": "input_extra", "contract": None, "ai": f})
+
+    output_changes = []
+    for f in sorted(contract_outputs - ai_outputs):
+        output_changes.append({"type": "output_missing", "contract": f, "ai": None})
+    if contract_outputs:  # Contract에 필드 명세가 있을 때만 extra 감지
+        for f in sorted(ai_outputs - contract_outputs):
+            output_changes.append({"type": "output_extra", "contract": None, "ai": f})
+
+    all_changes = input_changes + output_changes
+    return {
+        "drifted": bool(all_changes),
+        "input_changes": input_changes,
+        "output_changes": output_changes,
+        "changes": all_changes,
+    }
+
+
+def validate_formula_with_samples(
+    formula, input_schema: dict, test_cases: list | None = None
+) -> dict:
+    """formula 검증 + 샘플 입력값으로 실제 계산 결과 반환.
+
+    formula:      str(단일 식) 또는 dict(출력키 → 식)
+    input_schema: {필드명: 타입 문자열 또는 dict} — validate_formula() 전달용
+    test_cases:   [{"input": {...}, "expected": {...}}]  Contract에 기록된 검증 케이스
+
+    반환: {
+        "valid": bool,
+        "message": str,
+        "sample_results": [{"input": {}, "output": {}, "expected": {}, "match": bool|None}]
+    }
+    """
+    ok, msg = validate_formula(formula, input_schema)
+    result: dict = {"valid": ok, "message": msg, "sample_results": []}
+    if ok and test_cases:
+        for tc in test_cases:
+            inp = dict(tc.get("input") or {})
+            expected = tc.get("expected")
+            try:
+                # output_schema=None: dict formula → 수식 키, str formula → "result"
+                output = execute_formula(formula, inp, None)
+                result["sample_results"].append({
+                    "input": inp,
+                    "output": output,
+                    "expected": expected,
+                    "match": (output == expected) if expected is not None else None,
+                })
+            except Exception as e:
+                result["sample_results"].append({
+                    "input": inp, "output": None,
+                    "expected": expected, "match": False, "error": str(e),
+                })
+    return result
 
 
 # ── Repository 연동 (Sheets 직접 접근 금지) ───────────────────────

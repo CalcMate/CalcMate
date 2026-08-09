@@ -7,22 +7,22 @@
       "FAQ"
     ],
     "our_missing_topics": [
-      "지급 조건",
       "주휴수당 계산기",
+      "지급 조건",
       "FAQ"
     ],
     "improvement_tasks": [
-      {
-        "topic": "지급 조건",
-        "priority": "HIGH",
-        "action": "대상 조건 설명 추가",
-        "reason": "수급 조건 구체화"
-      },
       {
         "topic": "주휴수당 계산기",
         "priority": "HIGH",
         "action": "설명 확장",
         "reason": "문장 다듬기"
+      },
+      {
+        "topic": "지급 조건",
+        "priority": "HIGH",
+        "action": "대상 조건 설명 추가",
+        "reason": "수급 조건 구체화"
       },
       {
         "topic": "FAQ",
@@ -41,22 +41,22 @@
       "FAQ"
     ],
     "our_missing_topics": [
-      "지급 조건",
       "육아휴직 계산기",
+      "지급 조건",
       "FAQ"
     ],
     "improvement_tasks": [
-      {
-        "topic": "지급 조건",
-        "priority": "HIGH",
-        "action": "대상 조건 설명 추가",
-        "reason": "수급 조건 구체화"
-      },
       {
         "topic": "육아휴직 계산기",
         "priority": "HIGH",
         "action": "설명 확장",
         "reason": "문장 다듬기"
+      },
+      {
+        "topic": "지급 조건",
+        "priority": "HIGH",
+        "action": "대상 조건 설명 추가",
+        "reason": "수급 조건 구체화"
       },
       {
         "topic": "FAQ",
@@ -75,22 +75,22 @@
       "FAQ"
     ],
     "our_missing_topics": [
-      "퇴직금 계산기",
       "지급 조건",
+      "퇴직금 계산기",
       "FAQ"
     ],
     "improvement_tasks": [
-      {
-        "topic": "퇴직금 계산기",
-        "priority": "HIGH",
-        "action": "설명 확장",
-        "reason": "문장 다듬기"
-      },
       {
         "topic": "지급 조건",
         "priority": "HIGH",
         "action": "대상 조건 설명 추가",
         "reason": "수급 조건 구체화"
+      },
+      {
+        "topic": "퇴직금 계산기",
+        "priority": "HIGH",
+        "action": "설명 확장",
+        "reason": "문장 다듬기"
       },
       {
         "topic": "FAQ",

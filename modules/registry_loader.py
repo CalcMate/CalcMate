@@ -137,3 +137,16 @@ def add_auto_entry(slug: str, entry: dict) -> None:
     body = yaml.safe_dump(data, allow_unicode=True, sort_keys=False, default_flow_style=False)
     _AUTO_PATH.write_text(_AUTO_HEADER + "\n" + body, encoding="utf-8")
     invalidate()
+
+
+def remove_auto_entry(slug: str) -> bool:
+    """registry_auto.yaml에서 slug 엔트리 제거. 존재하지 않으면 False 반환."""
+    import yaml
+    data = _read_yaml(_AUTO_PATH)
+    if str(slug) not in data:
+        return False
+    del data[str(slug)]
+    body = yaml.safe_dump(data, allow_unicode=True, sort_keys=False, default_flow_style=False)
+    _AUTO_PATH.write_text(_AUTO_HEADER + "\n" + body, encoding="utf-8")
+    invalidate()
+    return True

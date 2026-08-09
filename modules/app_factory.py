@@ -35,6 +35,28 @@ from .logger import get_logger, BudgetTracker
 
 LOG = get_logger()
 
+# App Factory 세션 초기화 대상 키 (폐기 & 초기화 버튼에서 사용)
+AF_SESSION_DISCARD_KEYS: tuple[str, ...] = (
+    "af_result",                  # AI 생성 결과 전체
+    "af_name",                    # 계산기명 입력
+    "af_cat",                     # 카테고리 입력
+    "af_desc",                    # 설명 입력
+    "af_tier",                    # Tier 라디오 선택
+    "af_slug",                    # slug 입력
+    "af_keyword",                 # 키워드 입력
+    "af_tier_suggest",            # AI Tier 추천 상태
+    "_af_last_slug_for",          # slug 자동완성 내부 추적
+    "af_seo",                     # SEO 제목 표시 (af_result 소멸 시 자동 소멸)
+    "af_discard_confirm",         # 폐기 확인 대화창 플래그
+    # ── Contract 모드(Mode B) 전용 키 ───────────────────────────
+    "af_contract",                # build_contract() 결과 객체
+    "af_contract_slug_pre",       # 생성 전 확정 slug
+    "af_contract_input_fields",   # 확정 입력 필드 (쉼표 구분 문자열)
+    "af_contract_output_fields",  # 확정 출력 필드 (쉼표 구분 문자열)
+    "af_contract_formula",        # 확정 formula (str 또는 JSON)
+    "af_contract_test_cases",     # 검증 케이스 (JSON 배열 문자열)
+)
+
 
 def _slug(text: str) -> str:
     s = re.sub(r"[^0-9a-zA-Z가-힣]+", "_", (text or "").strip()).strip("_").lower()
@@ -161,6 +183,38 @@ def _write_registry_v3(slug: str, entry: dict, category: str) -> None:
     LOG.info("v3 Registry 기록(HOLD): %s → %s", slug, yaml_file.name)
 
 
+def _delete_from_registry_v3(slug: str, category: str) -> bool:
+    """_af.yaml에서 slug 엔트리를 제거. 파일 없거나 slug 없으면 False 반환."""
+    import yaml
+    from .registry_loader import invalidate
+
+    yaml_name = _category_to_af_yaml(category)
+    yaml_file = _REG_DIR / f"{yaml_name}.yaml"
+    if not yaml_file.exists():
+        return False
+
+    try:
+        existing = yaml.safe_load(yaml_file.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return False
+
+    if not isinstance(existing, dict) or slug not in existing:
+        return False
+
+    del existing[slug]
+    _AF_HEADER = (
+        f"# registry/{yaml_name}.yaml — App Factory 자동생성 계산기 (v3 SSOT)\n"
+        "# ⚠️ 이 파일은 App Factory(modules/app_factory)가 자동으로 씁니다. 직접 편집 주의.\n"
+        "# status: HOLD = legal 검증 대기 중 (index/sitemap 비노출)\n"
+        "# status: READY = 공개 (index/sitemap 포함, CalcMate 정적 사이트 빌드 대상)\n"
+    )
+    body = yaml.dump(existing, allow_unicode=True, sort_keys=False, default_flow_style=False)
+    yaml_file.write_text(_AF_HEADER + "\n" + body, encoding="utf-8")
+    invalidate()
+    LOG.info("v3 Registry 엔트리 제거: %s → %s", slug, yaml_file.name)
+    return True
+
+
 def promote_to_ready(slug: str) -> tuple:
     """App Factory 계산기의 v3 status를 HOLD → READY로 전환.
     legal 검증 완료 후 호출. 기존 8개 계산기(source != app_factory)에는 동작 거부."""
@@ -210,18 +264,225 @@ def promote_to_ready(slug: str) -> tuple:
     return True, f"✅ '{slug}' HOLD → READY 전환 완료. 사이트 재빌드 후 index/sitemap에 반영됩니다."
 
 
-def generate_app(cfg: dict, name: str, category: str = "", desc: str = "", tier: int = 2) -> dict:
-    """계산기 1종을 AI로 생성하여 dict 반환(저장은 save_app)."""
+def build_contract(
+    slug: str,
+    name: str,
+    category: str = "",
+    tier: str = "Tier2-A",
+    input_fields: list = None,
+    output_fields: list = None,
+    formula=None,
+    scope_exclusions: list = None,
+    test_cases: list = None,
+) -> dict:
+    """운영자가 확정한 계산기 스펙을 Contract 객체로 생성.
+
+    Contract는 AI 생성 결과의 기준점이다 — slug/필드명/formula가 AI에 의해
+    변경됐는지 validate_against_contract()로 검증한다.
+
+    slug:             확정 URL 식별자 (소문자 영문-숫자-하이픈)
+    input_fields:     확정 입력 필드명 리스트 (예: ["years_of_service", "used_days"])
+    output_fields:    확정 출력 필드명 리스트 (예: ["total_days", "remaining_days"])
+    formula:          확정 수식 (str 또는 dict)
+    scope_exclusions: 명시적 제외 조건 (화면 안내문 표시용)
+    test_cases:       검증 케이스 [{"input": {...}, "expected": {...}}]
+    """
+    return {
+        "slug": str(slug).strip().lower(),
+        "name": str(name).strip(),
+        "category": str(category).strip(),
+        "tier": str(tier).strip(),
+        "input_fields": list(input_fields or []),
+        "output_fields": list(output_fields or []),
+        "formula": formula,
+        "scope_exclusions": list(scope_exclusions or []),
+        "test_cases": list(test_cases or []),
+    }
+
+
+def validate_against_contract(contract: dict, ai_app: dict) -> dict:
+    """AI 생성 결과를 Contract와 비교하여 불일치 항목을 반환.
+
+    slug, input/output 필드명, formula 세 축을 비교한다.
+    불일치가 있으면 status_hint="INVALID" + messages에 상세 내용을 담아 반환.
+    저장(save_app)을 직접 차단하지 않으며 운영자 검토 후 진행하도록 설계됨.
+
+    반환: {
+        "valid": bool,
+        "slug_mismatch": bool,
+        "slug_contract": str,
+        "slug_ai": str,
+        "schema_drift": dict,   # detect_schema_drift() 결과
+        "formula_changed": bool,
+        "status_hint": "VALID" | "INVALID",
+        "messages": list[str],
+    }
+    """
+    from .formula_engine import detect_schema_drift
+
+    messages = []
+
+    contract_slug = str(contract.get("slug", "")).strip().lower()
+    ai_slug = str(ai_app.get("slug", "") or "").strip().lower()
+    slug_mismatch = bool(ai_slug and ai_slug != contract_slug)
+    if slug_mismatch:
+        messages.append(f"slug 불일치: Contract={contract_slug!r} → AI={ai_slug!r}")
+
+    drift = detect_schema_drift(contract, ai_app)
+    for change in drift.get("changes", []):
+        t = change.get("type", "")
+        f_c, f_a = change.get("contract"), change.get("ai")
+        if "input_missing" in t:
+            messages.append(f"입력 필드 누락: Contract의 {f_c!r}가 AI 결과에 없음")
+        elif "input_extra" in t:
+            messages.append(f"입력 필드 추가: AI가 {f_a!r}를 추가 (Contract에 없음)")
+        elif "output_missing" in t:
+            messages.append(f"출력 필드 누락: Contract의 {f_c!r}가 AI 결과에 없음")
+        elif "output_extra" in t:
+            messages.append(f"출력 필드 추가: AI가 {f_a!r}를 추가 (Contract에 없음)")
+
+    contract_formula = contract.get("formula")
+    ai_formula = ai_app.get("formula")
+    formula_changed = False
+    if contract_formula is not None:
+        def _norm(f):
+            if isinstance(f, dict):
+                return json.dumps(f, ensure_ascii=False, sort_keys=True)
+            return str(f or "").strip()
+        formula_changed = _norm(contract_formula) != _norm(ai_formula)
+        if formula_changed:
+            messages.append("formula 변경: AI가 Contract 확정 formula를 수정했습니다")
+
+    valid = not slug_mismatch and not drift["drifted"] and not formula_changed
+    return {
+        "valid": valid,
+        "slug_mismatch": slug_mismatch,
+        "slug_contract": contract_slug,
+        "slug_ai": ai_slug,
+        "schema_drift": drift,
+        "formula_changed": formula_changed,
+        "status_hint": "VALID" if valid else "INVALID",
+        "messages": messages,
+    }
+
+
+def generate_app_with_contract(cfg: dict, contract: dict) -> dict:
+    """Contract 기반 계산기 생성.
+
+    generate_app()을 호출한 뒤 Contract와 비교 — AI 결과의 slug/필드명/formula가
+    Contract를 벗어나면 _contract_validation["valid"]=False로 기록한다.
+    운영자가 불일치를 검토·수정한 후 save_app()을 호출하도록 설계됨.
+    자동 저장 없음, 자동 승인 없음.
+    """
+    name = contract.get("name", "")
+    category = contract.get("category", "")
+    tier_str = contract.get("tier", "Tier2-A")
+    tier_int = 1 if tier_str == "Tier1" else 2
+    desc = contract.get("description", "") or contract.get("desc", "")
+
+    result = generate_app(cfg, name, category=category, desc=desc, tier=tier_int,
+                          _contract=contract)
+
+    validation = validate_against_contract(contract, result)
+    result["_contract"] = contract
+    result["_contract_validation"] = validation
+    result["_schema_drift"] = validation["schema_drift"]
+
+    if not validation["valid"]:
+        LOG.warning(
+            "Contract 불일치 — 운영자 검토 필요: %s → %s",
+            name, validation["messages"],
+        )
+    return result
+
+
+def _build_contract_enforcement_prompt(contract: dict) -> str:
+    """Contract 기반 생성 시 sys1에 삽입되는 스펙 고정 지시문.
+
+    Contract의 input_fields/output_fields/formula/test_cases를 AI에게 명시적으로 전달해
+    AI가 Contract를 무시하거나 필드를 누락하는 것을 방지한다.
+    """
+    input_fields = contract.get("input_fields") or []
+    output_fields = contract.get("output_fields") or []
+    formula = contract.get("formula")
+    test_cases = contract.get("test_cases") or []
+
+    lines = [
+        "━━━━ CONTRACT LOCK — 운영자 사전 확정 사양 (절대 변경 금지) ━━━━",
+        "아래 스펙은 운영자가 법령·취업규칙에 근거해 AI 호출 전에 확정한 것이다.",
+        "AI는 이 스펙을 그대로 구현해야 한다. 협상·간소화·자체 재설계 금지.",
+        "",
+        f"[고정 입력 필드 {len(input_fields)}개] input_schema 키를 정확히 아래와 일치시켜라:",
+        "  " + ", ".join(input_fields),
+        "  (키 이름 변경·추가·삭제 절대 금지)",
+        "",
+        f"[고정 출력 필드 {len(output_fields)}개] output_schema 키를 정확히 아래와 일치시켜라:",
+        "  " + ", ".join(output_fields),
+        "  (키 이름 변경·추가·삭제 절대 금지)",
+        f"  ※ 특히 출력 필드 {len(output_fields)}개를 모두 output_schema에 포함해야 한다 — 하나라도 누락 금지.",
+    ]
+
+    if formula is not None:
+        formula_str = (json.dumps(formula, ensure_ascii=False)
+                       if isinstance(formula, dict) else str(formula))
+        lines += [
+            "",
+            "[고정 Formula] 아래 수식을 그대로 사용해야 한다:",
+            f"  {formula_str}",
+            "  (변수명·출력 키명·계산 구조 변경 금지)",
+            "  (구현 불가 시 임의 수정 말고 생성 실패로 처리할 것)",
+        ]
+
+    if test_cases:
+        lines += [
+            "",
+            f"[검증 케이스 {len(test_cases)}개] 아래 입력에 대해 expected 결과가 반드시 나와야 한다:",
+        ]
+        for tc in test_cases:
+            lines.append(f"  입력 {tc.get('input')} → 예상 {tc.get('expected')}")
+        lines.append("  (참고가 아니라 필수 통과 기준 — 이 값이 나오지 않으면 formula가 틀린 것이다)")
+
+    lines += [
+        "",
+        "【핵심 규칙】",
+        "1. input_schema 키는 위 고정 입력 필드와 완전히 일치해야 한다.",
+        "2. output_schema 키는 위 고정 출력 필드와 완전히 일치해야 하며, 하나라도 빠뜨리면 오답이다.",
+        "3. formula는 위에 명시된 것을 그대로 사용한다. 자체 재설계 금지.",
+        "4. Contract는 협상 대상이 아니다 — 이 규칙을 어긴 응답은 계약 위반이다.",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    ]
+    return "\n".join(lines)
+
+
+def generate_app(cfg: dict, name: str, category: str = "", desc: str = "", tier: int = 2,
+                 _contract: dict = None) -> dict:
+    """계산기 1종을 AI로 생성하여 dict 반환(저장은 save_app).
+
+    _contract: Contract 기반 생성 시 내부적으로 전달되는 확정 스펙 dict.
+               Mode A(자동 생성) 호출 시 전달하지 않음 — 기존 동작 그대로 유지.
+               Mode B(generate_app_with_contract) 호출 시만 사용.
+    """
     name = (name or "").strip()
     if not name:
         raise ValueError("계산기명을 입력하세요.")
     steps = []  # (단계, 모델, 토큰)
 
-    # [1] 기존 계산기 목록 요약(중복 회피 컨텍스트) — sys1에 주입
+    # [0] 기존 계산기 목록 로드 — 사전 중복 확인 + GPT 컨텍스트
     try:
         existing = CalculatorRepository(get_db_adapter(cfg)).get_all()
     except Exception:
         existing = []
+
+    # [0-A] 사전 중복 차단 — AI 호출 전, 이름 일치 시 즉시 중단 (AI 토큰 낭비 방지)
+    _name_norm = re.sub(r"\s+", "", name).lower()
+    for _c in existing:
+        if re.sub(r"\s+", "", _c.get("name", "")).lower() == _name_norm:
+            raise ValueError(
+                f"이미 등록된 계산기와 이름이 동일합니다: '{_c.get('name')}'. "
+                "AI 호출 없이 차단됩니다. 다른 이름을 사용하거나 기존 계산기를 검토하세요."
+            )
+
+    # [1] 기존 계산기 목록 요약(중복 회피 컨텍스트) — sys1에 주입
     existing_summary = "\n".join(
         f"- {c.get('name','')} ({c.get('category','')}): 입력항목 {list(_pj(c.get('input_schema'), {}).keys())}"
         for c in existing
@@ -233,9 +494,15 @@ def generate_app(cfg: dict, name: str, category: str = "", desc: str = "", tier:
         if tier == 2 else
         "[Tier1 — 법령/조건분기/복잡 계산] 다단계 조건, 날짜 기반, 법령 규정 적용이 필요한 계산."
     )
+    # Contract 기반 생성(Mode B)일 때 CONTRACT LOCK 섹션을 sys1에 삽입
+    _contract_lock_section = (
+        _build_contract_enforcement_prompt(_contract) + "\n\n"
+    ) if _contract else ""
+
     sys1 = (
         f"너는 웹 계산기 기획자다. 주어진 계산기에 대해 입력/출력 스키마와 산식을 설계하라.\n"
         f"계산기 Tier: {_tier_note}\n"
+        f"{_contract_lock_section}"
         "요구사항:\n"
         "1. formula 규칙:\n"
         "   - 단일 출력: input_schema 변수만 사용한 단일 산술 표현식(문자열).\n"
@@ -245,10 +512,11 @@ def generate_app(cfg: dict, name: str, category: str = "", desc: str = "", tier:
         "   허용 함수: min, max, round, abs, int, float 만 사용 가능.\n"
         "2. input_schema/output_schema의 모든 키는 반드시 한국어 라벨을 'labels' 필드에 매핑하라 "
         '(예: {"monthly_salary": "월급"}).\n'
-        "3. 순수 JSON만 반환: "
+        "3. 반드시 아래 JSON 형식으로만 응답하라 — 설명문·거부 메시지 절대 금지:\n"
         '{"calculator_type":"","input_schema":{},"output_schema":{},"formula":"또는{}","labels":{}}\n'
         f"다음은 이미 등록된 계산기 목록이다:\n{existing_summary}\n"
-        "위 목록과 기능·입력항목이 실질적으로 겹치지 않도록 설계하라."
+        "위 목록을 참고해 겹치지 않는 스키마를 설계하라. "
+        "어떠한 경우에도 위 JSON 형식으로만 응답하라."
     )
     u1 = f"계산기명: {name}\n카테고리: {category}\n설명: {desc}"
     t1, m1, k1 = _chat(cfg, "orchestrator", sys1, u1, 800)
@@ -526,6 +794,65 @@ def save_app(cfg: dict, app: dict, site_id: str = "", slug: str = None) -> tuple
         except Exception as _ce:
             LOG.warning("체크리스트 저장 실패(무시): %s", _ce)
     return True, _msg
+
+
+def delete_app(cfg: dict, slug: str) -> tuple[bool, str]:
+    """App Factory 계산기 전체 삭제 (테스트 정리용).
+    삭제 대상: calculators + app_templates (DB), registry_auto.yaml, _af.yaml v3 Registry.
+    기존 8개 계산기(source != app_factory) 보호 — v3에 있는데 source가 app_factory가 아니면 거부."""
+    from .registry_loader import load_registry_v3, invalidate, remove_auto_entry
+
+    v3 = load_registry_v3(force=True)
+    entry_v3 = v3.get(slug)
+    if entry_v3 is not None and entry_v3.get("source") != "app_factory":
+        return False, f"'{slug}'은 App Factory 계산기가 아닙니다(source={entry_v3.get('source')!r}) — 삭제 거부"
+
+    db = get_db_adapter(cfg)
+    calc_repo = CalculatorRepository(db)
+
+    rows = db.get_where("calculators", {"slug": slug})
+    if not rows:
+        return False, f"calculators에서 '{slug}' 조회 실패 — 이미 삭제됐거나 존재하지 않음"
+
+    row = rows[0]
+    calc_id = row.get("id")
+    tpl_id = row.get("template_id")
+    category = row.get("category", "")
+
+    if tpl_id:
+        try:
+            db.delete("app_templates", tpl_id)
+            LOG.info("app_templates 삭제 완료: %s", tpl_id)
+        except Exception as e:
+            LOG.warning("app_templates 삭제 실패(계속 진행): %s", e)
+
+    try:
+        calc_repo.delete(calc_id)
+        LOG.info("calculators 삭제 완료: %s (%s)", slug, calc_id)
+    except Exception as e:
+        return False, f"calculators 삭제 실패: {e}"
+
+    try:
+        removed = remove_auto_entry(slug)
+        LOG.info("registry_auto 엔트리 제거: %s (%s)", slug, "제거됨" if removed else "없었음")
+    except Exception as e:
+        LOG.warning("registry_auto 엔트리 제거 실패(계속 진행): %s", e)
+
+    try:
+        _cat = entry_v3.get("category", category) if entry_v3 else category
+        removed_v3 = _delete_from_registry_v3(slug, _cat)
+        LOG.info("v3 Registry 엔트리 제거: %s (%s)", slug, "제거됨" if removed_v3 else "없었음")
+    except Exception as e:
+        LOG.warning("v3 Registry 엔트리 제거 실패(계속 진행): %s", e)
+
+    try:
+        _write_calculator_index(cfg)
+    except Exception as e:
+        LOG.warning("calculator_index 재생성 실패(무시): %s", e)
+
+    invalidate()
+    LOG.info("App Factory 계산기 삭제 완료: %s (calc_id=%s, tpl_id=%s)", slug, calc_id, tpl_id)
+    return True, f"✅ '{slug}' 삭제 완료 (calc_id={calc_id}, tpl_id={tpl_id})"
 
 
 def get_af_checklist(slug: str) -> list[dict]:

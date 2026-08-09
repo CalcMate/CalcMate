@@ -110,3 +110,62 @@ def test_dict_formula_json_string_parses_correctly():
     })
     ok, msg = validate_formula(formula_str, {"monthly_salary": "number"})
     assert ok, f"JSON dict 문자열 파싱 실패: {msg}"
+
+
+# ── HOLD-3 수정: 내장 함수명 오탐 방지 ────────────────────────────────────────
+
+def test_min_max_in_formula_passes_validation():
+    """min/max를 포함한 formula는 PASS해야 한다 (HOLD-3 버그 수정 검증)."""
+    formula = "15 + min(max(0, (years_of_service - 1) // 2), 10)"
+    schema = {"years_of_service": "number"}
+    ok, msg = validate_formula(formula, schema)
+    assert ok, f"min/max 포함 formula가 FAIL: {msg}"
+
+
+def test_min_max_dict_formula_passes_validation():
+    """min/max가 포함된 dict formula도 PASS해야 한다."""
+    formula_dict = {
+        "total_days": "15 + min(max(0, (years_of_service - 1) // 2), 10)",
+        "remaining_days": "15 + min(max(0, (years_of_service - 1) // 2), 10) - used_days",
+    }
+    schema = {"years_of_service": "number", "used_days": "number"}
+    ok, msg = validate_formula(formula_dict, schema)
+    assert ok, f"min/max dict formula가 FAIL: {msg}"
+
+
+def test_abs_round_int_in_formula_pass_validation():
+    """abs/round/int 등 허용 함수를 포함한 formula도 PASS해야 한다."""
+    cases = [
+        ("abs(x - y)", {"x": "number", "y": "number"}),
+        ("round(a * 0.033, 2)", {"a": "number"}),
+        ("int(months // 12)", {"months": "number"}),
+    ]
+    for expr, schema in cases:
+        ok, msg = validate_formula(expr, schema)
+        assert ok, f"'{expr}'가 FAIL: {msg}"
+
+
+def test_undeclared_variable_still_fails():
+    """input_schema에 없는 실제 변수는 여전히 FAIL이어야 한다 (과잉 관대화 방지)."""
+    ok, msg = validate_formula("a * undeclared_var", {"a": "number"})
+    assert not ok, "미선언 변수가 PASS됨 — 과잉 관대화 버그"
+    assert "undeclared_var" in msg, f"에러 메시지에 변수명 없음: {msg}"
+
+
+def test_undeclared_variable_in_dict_formula_fails():
+    """dict formula에서 미선언 변수도 여전히 FAIL이어야 한다."""
+    formula_dict = {"result": "a * ghost_variable + b"}
+    ok, msg = validate_formula(formula_dict, {"a": "number", "b": "number"})
+    assert not ok, "dict formula 미선언 변수가 PASS됨"
+    assert "ghost_variable" in msg, f"에러 메시지에 변수명 없음: {msg}"
+
+
+def test_annual_leave_remaining_formula_full_validation():
+    """연차잔여일계산기 formula dict 전체 검증 — HOLD-3 수정 후 정상 통과해야 한다."""
+    formula_dict = {
+        "total_days": "15 + min(max(0, (years_of_service - 1) // 2), 10)",
+        "remaining_days": "15 + min(max(0, (years_of_service - 1) // 2), 10) - used_days",
+    }
+    schema = {"years_of_service": "number", "used_days": "number"}
+    ok, msg = validate_formula(formula_dict, schema)
+    assert ok, f"연차잔여일 formula 검증 실패: {msg}"

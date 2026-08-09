@@ -3,6 +3,10 @@
     "category": "노무/급여",
     "name": "연차수당 계산기"
   },
+  "annual-leave-remaining": {
+    "category": "노동/고용법",
+    "name": "연차 잔여일 계산기"
+  },
   "four-insurances": {
     "category": "고용/보험",
     "name": "4대보험 계산기"

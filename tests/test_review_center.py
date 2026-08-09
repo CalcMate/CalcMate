@@ -160,6 +160,78 @@ def test_all_items_unchecked_by_default():
 
 
 # ─────────────────────────────────────────────────────────────
+# 1-b. formula_cap 항목 추출 (HOLD-3 수정 연동)
+# ─────────────────────────────────────────────────────────────
+
+def test_formula_cap_extracted_when_min_max_present():
+    """formula에 min()/max()가 있으면 formula_cap 🔴 항목 추출."""
+    app = _make_app(
+        formula="15 + min(max(0, (years_of_service - 1) // 2), 10)",
+        category="노동/고용법",
+        input_schema={"years_of_service": {"type": "number"}},
+    )
+    items = extract_checklist(app, tier="Tier2-A", category="노동/고용법")
+    ids = [i["id"] for i in items]
+    assert "formula_cap" in ids, f"formula_cap 누락. 항목: {ids}"
+    cap = next(i for i in items if i["id"] == "formula_cap")
+    assert cap["severity"] == "critical", f"formula_cap이 critical이 아님: {cap['severity']}"
+    assert "min" in cap["display_value"] or "max" in cap["display_value"], \
+        f"display_value에 cap 함수 미표시: {cap['display_value']}"
+    # display_value에 실제 formula 문자열 포함 확인
+    assert "years_of_service" in cap["display_value"], "display_value에 formula 미포함"
+
+
+def test_formula_cap_not_extracted_when_no_cap_function():
+    """min()/max() 없는 formula에서는 formula_cap 미발생."""
+    app = _make_app(formula="income * 0.033", category="세금/세법")
+    items = extract_checklist(app, tier="Tier2-A", category="세금/세법")
+    ids = [i["id"] for i in items]
+    assert "formula_cap" not in ids, "min/max 없는데 formula_cap 추출됨"
+
+
+def test_formula_cap_not_extracted_for_date_based():
+    """date_based 계산기에서는 formula_cap 미발생."""
+    app = _make_app(formula="min(a, b)", category="노동/고용법")
+    app["compute_type"] = "date_based"
+    items = extract_checklist(app, tier="Tier2-B", category="노동/고용법")
+    ids = [i["id"] for i in items]
+    assert "formula_cap" not in ids, "date_based에서 formula_cap 추출됨"
+
+
+def test_formula_cap_and_legal_basis_are_independent():
+    """formula_cap과 legal_basis는 독립적으로 각각 추출되어야 한다."""
+    app = _make_app(
+        formula="15 + min(max(0, (years_of_service - 1) // 2), 10)",
+        category="노동/고용법",
+        legal_refs=["근로기준법 제60조"],
+        input_schema={"years_of_service": {"type": "number"}},
+    )
+    items = extract_checklist(app, tier="Tier2-A", category="노동/고용법")
+    ids = [i["id"] for i in items]
+    assert "formula_cap" in ids, "formula_cap 누락"
+    assert "legal_basis" in ids, "legal_basis 누락"
+    # 각각 checked=False로 독립 초기화
+    cap = next(i for i in items if i["id"] == "formula_cap")
+    lb = next(i for i in items if i["id"] == "legal_basis")
+    assert not cap["checked"], "formula_cap이 checked=True로 초기화됨"
+    assert not lb["checked"], "legal_basis가 checked=True로 초기화됨"
+
+
+def test_formula_cap_with_dict_formula():
+    """dict formula에서도 min()/max() 감지 및 formula_cap 추출."""
+    import json
+    app = _make_app(category="노동/고용법")
+    app["formula"] = json.dumps({
+        "total_days": "15 + min(max(0, (years_of_service - 1) // 2), 10)",
+        "remaining_days": "15 + min(max(0, (years_of_service - 1) // 2), 10) - used_days",
+    })
+    app["input_schema"] = {"years_of_service": {"type": "number"}, "used_days": {"type": "number"}}
+    items = extract_checklist(app, tier="Tier2-A", category="노동/고용법")
+    ids = [i["id"] for i in items]
+    assert "formula_cap" in ids, f"dict formula에서 formula_cap 누락. 항목: {ids}"
+
+
+# ─────────────────────────────────────────────────────────────
 # 2. detect_tier2b_keywords
 # ─────────────────────────────────────────────────────────────
 
