@@ -1800,18 +1800,91 @@ elif tab == "🧮 계산기 관리":
                          + (f" · 배포됨" if url else ""), expanded=_auto_expand):
             if url:
                 st.markdown(f"**배포 URL:** [{url}]({url})")
-            # App Factory HOLD 계산기 — READY 전환 버튼
+            # App Factory HOLD 계산기 — Phase3-3 검토센터 UI
             if _is_hold:
+                from modules import review_center as _RC
+                from datetime import datetime as _dt, timezone as _tz
+
+                _slug = c.get("slug", "")
                 st.warning(
                     f"⚠️ **LEGAL HOLD** — Tier{_v3e.get('tier','?')} 계산기. "
-                    "legal 검증(법령 근거/계산 공식) 완료 후 READY 전환하세요. "
-                    "READY 전환 전까지 index/sitemap/정적사이트에서 비노출."
+                    "아래 검토 항목을 확인 완료 후 READY 전환하세요."
                 )
-                if st.button(f"✅ READY 전환 (legal 검증 완료)", key=f"cm_ready_{cid}", type="primary"):
-                    _ok_r, _msg_r = AF_CM.promote_to_ready(c.get("slug", ""))
-                    (st.success if _ok_r else st.error)(_msg_r)
-                    if _ok_r:
+
+                # 체크리스트 로드 (yaml에서)
+                _checklist = AF_CM.get_af_checklist(_slug)
+                if not _checklist:
+                    st.info("검토 항목 생성 중... (계산기를 다시 저장하면 자동 생성됩니다)")
+                else:
+                    _critical = [i for i in _checklist if i.get("severity") == "critical"]
+                    _advisory = [i for i in _checklist if i.get("severity") == "advisory"]
+                    _critical_done = sum(1 for i in _critical if i.get("checked"))
+
+                    # 🔴 필수 검토
+                    st.markdown(f"**🔴 필수 검토** ({_critical_done}/{len(_critical)} 완료 — 전체 완료해야 READY 가능)")
+                    _checklist_changed = False
+                    for _item in _critical:
+                        _iid = _item["id"]
+                        _key = f"chk_{_slug}_{_iid}"
+                        _cur = bool(_item.get("checked"))
+                        _col_chk, _col_lbl = st.columns([1, 12])
+                        _new_val = _col_chk.checkbox("", value=_cur, key=_key)
+                        _display = _item.get("display_value") or ""
+                        _col_lbl.markdown(
+                            f"{'~~' if _new_val else ''}**{_item['label']}**{'~~' if _new_val else ''}"
+                            + (f"  \n`{_display[:120]}`" if _display else "")
+                        )
+                        if _new_val != _cur:
+                            if _cur and not _new_val:
+                                # D-3: 취소 → 재확인 없이 unchecked (st.warning으로 알림)
+                                st.toast(f"'{_item['label']}' 확인 취소됨")
+                            _item["checked"] = _new_val
+                            _item["checked_by"] = "operator" if _new_val else None
+                            _item["checked_at"] = (_dt.now(_tz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                                                   if _new_val else None)
+                            _checklist_changed = True
+
+                    # 🟡 권장 검토
+                    if _advisory:
+                        st.markdown("**🟡 권장 검토** (선택사항)")
+                        for _item in _advisory:
+                            _iid = _item["id"]
+                            _key = f"chk_{_slug}_{_iid}"
+                            _cur = bool(_item.get("checked"))
+                            _col_chk, _col_lbl = st.columns([1, 12])
+                            _new_val = _col_chk.checkbox("", value=_cur, key=_key)
+                            _display = _item.get("display_value") or ""
+                            _col_lbl.markdown(
+                                f"{'~~' if _new_val else ''}**{_item['label']}**{'~~' if _new_val else ''}"
+                                + (f"  \n`{_display[:120]}`" if _display else "")
+                            )
+                            if _new_val != _cur:
+                                _item["checked"] = _new_val
+                                _item["checked_by"] = "operator" if _new_val else None
+                                _item["checked_at"] = (_dt.now(_tz.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                                                       if _new_val else None)
+                                _checklist_changed = True
+
+                    # 체크 상태 변경 시 yaml 저장 + 페이지 갱신
+                    if _checklist_changed:
+                        try:
+                            AF_CM.save_af_checklist(_slug, _checklist)
+                        except Exception as _ce:
+                            st.error(f"체크리스트 저장 실패: {_ce}")
                         st.rerun()
+
+                    # READY 전환 버튼 (🔴 전체 완료 시에만 활성화)
+                    _all_critical_done = all(i.get("checked") for i in _critical)
+                    st.markdown("---")
+                    if _all_critical_done:
+                        st.caption("위 🔴 필수 항목 전체를 직접 확인하였습니다.")
+                    if st.button("✅ READY 전환 (legal 검증 완료)", key=f"cm_ready_{cid}",
+                                 type="primary", disabled=not _all_critical_done,
+                                 help="🔴 필수 항목 전체 완료 시에만 활성화됩니다." if not _all_critical_done else ""):
+                        _ok_r, _msg_r = AF_CM.promote_to_ready(_slug)
+                        (st.success if _ok_r else st.error)(_msg_r)
+                        if _ok_r:
+                            st.rerun()
             # 수식 편집(검증 후 저장)
             cur_formula = c.get("formula", "")
             new_formula = st.text_input("수식(formula)", value=str(cur_formula), key=f"cm_f_{cid}")
@@ -1920,6 +1993,76 @@ elif tab == "🧮 계산기 관리":
             if b[3].button("🗑 삭제", key=f"cm_del_{cid}"):
                 repo.delete(cid); st.rerun()
 
+            # ── Build 버튼 (READY 상태 app_factory 계산기만) ─────────────
+            _is_ready_af = (_v3e.get("source") == "app_factory" and
+                            _v3e.get("status") == "READY")
+            if _is_ready_af:
+                st.divider()
+                st.markdown("**⚙️ Build (정적 사이트 전체 재빌드)**")
+                if st.button(f"⚙️ Build — {c.get('name','')}", key=f"cm_build_{cid}", type="primary"):
+                    from modules import review_center as _RC_build
+                    # Step 1~6 사전 QA 실행
+                    with st.spinner("Build 사전 QA 실행 중..."):
+                        _qa_results = _RC_build.pre_build_qa(c, cfg)
+                    _qa_failed = [r for r in _qa_results if not r["passed"] and not r["skipped"]]
+                    # QA 결과 표시
+                    for _r in _qa_results:
+                        _icon = "✅" if _r["passed"] else ("⏭️" if _r["skipped"] else "❌")
+                        st.markdown(f"{_icon} **Step {_r['step']}: {_r['label']}** — {_r['detail']}")
+                    if _qa_failed:
+                        st.error(f"❌ Build 차단 — QA {len(_qa_failed)}개 항목 실패. 위 내용을 확인 후 재시도하세요.")
+                    else:
+                        st.success("✅ 사전 QA 전체 통과 → _rebuild_site.py 실행 중...")
+                        import subprocess, sys as _sys
+                        _rb = subprocess.run(
+                            [_sys.executable, "scripts/_rebuild_site.py"],
+                            capture_output=True, text=True, timeout=180, cwd=str(BASE)
+                        )
+                        if _rb.returncode == 0:
+                            st.success("✅ Build 완료 — _site/ 갱신됨")
+                            st.code(_rb.stdout[-2000:] or "(출력 없음)")
+                            # index/sitemap 반영 확인
+                            _site_dir = BASE / "data" / "workspace" / "_site"
+                            _slug_built = c.get("slug", "")
+                            _has_slug_dir = (_site_dir / _slug_built / "index.html").exists()
+                            _sitemap = _site_dir / "sitemap.xml"
+                            _in_sitemap = (_slug_built in _sitemap.read_text(encoding="utf-8")
+                                           if _sitemap.exists() else False)
+                            st.markdown(
+                                f"**반영 확인:**  \n"
+                                f"{'✅' if _has_slug_dir else '⚠️'} `_site/{_slug_built}/index.html` {'존재' if _has_slug_dir else '없음'}  \n"
+                                f"{'✅' if _in_sitemap else '⚠️'} `sitemap.xml`에 slug {'포함' if _in_sitemap else '미포함'}"
+                            )
+                            # Deploy 준비 안내 화면
+                            st.divider()
+                            st.markdown("### 📋 배포 전 확인 체크리스트 (수동 진행)")
+                            st.info(
+                                "Build 완료. 아래 4단계를 직접 진행하세요. "
+                                "Step 3·4가 확인될 때까지 '배포 완료'로 간주하지 마세요."
+                            )
+                            _deploy_slug = c.get("slug", "YOUR-SLUG")
+                            st.markdown(f"""
+**Step 1** — git commit
+```
+git add data/workspace/_site/ docs/registry/
+git commit -m "feat(phase3-N): add {_deploy_slug} calculator"
+```
+**Step 2** — git push
+```
+git push origin master
+```
+**Step 3** — GitHub Actions 확인
+→ Actions 페이지에서 최신 워크플로가 ✅ 완료 상태인지 확인
+
+**Step 4** — 실제 사이트 확인
+- `https://calcmate.kr/` (메인 카드 노출)
+- `https://calcmate.kr/{_deploy_slug}/` (HTTP 200 + 출력 요소)
+- `https://calcmate.kr/sitemap.xml` (URL 포함)
+""")
+                        else:
+                            st.error("❌ Build 실패")
+                            st.code(_rb.stderr[-2000:] or "(출력 없음)")
+
     # 자동펼침 플래그는 한 번 사용 후 제거(다음 렌더부터는 평소처럼 접힌 채)
     if _just_saved:
         st.session_state["af_just_saved_name"] = None
@@ -2007,9 +2150,48 @@ elif tab == "🏭 App Factory":
             except Exception as e:
                 st.warning(f"AI 제안 실패(직접 입력해주세요): {e}")
 
-    # Tier 선택 (필수) — 계산 로직 복잡도 및 legal 검증 수준 결정
+    from modules import review_center as RC
+
+    c1, c2 = st.columns(2)
+    af_name = c1.text_input("계산기명 *", placeholder="퇴직금 계산기", key="af_name")
+    af_cat = c2.text_input("카테고리", placeholder="노무/급여", key="af_cat")
+    af_desc = st.text_area("설명", placeholder="예: 근속연수와 평균임금으로 퇴직금 계산", key="af_desc")
+
+    # ── Tier2-B 키워드 사전 감지 (rule-based) ──────────────────
+    if af_name and RC.detect_tier2b_keywords(af_name, af_desc or ""):
+        st.warning("⚠️ 이름/설명에 날짜·기간 관련 키워드가 감지됩니다. Tier2-B(날짜형) 가능성을 직접 확인하세요.")
+
+    # ── Tier AI 추천 (D-1) ─────────────────────────────────────
+    _tier_map_str_to_int = {"Tier2-A": 2, "Tier2-B": 2, "Tier1": 1}
+    _tier_map_int_to_str = {2: "Tier2-A", 1: "Tier1"}
+
+    _tier_col1, _tier_col2 = st.columns([4, 1])
+    with _tier_col1:
+        _tier_suggest = st.session_state.get("af_tier_suggest", {})
+        if _tier_suggest:
+            _conf = _tier_suggest.get("confidence", "medium")
+            _conf_icon = {"high": "", "medium": "⚠️ 확신도 보통 —", "low": "🚨 분류 불확실 —"}.get(_conf, "")
+            st.info(f"💡 AI 추천: **{_tier_suggest.get('tier', 'Tier2-A')}** {_conf_icon}  \n"
+                    f"이유: {_tier_suggest.get('reason', '')}")
+    with _tier_col2:
+        if st.button("💡 Tier AI 추천", key="af_tier_suggest_btn", help="이름·설명 기반으로 AI가 Tier를 추천합니다"):
+            if not af_name.strip():
+                st.warning("계산기명을 먼저 입력하세요.")
+            else:
+                with st.spinner("Tier 분석 중..."):
+                    try:
+                        _result = RC.suggest_tier(cfg, af_name, af_desc or "")
+                        st.session_state["af_tier_suggest"] = _result
+                        # D-1: 추천값으로 라디오 기본값 세팅
+                        _t_int = _tier_map_str_to_int.get(_result["tier"], 2)
+                        st.session_state["af_tier"] = _t_int
+                        st.rerun()
+                    except Exception as _te:
+                        st.warning(f"Tier 추천 실패(직접 선택): {_te}")
+
+    # Tier 선택 (필수) — D-1: AI 추천이 기본값, 운영자 최종 확인/변경
     af_tier = st.radio(
-        "Tier * (필수)",
+        "Tier * (최종 선택 — AI 추천을 참고하되 직접 확인하세요)",
         options=[2, 1],
         format_func=lambda t: (
             "Tier2 — 단순 산술/일반 공식 (수식으로 표현 가능한 계산)"
@@ -2023,11 +2205,6 @@ elif tab == "🏭 App Factory":
         st.info("ℹ️ Tier1은 생성 후 계산 로직 + legal 근거 모두 사람이 검증해야 합니다. READY 전환 전까지 index/sitemap 비노출.")
     else:
         st.info("ℹ️ Tier2는 생성 후 계산 정확성 검증 + legal 검증 완료 시 READY 전환 가능.")
-
-    c1, c2 = st.columns(2)
-    af_name = c1.text_input("계산기명 *", placeholder="퇴직금 계산기", key="af_name")
-    af_cat = c2.text_input("카테고리", placeholder="노무/급여", key="af_cat")
-    af_desc = st.text_area("설명", placeholder="예: 근속연수와 평균임금으로 퇴직금 계산", key="af_desc")
     if st.button("🏭 자동 생성", type="primary", key="af_gen"):
         if not af_name.strip():
             st.error("계산기명은 필수입니다.")
@@ -2073,6 +2250,18 @@ elif tab == "🏭 App Factory":
             "영문 slug * (폴더·URL·내부 식별자 — 저장 후 변경 불가)",
             key="af_slug",
             help="영문 소문자·숫자·하이픈만. 한글/공백 불가. 대시보드 표시는 계속 한글 이름(name)을 사용합니다.")
+        # slug 중복 확인 (D: 생성 단계에서 실시간 차단)
+        _slug_to_check = (af_slug or "").strip().lower()
+        if _slug_to_check:
+            import re as _re_slug_chk
+            if _re_slug_chk.match(r"^[a-z0-9][a-z0-9-]*$", _slug_to_check):
+                _, _slug_conflict, _slug_msg = RC.check_slug_conflict(_slug_to_check, cfg)
+                if _slug_conflict:
+                    st.error(f"⛔ 슬러그 중복: {_slug_msg}")
+                else:
+                    st.success(f"✅ 슬러그 사용 가능: '{_slug_to_check}'")
+            else:
+                st.warning("영문 소문자·숫자·하이픈만 사용 가능합니다.")
         if st.button("💾 calculators + app_templates 저장", type="primary", key="af_save"):
             import re as _re_slug
             slug_in = (af_slug or "").strip().lower()

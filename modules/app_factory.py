@@ -176,6 +176,15 @@ def promote_to_ready(slug: str) -> tuple:
     if entry.get("status") == "READY":
         return True, f"'{slug}'은 이미 READY 상태입니다"
 
+    # 체크리스트 🔴 필수 항목 완료 여부 검증
+    checklist = entry.get("review_checklist") or []
+    if checklist:
+        incomplete = [i.get("label", i.get("id", "?")) for i in checklist
+                      if i.get("severity") == "critical" and not i.get("checked")]
+        if incomplete:
+            return False, (f"🔴 필수 검토 항목 미완료 ({len(incomplete)}개): "
+                           f"{incomplete} — 대시보드에서 체크 완료 후 재시도")
+
     category = entry.get("category", "")
     yaml_name = _category_to_af_yaml(category)
     yaml_file = _REG_DIR / f"{yaml_name}.yaml"
@@ -506,4 +515,57 @@ def save_app(cfg: dict, app: dict, site_id: str = "", slug: str = None) -> tuple
     LOG.info("App Factory 저장 완료: %s (tpl=%s)", name, tpl_id)
     _msg = f"✅ '{name}' 계산기 + 템플릿 저장 완료 (template_id={tpl_id})"
     _msg += " | v3 Registry HOLD 등록 완료. legal 검증 후 READY 전환 필요." if not _v3_warn else _v3_warn
+    # [Step C] 검토 체크리스트 자동 추출 + _af.yaml에 저장
+    if not _v3_warn:
+        try:
+            from modules.review_center import extract_checklist
+            _tier_str = f"Tier{_tier}-A" if _tier == 2 else "Tier1"
+            _checklist = extract_checklist(app, tier=_tier_str, category=app.get("category", ""))
+            save_af_checklist(new_slug, _checklist)
+            LOG.info("검토 체크리스트 저장 완료: %s (%d 항목)", new_slug, len(_checklist))
+        except Exception as _ce:
+            LOG.warning("체크리스트 저장 실패(무시): %s", _ce)
     return True, _msg
+
+
+def get_af_checklist(slug: str) -> list[dict]:
+    """Registry v3에서 slug의 review_checklist 반환. 없으면 []."""
+    from .registry_loader import load_registry_v3
+    v3 = load_registry_v3(force=True)
+    entry = v3.get(slug, {})
+    return list(entry.get("review_checklist", []) or [])
+
+
+def save_af_checklist(slug: str, checklist: list[dict]) -> None:
+    """_af.yaml에서 slug 엔트리의 review_checklist를 갱신."""
+    import yaml
+    from .registry_loader import load_registry_v3, invalidate
+
+    v3 = load_registry_v3(force=True)
+    entry = v3.get(slug)
+    if entry is None or entry.get("source") != "app_factory":
+        raise ValueError(f"'{slug}'은 App Factory 계산기가 아니거나 존재하지 않음")
+
+    category = entry.get("category", "")
+    yaml_name = _category_to_af_yaml(category)
+    yaml_file = _REG_DIR / f"{yaml_name}.yaml"
+
+    try:
+        data = yaml.safe_load(yaml_file.read_text(encoding="utf-8")) or {}
+    except Exception as e:
+        raise RuntimeError(f"Registry 파일 읽기 실패: {e}")
+
+    if not isinstance(data, dict) or slug not in data:
+        raise ValueError(f"'{slug}'이 {yaml_file.name}에 없음")
+
+    data[slug]["review_checklist"] = checklist
+    _AF_HEADER = (
+        f"# registry/{yaml_name}.yaml — App Factory 자동생성 계산기 (v3 SSOT)\n"
+        "# ⚠️ 이 파일은 App Factory(modules/app_factory)가 자동으로 씁니다. 직접 편집 주의.\n"
+        "# status: HOLD = legal 검증 대기 중 (index/sitemap 비노출)\n"
+        "# status: READY = 공개 (index/sitemap 포함, CalcMate 정적 사이트 빌드 대상)\n"
+    )
+    body = yaml.dump(data, allow_unicode=True, sort_keys=False, default_flow_style=False)
+    yaml_file.write_text(_AF_HEADER + "\n" + body, encoding="utf-8")
+    invalidate()
+    LOG.info("체크리스트 갱신: %s", slug)
