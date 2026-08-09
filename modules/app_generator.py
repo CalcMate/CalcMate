@@ -817,17 +817,20 @@ def _compute_js(calc) -> str:
         # 검증 블록 있음: reads → notices 초기화 → 검증 → 수식 → _formula → return
         out_key = next(iter(fmap))
         out_expr = _to_js(next(iter(fmap.values())))
-        primary_label = _label(out_key)
         in_keys = list(ins.keys())
         formula_str = (f"{in_keys[0]}.toLocaleString() + '원 × (' "
                        f"+ {in_keys[1]} + '÷40×8) = ' "
                        f"+ Math.round({out_expr}).toLocaleString() + '원'"
                        if len(in_keys) == 2 else '""')
+        # fmap의 모든 출력 key를 처리 (단일/다중 출력 공통)
+        out_lines = "".join(
+            f'  out["{k}"] = ({_to_js(expr)});\n' for k, expr in fmap.items()
+        )
         body = (
             "  var out = {};\n"
             "  out.notices = [];\n"
             + validation
-            + f'  out["{out_key}"] = ({out_expr});\n'
+            + out_lines
             + f'  out._formula = {formula_str};\n'
         )
     else:
@@ -1523,6 +1526,22 @@ def generate_html(calc: dict, cfg: dict = None) -> str:
     labels = _effective_labels(calc)  # registry v3 field_labels primary, _LABELS fallback
     primary = list(outs.keys())[0] if outs else "result"
     plabel, punit = _split_label(primary, labels)
+    # 다중 출력: primary 이후 출력들을 결과 카드 내 추가 행으로 표시
+    extra_out_keys = list(outs.keys())[1:]
+    if extra_out_keys:
+        extra_rows_html = '    <div class="sm-result-extra">\n'
+        for k in extra_out_keys:
+            klabel, kunit = _split_label(k, labels)
+            extra_rows_html += (
+                f'      <div class="sm-result-extra-row">'
+                f'<span class="sm-result-extra-label">{_html.escape(klabel)}</span>'
+                f'<span><span class="sm-result-extra-value" id="out_{_html.escape(k)}">-</span>'
+                f'<span class="sm-result-extra-unit">{_html.escape(kunit or "원")}</span></span>'
+                f'</div>\n'
+            )
+        extra_rows_html += '    </div>'
+    else:
+        extra_rows_html = ""
     category = calc.get("category", "") or "계산기"
     emoji = ("💰" if ("급여" in category or "노무" in category)
              else "🏢" if ("보험" in category or "고용" in category) else "🧮")
@@ -1534,6 +1553,7 @@ def generate_html(calc: dict, cfg: dict = None) -> str:
         "CALC_BTN": _html.escape(f"{short} 계산하기"),
         "RESULT_LABEL": _html.escape(plabel if plabel.startswith("예상") else f"예상 {plabel}"),
         "PRIMARY_OUT": _html.escape(primary), "RESULT_UNIT": _html.escape(punit or "원"),
+        "EXTRA_OUTPUT_ROWS": extra_rows_html,
         "NOTICE": "본 계산 결과는 참고용이며, 실제 지급액은 근로계약·관련 법령에 따라 달라질 수 있습니다.",
         # 섹션은 render_* 함수가 조립(show_*=False면 태그 포함 전체 생략)
         "ADSENSE_SLOT": render_adsense_slot(cfg),

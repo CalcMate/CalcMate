@@ -377,7 +377,11 @@
 
     var card = d.getElementById("result-card");
     if (card) { card.classList.remove("show"); void card.offsetWidth; card.classList.add("show"); }
-    countUp(d.getElementById("out_" + primary), pv);
+    // 결과 카드 내 모든 출력 요소(primary + 추가 출력)를 countUp으로 업데이트
+    (CFG.outputs || []).forEach(function(o) {
+      var el = d.getElementById("out_" + o.key);
+      if (el) countUp(el, num(outputs[o.key]));
+    });
 
     var sub = d.getElementById("result-formula");
     if (sub) sub.textContent = outputs._formula || "";

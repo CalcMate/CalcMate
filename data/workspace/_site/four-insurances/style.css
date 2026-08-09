@@ -60,6 +60,11 @@ body{font-family:-apple-system,'Apple SD Gothic Neo','Pretendard','Noto Sans KR'
 .sm-result-value{font-size:var(--t-result);font-weight:800;letter-spacing:-1px;line-height:1.1}
 .sm-result-unit{font-size:20px;font-weight:500;opacity:.8;margin-left:4px}
 .sm-result-sub{margin-top:var(--sp-2);padding-top:var(--sp-2);border-top:1px solid rgba(255,255,255,.15);font-size:13px;opacity:.7}
+.sm-result-extra{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.2)}
+.sm-result-extra-row{display:flex;justify-content:space-between;align-items:baseline;padding:3px 0;font-size:14px}
+.sm-result-extra-label{opacity:.8;font-weight:500}
+.sm-result-extra-value{font-weight:700;font-size:16px}
+.sm-result-extra-unit{font-size:13px;opacity:.75;margin-left:3px}
 
 /* Result Action Buttons */
 .sm-result-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--sp-1);margin-bottom:var(--sp-2);display:none}
