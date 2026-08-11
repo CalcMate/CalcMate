@@ -2247,12 +2247,186 @@ elif tab == "🏭 App Factory":
             height=90,
             key="af_contract_formula",
             help="수식이 법령으로 확정된 경우만 입력. 입력 시 AI 결과 수식과 비교합니다.")
+
+        # ── CA-3-4: AI Formula 제안 버튼 ─────────────────────────────
+        _sf_input_ok = (
+            bool((_af_input_fields or "").strip())
+            and bool((_af_output_fields or "").strip())
+        )
+        if st.button(
+            "🤖 AI Formula 제안",
+            key="af_formula_ai_suggest",
+            disabled=not _sf_input_ok,
+            help=(
+                "입력 필드와 출력 필드를 먼저 입력하세요." if not _sf_input_ok
+                else "AI가 Formula를 제안합니다. 반드시 [🔍 Formula 검증] 후 [✅ Formula 확정]을 실행하세요."
+            ),
+        ):
+            _existing_formula = (_af_formula or "").strip()
+            _override_set = st.session_state.pop("_af_ai_suggest_override", False)
+            if _existing_formula and not _override_set:
+                # R-6: 1차 클릭 — 기존 formula 존재 시 경고 후 대기
+                st.warning("⚠️ 기존 Formula가 있습니다. 다시 클릭하면 AI 제안으로 교체됩니다.")
+                st.session_state["_af_ai_suggest_override"] = True
+            else:
+                # 2차 클릭 또는 기존 formula 없음 — AI 호출
+                _sf_input_list  = [f.strip() for f in (_af_input_fields or "").split(",") if f.strip()]
+                _sf_output_list = [f.strip() for f in (_af_output_fields or "").split(",") if f.strip()]
+                with st.spinner("🤖 AI가 Formula를 제안하는 중..."):
+                    _sf_result = AF.suggest_formula(
+                        cfg=cfg,
+                        name=af_name or "",
+                        category=af_cat or "",
+                        desc=af_desc or "",
+                        input_fields=_sf_input_list,
+                        output_fields=_sf_output_list,
+                        legal_refs=[],
+                        slug=(_af_slug_pre or "").strip() or None,
+                    )
+                if _sf_result["success"]:
+                    _sf_formula = _sf_result["formula"]
+                    # dict → compact JSON 문자열로 직렬화 (whitespace 비교 일관성 유지)
+                    _sf_formula_str = (
+                        json.dumps(_sf_formula, ensure_ascii=False)
+                        if isinstance(_sf_formula, dict)
+                        else str(_sf_formula)
+                    )
+                    st.session_state["af_contract_formula"] = _sf_formula_str
+                    st.session_state["af_formula_ai_suggested_text"] = _sf_formula_str
+                    # 이전 확정/검증 상태 초기화
+                    st.session_state.pop("af_formula_confirmed_text", None)
+                    st.session_state.pop("af_formula_validation", None)
+                    if st.session_state.get("af_contract"):
+                        st.session_state["af_contract"]["formula_status"] = "ai_suggested"
+                    for _sw in (_sf_result.get("warnings") or []):
+                        st.warning(f"⚠️ {_sw}")
+                    st.info("AI Formula 제안 완료. 반드시 검토 후 [🔍 Formula 검증]을 실행하세요.")
+                    st.rerun()
+                else:
+                    st.error(f"❌ AI Formula 제안 실패: {_sf_result['reason']}")
+                    for _sw in (_sf_result.get("warnings") or []):
+                        st.warning(f"⚠️ {_sw}")
+
+        # ── CA-2-6-2: formula_status 배지 (항상 표시) ─────────────────
+        _fv_badge_status = (st.session_state.get("af_contract") or {}).get("formula_status")
+        if _fv_badge_status is None:
+            _fv_prior_raw_badge = st.session_state.get("af_formula_confirmed_text", "")
+            _fv_ai_badge_raw    = st.session_state.get("af_formula_ai_suggested_text", "")
+            _fv_cur_raw_badge   = (_af_formula or "").strip()
+            if _fv_prior_raw_badge and _fv_cur_raw_badge == _fv_prior_raw_badge:
+                _fv_badge_status = "operator_confirmed"
+            elif _fv_ai_badge_raw and _fv_cur_raw_badge == _fv_ai_badge_raw:
+                _fv_badge_status = "ai_suggested"   # CA-3-4: af_contract 없을 때 fallback
+            elif _fv_cur_raw_badge:
+                _fv_badge_status = "pending_validation"
+            else:
+                _fv_badge_status = "not_generated"
+        _fv_badge_map = {
+            "not_generated":      "⚪ Formula 미생성",
+            "ai_suggested":        "🔵 AI 제안",
+            "pending_validation":  "🟡 검증 대기",
+            "operator_confirmed":  "🟢 운영자 확정",
+        }
+        st.caption(f"Formula 상태: {_fv_badge_map.get(_fv_badge_status, '⚠️ 확인 필요')}")
         _af_test_cases = st.text_area(
             "테스트 케이스 (선택 — JSON 배열)",
             placeholder='[{"input": {"years_of_service": 1, "used_days": 0}, "expected": {"total_days": 15.0}}]',
             height=90,
             key="af_contract_test_cases",
             help="예상 입출력 쌍. 있으면 Contract 기반 생성 후 수식 샘플 검증도 수행합니다.")
+
+        # ── CA-2-6-2: Formula 수정 감지 → operator_confirmed 무효화 ───
+        _fv_confirmed_raw = st.session_state.get("af_formula_confirmed_text", "")
+        _fv_current_raw   = (_af_formula or "").strip()
+        if _fv_confirmed_raw and _fv_current_raw != _fv_confirmed_raw:
+            st.session_state.pop("af_formula_confirmed_text", None)
+            st.session_state.pop("af_formula_validation", None)
+            if st.session_state.get("af_contract"):
+                st.session_state["af_contract"]["formula_status"] = "pending_validation"
+
+        # ── CA-3-1: ai_suggested 수정 감지 → pending_validation 복귀 ───
+        _fv_ai_suggested_raw = st.session_state.get("af_formula_ai_suggested_text", "")
+        if _fv_ai_suggested_raw and _fv_current_raw != _fv_ai_suggested_raw:
+            st.session_state.pop("af_formula_ai_suggested_text", None)
+            st.session_state.pop("af_formula_validation", None)
+            if st.session_state.get("af_contract"):
+                st.session_state["af_contract"]["formula_status"] = "pending_validation"
+
+        # ── CA-2-6-2: Formula 검증 / 확정 버튼 ─────────────────────────
+        _fv_stored = st.session_state.get("af_formula_validation")
+        _fv_passed = (
+            _fv_stored is not None
+            and _fv_stored.get("valid", False)
+            and not any(s.get("match") is False for s in _fv_stored.get("sample_results", []))
+        )
+        _fv_col1, _fv_col2 = st.columns([1, 1])
+        if _fv_col1.button("🔍 Formula 검증", key="af_formula_validate"):
+            _fv_raw = (_af_formula or "").strip()
+            if not _fv_raw:
+                st.warning("Formula를 입력한 후 검증하세요.")
+                st.session_state.pop("af_formula_validation", None)
+                _fv_passed = False
+            else:
+                try:
+                    _fv_formula_parsed = json.loads(_fv_raw)
+                except Exception:
+                    _fv_formula_parsed = _fv_raw
+                _fv_in_list = [f.strip() for f in (_af_input_fields or "").split(",") if f.strip()]
+                _fv_schema  = {f: "number" for f in _fv_in_list}
+                _fv_tc = []
+                _fv_tc_raw = (_af_test_cases or "").strip()
+                if _fv_tc_raw:
+                    try:
+                        _fv_tc_parsed = json.loads(_fv_tc_raw)
+                        if isinstance(_fv_tc_parsed, list):
+                            _fv_tc = _fv_tc_parsed
+                    except Exception:
+                        pass
+                from modules.formula_engine import validate_formula_with_samples as _vfws
+                _fv_result = _vfws(_fv_formula_parsed, _fv_schema, _fv_tc or None)
+                st.session_state["af_formula_validation"] = _fv_result
+                _fv_stored = _fv_result
+                _fv_passed = (
+                    _fv_result.get("valid", False)
+                    and not any(s.get("match") is False
+                                for s in _fv_result.get("sample_results", []))
+                )
+                if st.session_state.get("af_contract"):
+                    st.session_state["af_contract"]["formula_status"] = "pending_validation"
+                st.session_state.pop("af_formula_confirmed_text", None)
+
+        if _fv_col2.button(
+            "✅ Formula 확정",
+            key="af_formula_confirm",
+            disabled=not _fv_passed,
+            help="Formula 검증을 먼저 실행하고 통과해야 확정할 수 있습니다." if not _fv_passed else None,
+        ):
+            st.session_state["af_formula_confirmed_text"] = (_af_formula or "").strip()
+            if st.session_state.get("af_contract"):
+                st.session_state["af_contract"]["formula_status"] = "operator_confirmed"
+            st.success("✅ Formula 운영자 확정 완료 — operator_confirmed")
+            st.rerun()
+
+        if _fv_stored is not None:
+            _fv_valid   = _fv_stored.get("valid", False)
+            _fv_msg     = _fv_stored.get("message", "")
+            _fv_samples = _fv_stored.get("sample_results", [])
+            _fv_failed  = [s for s in _fv_samples if s.get("match") is False]
+            if _fv_passed:
+                _fv_tc_info = f" | 테스트 케이스 {len(_fv_samples)}개 통과" if _fv_samples else ""
+                st.success(f"✅ Formula 검증 통과 (Level 1/2/3){_fv_tc_info}")
+            elif not _fv_valid:
+                st.error(f"❌ Formula 검증 실패 (Level 1/2): {_fv_msg}")
+            else:
+                st.error(f"❌ Formula 검증 실패 (Level 3 — 기대값 불일치): {len(_fv_failed)}개")
+                for _s in _fv_failed[:3]:
+                    if _s.get("error"):
+                        st.markdown(f"  - 입력 `{_s.get('input')}` → 오류: `{_s.get('error')}`")
+                    else:
+                        st.markdown(
+                            f"  - 입력 `{_s.get('input')}` → "
+                            f"예상 `{_s.get('expected')}` / 실제 `{_s.get('output')}`"
+                        )
 
         if st.button("📋 Contract 기반 생성", key="af_gen_contract"):
             if not af_name.strip():
@@ -2290,6 +2464,13 @@ elif tab == "🏭 App Factory":
                             st.error(f"테스트 케이스 파싱 실패: {_te}")
                             _test_cases_val = []
 
+                    # CA-2-6-2: 이전 확정 상태 전달 — formula 미변경 시 operator_confirmed 보존
+                    _fv_prior_raw = st.session_state.get("af_formula_confirmed_text", "")
+                    _fv_prior_status = (
+                        "operator_confirmed"
+                        if _fv_prior_raw and _formula_raw == _fv_prior_raw
+                        else None
+                    )
                     _contract = AF.build_contract(
                         slug=_slug_clean,
                         name=af_name.strip(),
@@ -2298,9 +2479,16 @@ elif tab == "🏭 App Factory":
                         input_fields=_input_list,
                         output_fields=_output_list,
                         formula=_formula_val,
+                        formula_status=_fv_prior_status,
                         test_cases=_test_cases_val,
+                        desc=af_desc or "",
                     )
                     st.session_state["af_contract"] = _contract
+
+                    # ── Pre-generation Soft Gate (HOLD-1/2/3) ────────────────
+                    _hold = AF.check_hold_rules(_contract)
+                    for _hm in _hold["messages"]:
+                        st.warning(f"⚠️ {_hm}")
 
                     with st.spinner("Contract 기반으로 AI가 계산기를 생성 중입니다... (수십 초)"):
                         try:
