@@ -13,6 +13,12 @@
     family_count: "부양가족 수(인)"
     paid_tax: "기납부 세액(원)"
     estimated_refund: "예상 환급액(원)"
+  input_labels:
+    - total_salary
+    - family_count
+    - paid_tax
+  output_labels:
+    - estimated_refund
   display_order: 6
   card_desc: "연간 납부 세금과 공제 항목으로 환급액을 계산해보세요"
   difficulty: simple
@@ -55,6 +61,11 @@ freelancer-tax-3p3:
     gross_income: "총 수입(원)"
     withholding_tax: "원천징수세액(원)"
     net_income: "실수령액(원)"
+  input_labels:
+    - gross_income
+  output_labels:
+    - withholding_tax
+    - net_income
   display_order: 8
   card_desc: "프리랜서·강사·작가 수입에서 3.3% 원천징수 세액과 실수령액을 계산해보세요"
   difficulty: simple

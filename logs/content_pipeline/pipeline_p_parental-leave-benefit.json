@@ -2,13 +2,25 @@
   "pipeline_id": "p_parental-leave-benefit",
   "calculator": "parental-leave-benefit",
   "current_stage": "PUBLISH",
-  "status": "SUCCESS",
+  "status": "FAILED",
   "results": {
     "H4B_COMPETITIVE": {
       "status": "PASS",
       "data": {
         "tasks": {
           "tasks": [
+            {
+              "topic": "FAQ",
+              "priority": "HIGH",
+              "action": "FAQ \uc139\uc158 \ucd94\uac00",
+              "reason": "\uc8fc\uc694 \uc0ac\uc6a9\uc790 \uc9c8\ubb38 \ubcf4\uc644"
+            },
+            {
+              "topic": "\ubc95\uc801 \uae30\uc900",
+              "priority": "HIGH",
+              "action": "\ubc95\uc801 \uae30\uc900 \uc124\uba85 \ucd94\uac00",
+              "reason": "\ucd5c\uc2e0 \ubc95\ub839 \uba85\uc2dc"
+            },
             {
               "topic": "\uc9c0\uae09 \uc870\uac74",
               "priority": "HIGH",
@@ -20,18 +32,6 @@
               "priority": "HIGH",
               "action": "\uacc4\uc0b0 \uc608\uc2dc \ucd94\uac00",
               "reason": "\uc2e4\uc81c \ub370\uc774\ud130 \uae30\ubc18 \uc0ac\ub840 \uc81c\uacf5"
-            },
-            {
-              "topic": "\ubc95\uc801 \uae30\uc900",
-              "priority": "HIGH",
-              "action": "\ubc95\uc801 \uae30\uc900 \uc124\uba85 \ucd94\uac00",
-              "reason": "\ucd5c\uc2e0 \ubc95\ub839 \uba85\uc2dc"
-            },
-            {
-              "topic": "FAQ",
-              "priority": "HIGH",
-              "action": "FAQ \uc139\uc158 \ucd94\uac00",
-              "reason": "\uc8fc\uc694 \uc0ac\uc6a9\uc790 \uc9c8\ubb38 \ubcf4\uc644"
             }
           ]
         },
@@ -75,10 +75,9 @@
     "H4A_QUALITY": {
       "status": "PASS",
       "data": {}
-    },
-    "PUBLISH": {
-      "status": "PUBLISHED"
     }
   },
-  "errors": []
+  "errors": [
+    "Stage PUBLISH returned FAILED"
+  ]
 }

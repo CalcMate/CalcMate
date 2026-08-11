@@ -14,6 +14,13 @@ four-insurances:
     health_insurance: "건강보험"
     employment_insurance: "고용보험"
     total: "합계"
+  input_labels:
+    - monthly_salary
+  output_labels:
+    - national_pension
+    - health_insurance
+    - employment_insurance
+    - total
   display_order: 5
   card_desc: "국민연금·건강보험·고용보험·산재보험 공제액 확인"
   difficulty: multi_output

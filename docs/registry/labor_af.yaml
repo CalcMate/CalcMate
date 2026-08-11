@@ -17,6 +17,12 @@ annual-leave-remaining:
     used_days: 이미 사용한 연차일수
     total_days: 올해 총 연차일수
     remaining_days: 잔여 연차일수
+  input_labels:
+  - years_of_service
+  - used_days
+  output_labels:
+  - total_days
+  - remaining_days
   display_order: 10
   card_desc: '입력: years_of_service(근속연수, 양의 정수), used_days(…'
   difficulty: multi_output

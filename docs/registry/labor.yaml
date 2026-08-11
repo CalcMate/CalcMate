@@ -12,6 +12,11 @@ weekly-holiday-allowance:
     hourly_wage: "시급(원)"
     weekly_hours: "주당 근로시간"
     weekly_holiday_pay: "주휴수당(원)"
+  input_labels:
+    - hourly_wage
+    - weekly_hours
+  output_labels:
+    - weekly_holiday_pay
   display_order: 1
   card_desc: "주 15시간 이상 근무했다면 꼭 확인하세요"
   difficulty: simple
@@ -55,6 +60,12 @@ severance-pay:
     start_date: "입사일"
     end_date: "퇴사일"
     severance_pay: "퇴직금"
+  input_labels:
+    - avg_monthly_wage
+    - start_date
+    - end_date
+  output_labels:
+    - severance_pay
   display_order: 2
   card_desc: "근속기간과 평균임금으로 퇴직금을 계산해보세요"
   difficulty: date_based
@@ -95,6 +106,11 @@ annual-leave-allowance:
     daily_wage: "일급(원)"
     unused_days: "미사용 연차(일)"
     annual_leave_allowance: "연차수당"
+  input_labels:
+    - daily_wage
+    - unused_days
+  output_labels:
+    - annual_leave_allowance
   display_order: 3
   card_desc: "미사용 연차를 수당으로 환산해보세요"
   difficulty: simple

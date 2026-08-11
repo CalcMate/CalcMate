@@ -14,6 +14,13 @@ unemployment-benefit:
     employment_months: "고용 개월수"
     daily_benefit: "1일 구직급여"
     total_benefit: "예상 총액"
+  input_labels:
+    - avg_daily_wage
+    - age
+    - employment_months
+  output_labels:
+    - daily_benefit
+    - total_benefit
   display_order: 4
   card_desc: "고용보험 가입기간 기준 예상 수급액을 확인하세요"
   difficulty: complex
@@ -56,6 +63,13 @@ unemployment-benefit:
     use_6plus6: "6+6 특례(1=적용, 0=일반)"
     leave_month: "육아휴직 개월 차"
     monthly_allowance: "예상 월 지급액(원)"
+  input_labels:
+    - monthly_wage
+    - insured_days
+    - use_6plus6
+    - leave_month
+  output_labels:
+    - monthly_allowance
   display_order: 7
   card_desc: "육아휴직 기간별 예상 급여를 확인해보세요"
   difficulty: simple

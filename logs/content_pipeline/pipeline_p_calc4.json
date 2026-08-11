@@ -10,10 +10,10 @@
         "tasks": {
           "tasks": [
             {
-              "topic": "\uc9c0\uae09 \uc870\uac74",
+              "topic": "FAQ",
               "priority": "HIGH",
-              "action": "\ub300\uc0c1 \uc870\uac74 \uc124\uba85 \ucd94\uac00",
-              "reason": "\uc218\uae09 \uc870\uac74 \uad6c\uccb4\ud654"
+              "action": "FAQ \uc139\uc158 \ucd94\uac00",
+              "reason": "\uc8fc\uc694 \uc0ac\uc6a9\uc790 \uc9c8\ubb38 \ubcf4\uc644"
             },
             {
               "topic": "\uc608\uc2dc",
@@ -28,10 +28,10 @@
               "reason": "\ucd5c\uc2e0 \ubc95\ub839 \uba85\uc2dc"
             },
             {
-              "topic": "FAQ",
+              "topic": "\uc9c0\uae09 \uc870\uac74",
               "priority": "HIGH",
-              "action": "FAQ \uc139\uc158 \ucd94\uac00",
-              "reason": "\uc8fc\uc694 \uc0ac\uc6a9\uc790 \uc9c8\ubb38 \ubcf4\uc644"
+              "action": "\ub300\uc0c1 \uc870\uac74 \uc124\uba85 \ucd94\uac00",
+              "reason": "\uc218\uae09 \uc870\uac74 \uad6c\uccb4\ud654"
             }
           ]
         },

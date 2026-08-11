@@ -20,6 +20,15 @@ jeonse-vs-monthly:
     jeonse_opp_cost: 전세 월 기회비용
     wolse_to_jeonse_equiv: 월세→전세 환산금액
     monthly_savings: 월 비용 우위
+  input_labels:
+    - jeonse_deposit
+    - wolse_deposit
+    - wolse_amount
+    - rate
+  output_labels:
+    - jeonse_opp_cost
+    - wolse_to_jeonse_equiv
+    - monthly_savings
   display_order: 9
   card_desc: 전세보증금과 월세 조건을 입력하면 전세 월 기회비용, 월세→전세 환산금액, 월 비…
   difficulty: multi_output
