@@ -17,6 +17,9 @@ from pathlib import Path
 # v3 Registry 경로 (docs/registry/*.yaml SSOT)
 _REG_DIR = Path(__file__).resolve().parent.parent / "docs" / "registry"
 
+# Contract Schema 경로 (docs/contract_schema/ — CA-2-4)
+_SCHEMA_DIR = Path(__file__).resolve().parent.parent / "docs" / "contract_schema"
+
 # category → _af yaml 파일명(확장자 제외). 미매핑은 labor_af 폴백.
 _CATEGORY_AF_YAML_MAP: dict[str, str] = {
     "세금/정부혜택": "tax_af",
@@ -55,6 +58,11 @@ AF_SESSION_DISCARD_KEYS: tuple[str, ...] = (
     "af_contract_output_fields",  # 확정 출력 필드 (쉼표 구분 문자열)
     "af_contract_formula",        # 확정 formula (str 또는 JSON)
     "af_contract_test_cases",     # 검증 케이스 (JSON 배열 문자열)
+    # ── Formula lifecycle 보조 키 (CA-3-1/CA-3-4) ────────────
+    "af_formula_confirmed_text",  # operator_confirmed 시점의 raw formula
+    "af_formula_validation",      # [🔍 Formula 검증] 결과 dict
+    "af_formula_ai_suggested_text",  # AI 제안 추적 (ai_suggested 수정 감지용)
+    "_af_ai_suggest_override",    # 2-click 덮어쓰기 확인 플래그
 )
 
 
@@ -106,9 +114,11 @@ def _next_display_order() -> int:
     return max(orders, default=9) + 1
 
 
-def _build_v3_entry(app: dict, slug: str, tier: int = 2) -> dict:
+def _build_v3_entry(app: dict, slug: str, tier: int = 2, contract: dict = None) -> dict:
     """v3 Registry(docs/registry/*_af.yaml)에 기록할 엔트리 생성.
-    기존 8개 계산기 형식과 동일 스키마 + status/tier/source 추가."""
+    기존 8개 계산기 형식과 동일 스키마 + status/tier/source 추가.
+    contract: Mode B(generate_app_with_contract) 경로에서만 전달. None이면 Mode A(기존 동작 유지)."""
+    _c = contract or {}
     ins = app.get("input_schema", {}) or {}
     outs = app.get("output_schema", {}) or {}
     date_fields, compute_type, validation_mode, difficulty = _infer_registry_meta(
@@ -126,6 +136,8 @@ def _build_v3_entry(app: dict, slug: str, tier: int = 2) -> dict:
         "date_fields": date_fields,
         "validation_mode": validation_mode,
         "field_labels": app.get("labels", {}) or {},
+        "input_labels": list(_c.get("input_fields", []) or []),
+        "output_labels": list(_c.get("output_fields", []) or []),
         "display_order": _next_display_order(),
         "card_desc": card_desc,
         "difficulty": difficulty,
@@ -135,12 +147,19 @@ def _build_v3_entry(app: dict, slug: str, tier: int = 2) -> dict:
         "source": "app_factory",
         "content": {"evergreen": True, "update_cycle": None, "content_caveat": None},
         "related_slugs": [],
-        "legal_refs": [],
+        "legal_refs": list(_c.get("legal_refs", []) or []),
         "writer_context": {
             "emphasize": [],
             "example_patterns": [desc[:60]] if desc else [],
             "calculation_story": [],
         },
+        "contract_source": {
+            "contract_slug":    _c.get("slug", ""),
+            "input_fields":     list(_c.get("input_fields",     []) or []),
+            "output_fields":    list(_c.get("output_fields",    []) or []),
+            "formula_status":   _c.get("formula_status",   "not_generated"),
+            "test_cases_status":_c.get("test_cases_status","not_generated"),
+        } if _c else None,
     }
     if app.get("compute_rules"):
         entry["compute_rules"] = app["compute_rules"]
@@ -272,8 +291,11 @@ def build_contract(
     input_fields: list = None,
     output_fields: list = None,
     formula=None,
+    formula_status: str = None,
     scope_exclusions: list = None,
     test_cases: list = None,
+    desc: str = "",
+    legal_refs: list = None,
 ) -> dict:
     """운영자가 확정한 계산기 스펙을 Contract 객체로 생성.
 
@@ -284,9 +306,20 @@ def build_contract(
     input_fields:     확정 입력 필드명 리스트 (예: ["years_of_service", "used_days"])
     output_fields:    확정 출력 필드명 리스트 (예: ["total_days", "remaining_days"])
     formula:          확정 수식 (str 또는 dict)
+    formula_status:   명시적 상태 ("not_generated"/"ai_suggested"/"pending_validation"/"operator_confirmed").
+                      None이면 formula 존재 여부로 자동 도출:
+                        formula 있음 → "pending_validation"
+                        formula 없음 → "not_generated"
     scope_exclusions: 명시적 제외 조건 (화면 안내문 표시용)
     test_cases:       검증 케이스 [{"input": {...}, "expected": {...}}]
+    desc:             계산기 설명 (AI 생성 시 u1/u3 프롬프트에 삽입됨)
+    legal_refs:       법령 entity_id 리스트 (legal_master/*.yaml의 entity_id)
     """
+    has_formula = formula is not None and formula != ""
+    if formula_status is None:
+        derived_status = "pending_validation" if has_formula else "not_generated"
+    else:
+        derived_status = formula_status
     return {
         "slug": str(slug).strip().lower(),
         "name": str(name).strip(),
@@ -295,8 +328,68 @@ def build_contract(
         "input_fields": list(input_fields or []),
         "output_fields": list(output_fields or []),
         "formula": formula,
+        "formula_status": derived_status,
         "scope_exclusions": list(scope_exclusions or []),
         "test_cases": list(test_cases or []),
+        "test_cases_status": "operator_confirmed" if test_cases else "not_generated",
+        "desc": str(desc).strip(),
+        "legal_refs": list(legal_refs or []),
+    }
+
+
+def check_hold_rules(contract: dict) -> dict:
+    """Pre-generation Soft Gate — CA-1A §5 hold_rules 중 HOLD-1/2/3 평가.
+
+    생성 전 운영자에게 위험 요소를 알리기 위한 경고 함수.
+    Hard block이 아님. 운영자가 경고를 확인하고 진행 여부를 결정한다.
+
+    반환: {
+        "held": bool,           # True이면 경고 있음 (생성 진행은 운영자 결정)
+        "rules": list[str],     # 발동된 rule id 목록 (예: ["HOLD-1", "HOLD-3"])
+        "messages": list[str],  # 운영자에게 표시할 경고 메시지
+    }
+    """
+    from modules.review_center import CRITICAL_CATEGORIES
+    from modules.registry_loader import load_legal_master
+
+    rules, messages = [], []
+
+    # HOLD-1: formula 미확정 또는 검증 미완료 (operator_confirmed만 통과)
+    if contract.get("formula_status", "not_generated") != "operator_confirmed":
+        rules.append("HOLD-1")
+        messages.append(
+            "HOLD-1: formula가 운영자 확정 상태가 아닙니다. "
+            "수식 없이 생성하면 AI가 임의 수식을 사용할 수 있습니다."
+        )
+
+    # HOLD-2: critical category + test_cases 미확정
+    if (contract.get("test_cases_status", "not_generated") == "not_generated"
+            and contract.get("category", "") in CRITICAL_CATEGORIES):
+        rules.append("HOLD-2")
+        messages.append(
+            f"HOLD-2: '{contract.get('category', '')}' 카테고리는 법령 계산기입니다. "
+            "테스트 케이스 없이 생성하면 수식 정확성을 사전 검증할 수 없습니다."
+        )
+
+    # HOLD-3: legal_refs entity의 confidence=medium (경고)
+    legal_refs = contract.get("legal_refs") or []
+    if legal_refs:
+        lm = load_legal_master()
+        medium_refs = [
+            ref for ref in legal_refs
+            if (lm.get(ref) or {}).get("confidence") == "medium"
+        ]
+        if medium_refs:
+            rules.append("HOLD-3")
+            messages.append(
+                f"HOLD-3: 참조 법령 {medium_refs}의 confidence=medium — "
+                "법적 불확실성이 있습니다. 내용을 확인하고 진행하세요."
+            )
+
+    return {
+        "held": bool(rules),
+        "rules": rules,
+        "messages": messages,
     }
 
 
@@ -366,6 +459,211 @@ def validate_against_contract(contract: dict, ai_app: dict) -> dict:
     }
 
 
+# ── CA-3-3: Type D 식별 키워드 ─────────────────────────────────────────────
+_TYPE_D_FLOW_KEYWORDS: frozenset = frozenset({
+    "매년 변경", "별표", "테이블", "나이·피보험기간",
+})
+
+
+def _is_type_d_flow(calc_flows: list) -> bool:
+    """calculation_flow에 Type D 식별자(연도 변경/별표/테이블)가 있으면 True."""
+    for item in (calc_flows or []):
+        for kw in _TYPE_D_FLOW_KEYWORDS:
+            if kw in str(item):
+                return True
+    return False
+
+
+def suggest_formula(
+    cfg: dict,
+    name: str,
+    category: str = "",
+    desc: str = "",
+    input_fields: list = None,
+    output_fields: list = None,
+    legal_refs: list = None,
+    calculation_flow: list = None,
+    scope_exclusions: list = None,
+    slug: str = None,
+) -> dict:
+    """Contract 기반 AI Formula 제안 (CA-3-3).
+
+    기존 generate_app() 전체 생성과 무관한 독립 함수.
+    AI 호출 1회 (max_tokens=300).
+
+    반환 status:
+      "ai_suggested"  — AI 제안 성공
+      "not_generated" — 차단/실패
+
+    반환 형식:
+    {
+        "success": bool,
+        "formula": str | dict | None,
+        "reason":  str,
+        "assumptions": list,
+        "warnings":    list[str],
+        "status":  "ai_suggested" | "not_generated",
+    }
+
+    중요: success=True 라도 "operator_confirmed"가 아니다.
+    최종 확정은 반드시 운영자 행동(Dashboard [✅ Formula 확정])으로 이루어진다.
+    """
+    from modules.formula_engine import CUSTOM_COMPUTE_SLUGS, validate_formula
+
+    input_fields = list(input_fields or [])
+    output_fields = list(output_fields or [])
+
+    def _fail(reason: str, warnings: list = None) -> dict:
+        LOG.info("suggest_formula 실패: %s", reason)
+        return {
+            "success": False, "formula": None, "reason": reason,
+            "assumptions": [], "warnings": list(warnings or []),
+            "status": "not_generated",
+        }
+
+    # ── Type D 차단 1: CUSTOM_COMPUTE_SLUGS ───────────────────────
+    if slug and slug in CUSTOM_COMPUTE_SLUGS:
+        return _fail(
+            "이 계산기는 커스텀 계산 로직이 필요하여 AI Formula 자동 제안을 지원하지 않습니다.",
+            ["CUSTOM_COMPUTE_SLUGS 대상 계산기"],
+        )
+
+    # ── 필수 입력 확인 ─────────────────────────────────────────────
+    if not input_fields:
+        return _fail("input_fields가 비어 있습니다. Formula 제안에 필요합니다.")
+    if not output_fields:
+        return _fail("output_fields가 비어 있습니다. Formula 제안에 필요합니다.")
+
+    # ── legal_master에서 calculation_flow 조회 ──────────────────────
+    calc_flows = list(calculation_flow or [])
+    if legal_refs and not calc_flows:
+        try:
+            from modules.registry_loader import load_legal_master
+            lm = load_legal_master()
+            for ref in legal_refs:
+                calc_flows.extend((lm.get(ref) or {}).get("calculation_flow") or [])
+        except Exception as _e:
+            LOG.warning("legal_master 로드 실패: %s", _e)
+
+    # ── Type D 차단 2: calculation_flow 키워드 기반 ─────────────────
+    if _is_type_d_flow(calc_flows):
+        return _fail(
+            "이 계산기는 테이블/법령 기준값 또는 연도별 변경 데이터가 필요하여 "
+            "AI Formula 자동 제안을 지원하지 않습니다.",
+            ["calculation_flow에 테이블/매년 변경 항목 포함"],
+        )
+
+    # ── Prompt 구성 ────────────────────────────────────────────────
+    multi_output = len(output_fields) > 1
+    if multi_output:
+        output_format_rule = (
+            f"5. 복수 출력이므로 JSON 형식으로 반환: "
+            + json.dumps({k: "산술식" for k in output_fields}, ensure_ascii=False)
+            + " (출력 변수 목록과 키 이름 일치)\n"
+        )
+    else:
+        output_format_rule = "5. 단일 출력: 산술 표현식 문자열\n"
+
+    sys_suggest = (
+        "너는 계산기 Formula 제안 도우미다.\n"
+        "제공된 Contract와 법적 근거 정보만 사용한다.\n"
+        "존재하지 않는 입력 변수나 출력 변수를 만들지 않는다.\n"
+        "제공되지 않은 법률 규칙, 요율, 기준값을 임의로 생성하지 않는다.\n"
+        "계산 규칙이 충분하지 않으면 Formula를 추측하지 않는다.\n"
+        "AI의 제안은 운영자의 최종 확정이 아니며, 검증되지 않은 Formula임을 전제로 한다.\n\n"
+        f"입력 변수(이것만 사용 가능): {', '.join(input_fields)}\n"
+        f"출력 변수: {', '.join(output_fields)}\n"
+        + (f"카테고리: {category}\n" if category else "")
+        + (f"설명: {desc}\n" if desc else "")
+        + (
+            "법령 계산 흐름(참고):\n"
+            + "\n".join(f"  - {f}" for f in calc_flows)
+            + "\n"
+            if calc_flows else ""
+        )
+        + "\n규칙:\n"
+        "1. 입력 변수 목록 외 변수 절대 금지\n"
+        "2. 대입문(=), 세미콜론(;), 함수 정의, 외부 함수 호출 금지\n"
+        "3. 허용 함수: min, max, round, abs, int, float 만\n"
+        "4. calculation_flow에 없는 상수·요율 추가 금지\n"
+        + output_format_rule
+        + "\n반드시 아래 JSON 형식으로만 응답하라:\n"
+        '{"formula": "...", "reason": "...", "assumptions": [], "warnings": []}\n'
+        "계산 근거가 불충분하면:\n"
+        '{"formula": null, "reason": "근거 부족 이유", "assumptions": [], "warnings": ["..."]}'
+    )
+    u_suggest = f"계산기명: {name}"
+
+    # ── AI 호출 (1회, max_tokens=300) ─────────────────────────────
+    try:
+        raw_text, _, _ = _chat(cfg, "orchestrator", sys_suggest, u_suggest, 300)
+    except Exception as exc:
+        LOG.error("suggest_formula AI 호출 실패: %s", exc)
+        return _fail(f"AI 호출 실패: {exc}", [str(exc)])
+
+    # ── 빈 응답 처리 ───────────────────────────────────────────────
+    if not raw_text or not raw_text.strip():
+        return _fail("AI가 빈 응답을 반환했습니다.")
+
+    # ── 응답 파싱 (JSON 우선, raw string 폴백) ─────────────────────
+    parsed_formula = None
+    reason = ""
+    assumptions: list = []
+    warnings: list = []
+
+    try:
+        obj = parse_json_lenient(raw_text)
+        if isinstance(obj, dict):
+            parsed_formula = obj.get("formula")
+            reason = str(obj.get("reason") or "")
+            assumptions = list(obj.get("assumptions") or [])
+            warnings = list(obj.get("warnings") or [])
+        else:
+            parsed_formula = str(obj).strip() if obj is not None else None
+    except Exception:
+        parsed_formula = raw_text.strip().strip("\"'")
+
+    # ── formula null/빈 처리 ───────────────────────────────────────
+    if parsed_formula is None or parsed_formula == "" or parsed_formula == "null":
+        return _fail(reason or "AI가 Formula를 생성하지 못했습니다.", warnings)
+
+    # ── dict formula: JSON 문자열이면 파싱 ─────────────────────────
+    if isinstance(parsed_formula, str) and parsed_formula.strip().startswith("{"):
+        try:
+            parsed_formula = json.loads(parsed_formula)
+        except Exception:
+            pass
+
+    # ── R-2: dict formula 출력 키 검증 ────────────────────────────
+    if isinstance(parsed_formula, dict) and output_fields:
+        expected_keys = set(output_fields)
+        actual_keys = set(parsed_formula.keys())
+        extra = actual_keys - expected_keys
+        if extra:
+            return _fail(
+                f"AI가 정의되지 않은 출력 변수를 사용했습니다: {extra}",
+                [f"output_fields에 없는 키: {extra}"],
+            )
+
+    # ── R-1: 입력 변수 검증 (validate_formula 재사용) ──────────────
+    schema = {f: "number" for f in input_fields}
+    ok, msg = validate_formula(parsed_formula, schema)
+    if not ok:
+        return _fail(
+            f"AI Formula 변수 검증 실패: {msg}",
+            [f"변수 검증 오류: {msg}"],
+        )
+
+    return {
+        "success": True,
+        "formula": parsed_formula,
+        "reason": reason,
+        "assumptions": assumptions,
+        "warnings": warnings,
+        "status": "ai_suggested",
+    }
+
+
 def generate_app_with_contract(cfg: dict, contract: dict) -> dict:
     """Contract 기반 계산기 생성.
 
@@ -378,7 +676,7 @@ def generate_app_with_contract(cfg: dict, contract: dict) -> dict:
     category = contract.get("category", "")
     tier_str = contract.get("tier", "Tier2-A")
     tier_int = 1 if tier_str == "Tier1" else 2
-    desc = contract.get("description", "") or contract.get("desc", "")
+    desc = contract.get("desc", "")
 
     result = generate_app(cfg, name, category=category, desc=desc, tier=tier_int,
                           _contract=contract)
@@ -702,6 +1000,80 @@ def _write_calculator_index(cfg: dict) -> None:
         json.dumps(idx, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
 
 
+def _update_contract_registry(calc_slug: str, contract: dict, generated_at: str) -> None:
+    """docs/contract_schema/registry.yaml에 calc_slug 항목 추가/갱신."""
+    import yaml
+    registry_path = _SCHEMA_DIR / "registry.yaml"
+    if registry_path.exists():
+        with open(registry_path, encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+    else:
+        data = {}
+    instances = data.get("instances") or {}
+    instances[calc_slug] = {
+        "contract_slug":      contract.get("slug", calc_slug),
+        "generated_at":       generated_at,
+        "formula_status":     contract.get("formula_status", "not_generated"),
+        "test_cases_status":  contract.get("test_cases_status", "not_generated"),
+    }
+    data["instances"] = instances
+    _SCHEMA_DIR.mkdir(parents=True, exist_ok=True)
+    with open(registry_path, "w", encoding="utf-8") as f:
+        yaml.dump(data, f, allow_unicode=True, sort_keys=False, default_flow_style=False)
+
+
+def _save_contract_instance(calc_slug: str, contract: dict) -> None:
+    """Contract 전체를 docs/contract_schema/instances/{calc_slug}.yaml에 영속화.
+
+    calc_slug : 계산기 slug (Registry v3 key, 파일 인덱스 기준)
+    contract  : build_contract() 반환 dict. None/빈 dict이면 noop.
+    저장 순서: instances/ 파일 → registry.yaml 인덱스 갱신.
+    실패 시 예외를 발생시킨다 — 호출자(save_app)가 LOG.warning으로 처리.
+    """
+    import yaml
+    from datetime import timezone, timedelta
+    if not contract:
+        return
+    KST = timezone(timedelta(hours=9))
+    generated_at = datetime.now(KST).isoformat()
+    instance = dict(contract)
+    instance["generated_at"] = generated_at
+    instances_dir = _SCHEMA_DIR / "instances"
+    instances_dir.mkdir(parents=True, exist_ok=True)
+    instance_path = instances_dir / f"{calc_slug}.yaml"
+    with open(instance_path, "w", encoding="utf-8") as f:
+        yaml.dump(instance, f, allow_unicode=True, sort_keys=False, default_flow_style=False)
+    _update_contract_registry(calc_slug, contract, generated_at)
+    LOG.info("Contract Instance 저장 완료: %s → %s", calc_slug, instance_path)
+
+
+def _delete_contract_instance(calc_slug: str) -> bool:
+    """Contract Instance를 docs/contract_schema/instances/{calc_slug}.yaml에서 삭제.
+
+    파일이 없으면 조용히 False 반환(오류 없음).
+    registry.yaml 항목도 함께 제거.
+    반환: True=파일이 존재해 삭제됨, False=파일 없었음.
+    """
+    import yaml
+    instance_path = _SCHEMA_DIR / "instances" / f"{calc_slug}.yaml"
+    existed = instance_path.exists()
+    if existed:
+        instance_path.unlink()
+        LOG.info("Contract Instance 파일 삭제: %s", instance_path)
+    registry_path = _SCHEMA_DIR / "registry.yaml"
+    if registry_path.exists():
+        with open(registry_path, encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        instances = data.get("instances") or {}
+        if calc_slug in instances:
+            del instances[calc_slug]
+            data["instances"] = instances
+            with open(registry_path, "w", encoding="utf-8") as f:
+                yaml.dump(data, f, allow_unicode=True, sort_keys=False, default_flow_style=False)
+            LOG.info("Contract Registry 항목 제거: %s", calc_slug)
+    return existed
+
+
 def save_app(cfg: dict, app: dict, site_id: str = "", slug: str = None) -> tuple:
     """생성 결과를 calculators + app_templates 시트에 저장(Repository 경유).
     slug: 신규 계산기의 영문 식별자(폴더/URL/내부참조). 미지정 시 _slug(name)로 폴백(하위호환).
@@ -769,12 +1141,19 @@ def save_app(cfg: dict, app: dict, site_id: str = "", slug: str = None) -> tuple
     # 실패해도 계산기 DB 저장은 유효(경고 반환)
     try:
         _tier = app.get("tier", 2)
-        _v3_entry = _build_v3_entry(app, new_slug, tier=_tier)
+        _v3_entry = _build_v3_entry(app, new_slug, tier=_tier, contract=app.get("_contract"))
         _write_registry_v3(new_slug, _v3_entry, app.get("category", ""))
         LOG.info("v3 Registry 기록(HOLD): %s", new_slug)
     except Exception as _v3e:
         _v3_warn = f" ⚠️ v3 Registry 기록 실패({_v3e}) — 사이트 관리 탭에서 수동 확인 필요"
         LOG.warning("v3 Registry 기록 실패(계산기 저장은 완료됨): %s", _v3e)
+    # [Step B'] Contract Instance 영속화 (Mode B만 해당, Registry 성공 시)
+    # Registry 실패(_v3_warn 있음) 시 Contract Instance도 저장하지 않아 고아 파일 방지.
+    if not _v3_warn and app.get("_contract"):
+        try:
+            _save_contract_instance(new_slug, app["_contract"])
+        except Exception as _cie:
+            LOG.warning("Contract Instance 저장 실패(무시): %s", _cie)
     # calculator_index.json 갱신(개발 편의용)
     try:
         _write_calculator_index(cfg)
@@ -844,6 +1223,12 @@ def delete_app(cfg: dict, slug: str) -> tuple[bool, str]:
         LOG.info("v3 Registry 엔트리 제거: %s (%s)", slug, "제거됨" if removed_v3 else "없었음")
     except Exception as e:
         LOG.warning("v3 Registry 엔트리 제거 실패(계속 진행): %s", e)
+
+    # Contract Instance 정리 (없으면 조용히 종료 — delete_app() 성공/실패에 영향 없음)
+    try:
+        _delete_contract_instance(slug)
+    except Exception as e:
+        LOG.warning("Contract Instance 정리 실패(계속 진행): %s", e)
 
     try:
         _write_calculator_index(cfg)

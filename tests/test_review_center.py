@@ -369,6 +369,38 @@ def test_promote_to_ready_blocks_when_checklist_incomplete():
     assert "미완료" in msg or "필수" in msg, f"에러 메시지 부적절: {msg}"
 
 
+# ── CA-2-6-1: check_hold_rules() HOLD-1 pending_validation 테스트 ────────────
+
+from modules.app_factory import build_contract as _af_build_contract
+from modules.app_factory import check_hold_rules as _af_check_hold_rules
+
+
+def test_hold1_fires_for_pending_validation(monkeypatch):
+    """formula_status='pending_validation' → HOLD-1 발동 (미확정 상태)."""
+    monkeypatch.setattr(
+        "modules.registry_loader.load_legal_master",
+        lambda: {},
+    )
+    contract = _af_build_contract("x", "X", formula="a + b")
+    assert contract["formula_status"] == "pending_validation"
+    result = _af_check_hold_rules(contract)
+    assert result["held"] is True
+    assert "HOLD-1" in result["rules"]
+
+
+def test_hold1_silent_for_operator_confirmed(monkeypatch):
+    """formula_status='operator_confirmed' → HOLD-1 발동 안 됨."""
+    monkeypatch.setattr(
+        "modules.registry_loader.load_legal_master",
+        lambda: {},
+    )
+    contract = _af_build_contract(
+        "x", "X", formula="a + b", formula_status="operator_confirmed"
+    )
+    result = _af_check_hold_rules(contract)
+    assert "HOLD-1" not in result["rules"]
+
+
 if __name__ == "__main__":
     import pytest
     sys.exit(pytest.main([__file__, "-v"]))
