@@ -53,8 +53,6 @@ def _eval(node, vars: dict):
         if isinstance(node.value, (int, float)) and not isinstance(node.value, bool):
             return node.value
         raise FormulaError(f"허용되지 않은 상수: {node.value!r}")
-    if isinstance(node, ast.Num):  # py<3.8 호환
-        return node.n
     if isinstance(node, ast.BinOp):
         op = _OPS.get(type(node.op))
         if op is None:
