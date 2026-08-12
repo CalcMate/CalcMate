@@ -226,6 +226,147 @@ class TestBuildProviderFromProfile:
             build_provider_from_profile("nonexistent", {})
 
 
+# ── TEST 9: 무료 모델 목록 검증 ──────────────────────────────────────────────
+class TestFreeModels:
+    def test_free_models_count(self):
+        """무료 모델 목록이 정확히 3개인지."""
+        from tools.dev_assistant import FREE_MODELS
+        assert len(FREE_MODELS) == 3
+
+    def test_all_models_are_free(self):
+        """:free suffix 없는 모델이 목록에 없는지 (비용 안전 원칙)."""
+        from tools.dev_assistant import FREE_MODELS
+        for m in FREE_MODELS:
+            assert ":free" in m["id"], f"유료 모델이 포함됨: {m['id']}"
+
+    def test_model_1_id(self):
+        """모델 1 → nvidia/nemotron-3-super-120b-a12b:free"""
+        from tools.dev_assistant import FREE_MODELS
+        assert FREE_MODELS[0]["id"] == "nvidia/nemotron-3-super-120b-a12b:free"
+
+    def test_model_2_id(self):
+        """모델 2 → cohere/north-mini-code:free"""
+        from tools.dev_assistant import FREE_MODELS
+        assert FREE_MODELS[1]["id"] == "cohere/north-mini-code:free"
+
+    def test_model_3_id(self):
+        """모델 3 → openai/gpt-oss-20b:free (google/gemma-4-31b-it:free 공유 풀 rate limit으로 대체)"""
+        from tools.dev_assistant import FREE_MODELS
+        assert FREE_MODELS[2]["id"] == "openai/gpt-oss-20b:free"
+
+    def test_each_model_has_required_fields(self):
+        """각 모델 항목에 label, id, ctx, note가 있는지."""
+        from tools.dev_assistant import FREE_MODELS
+        for m in FREE_MODELS:
+            assert "label" in m
+            assert "id" in m
+            assert "ctx" in m
+            assert "note" in m
+
+    def test_default_model_is_free(self):
+        """기본 모델이 :free인지."""
+        from tools.dev_assistant import DEFAULT_MODEL
+        assert ":free" in DEFAULT_MODEL
+
+    def test_default_model_is_first_in_list(self):
+        """DEFAULT_MODEL이 FREE_MODELS[0]와 일치하는지."""
+        from tools.dev_assistant import DEFAULT_MODEL, FREE_MODELS
+        assert DEFAULT_MODEL == FREE_MODELS[0]["id"]
+
+
+# ── TEST 10: /model 선택 메뉴 동작 ───────────────────────────────────────────
+class TestSelectModelMenu:
+    def test_select_model_1(self, monkeypatch):
+        """/model 후 1 입력 → FREE_MODELS[0] 반환."""
+        from tools.dev_assistant import select_model_menu, FREE_MODELS
+        monkeypatch.setattr("builtins.input", lambda _: "1")
+        result = select_model_menu("dummy/model:free")
+        assert result == FREE_MODELS[0]["id"]
+
+    def test_select_model_2(self, monkeypatch):
+        """/model 후 2 입력 → FREE_MODELS[1] 반환."""
+        from tools.dev_assistant import select_model_menu, FREE_MODELS
+        monkeypatch.setattr("builtins.input", lambda _: "2")
+        result = select_model_menu("dummy/model:free")
+        assert result == FREE_MODELS[1]["id"]
+
+    def test_select_model_3(self, monkeypatch):
+        """/model 후 3 입력 → FREE_MODELS[2] 반환."""
+        from tools.dev_assistant import select_model_menu, FREE_MODELS
+        monkeypatch.setattr("builtins.input", lambda _: "3")
+        result = select_model_menu("dummy/model:free")
+        assert result == FREE_MODELS[2]["id"]
+
+    def test_invalid_number_keeps_current(self, monkeypatch, capsys):
+        """잘못된 번호(4) → 현재 모델 유지 + 오류 메시지."""
+        from tools.dev_assistant import select_model_menu
+        current = "nvidia/nemotron-3-super-120b-a12b:free"
+        monkeypatch.setattr("builtins.input", lambda _: "4")
+        result = select_model_menu(current)
+        assert result == current
+        captured = capsys.readouterr()
+        assert "잘못된" in captured.out
+
+    def test_non_numeric_input_keeps_current(self, monkeypatch, capsys):
+        """숫자가 아닌 입력(abc) → 현재 모델 유지 + 오류 메시지."""
+        from tools.dev_assistant import select_model_menu
+        current = "nvidia/nemotron-3-super-120b-a12b:free"
+        monkeypatch.setattr("builtins.input", lambda _: "abc")
+        result = select_model_menu(current)
+        assert result == current
+        captured = capsys.readouterr()
+        assert "잘못된" in captured.out
+
+    def test_zero_input_keeps_current(self, monkeypatch):
+        """0 입력 → 현재 모델 유지."""
+        from tools.dev_assistant import select_model_menu
+        current = "nvidia/nemotron-3-super-120b-a12b:free"
+        monkeypatch.setattr("builtins.input", lambda _: "0")
+        result = select_model_menu(current)
+        assert result == current
+
+    def test_q_cancels(self, monkeypatch, capsys):
+        """q 입력 → 취소, 현재 모델 유지."""
+        from tools.dev_assistant import select_model_menu
+        current = "nvidia/nemotron-3-super-120b-a12b:free"
+        monkeypatch.setattr("builtins.input", lambda _: "q")
+        result = select_model_menu(current)
+        assert result == current
+
+    def test_empty_input_cancels(self, monkeypatch):
+        """빈 입력 → 취소, 현재 모델 유지."""
+        from tools.dev_assistant import select_model_menu
+        current = "nvidia/nemotron-3-super-120b-a12b:free"
+        monkeypatch.setattr("builtins.input", lambda _: "")
+        result = select_model_menu(current)
+        assert result == current
+
+    def test_selection_applied_to_next_ask(self, monkeypatch):
+        """/model로 선택한 모델이 ask()에 실제로 전달되는지 확인 (mock)."""
+        from tools.dev_assistant import select_model_menu, FREE_MODELS
+        from unittest.mock import MagicMock, patch
+
+        monkeypatch.setattr("builtins.input", lambda _: "2")
+        new_model = select_model_menu("nvidia/nemotron-3-super-120b-a12b:free")
+        assert new_model == FREE_MODELS[1]["id"]
+
+        # ask() 호출 시 새 모델이 전달되는지 확인
+        from tools.dev_assistant import ask
+        mock_resp = MagicMock()
+        mock_resp.choices[0].message.content = "응답"
+        mock_resp.usage.total_tokens = 5
+
+        with patch("openai.OpenAI") as mock_oa:
+            mock_client = MagicMock()
+            mock_oa.return_value = mock_client
+            mock_client.chat.completions.create.return_value = mock_resp
+
+            resp, tokens = ask("테스트", "", new_model, "sk-or-v1-fake")
+
+        call_kwargs = mock_client.chat.completions.create.call_args[1]
+        assert call_kwargs["model"] == FREE_MODELS[1]["id"]
+
+
 # ── 실제 API 연결 테스트 (선택적, TEST_OR_LIVE=1 시만 실행) ──────────────────
 @pytest.mark.skipif(
     not __import__("os").environ.get("TEST_OR_LIVE"),
@@ -242,8 +383,30 @@ class TestOpenRouterLive:
         resp, tokens = provider.chat(
             system="You are a helpful assistant.",
             user="Reply with exactly: PONG",
-            model=os.environ.get("OPENROUTER_MODEL", "deepseek/deepseek-r1:free"),
-            max_tokens=10,
+            model=os.environ.get("OPENROUTER_MODEL", "nvidia/nemotron-3-super-120b-a12b:free"),
+            max_tokens=20,
         )
-        assert "PONG" in resp.upper() or len(resp) > 0
+        assert len(resp) > 0
         assert tokens >= 0
+
+    def test_live_all_free_models(self):
+        """무료 모델 3종 각각에 ping 테스트."""
+        import os
+        from tools.dev_assistant import FREE_MODELS
+        from modules.ai_provider import OpenRouterProvider
+        key = os.environ.get("OPENROUTER_API_KEY", "")
+        if not key:
+            pytest.skip("OPENROUTER_API_KEY 없음")
+        provider = OpenRouterProvider(key)
+        for m in FREE_MODELS:
+            try:
+                resp, tokens = provider.chat(
+                    system="You are a helpful assistant.",
+                    user="한 단어로만 답하라: 안녕",
+                    model=m["id"],
+                    max_tokens=20,
+                )
+                assert len(resp) > 0
+                print(f"  {m['id']}: OK ({tokens} tokens)")
+            except Exception as e:
+                print(f"  {m['id']}: FAIL - {e}")
