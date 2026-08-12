@@ -48,6 +48,12 @@ class BudgetTracker:
         "gemini-1.5-flash":  (0.00015, 0.0006),
         "text-embedding-3-small": (0.00002, 0.00002),
         "text-embedding-3-large": (0.00013, 0.00013),
+        # ── OpenRouter 경유 모델 (prefix 매칭) ────────────────────────
+        "deepseek/deepseek-r1":            (0.00055, 0.00219),
+        "qwen/qwen2.5-coder-32b":          (0.0004,  0.0016),
+        "anthropic/claude-sonnet":         (0.003,   0.015),
+        "google/gemini-2.5-flash":         (0.0003,  0.0025),
+        "meta-llama/llama-3.1":            (0.0009,  0.0009),
     }
     DEFAULT_IO = (0.005, 0.005)
 

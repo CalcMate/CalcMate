@@ -1,6 +1,6 @@
 """
 ai_provider.py — AI Provider 추상화 레이어
-지원: OpenAI(GPT) / Anthropic(Claude) / Google(Gemini)
+지원: OpenAI(GPT) / Anthropic(Claude) / Google(Gemini) / OpenRouter
 site_id 기반 사이트별 AI 모델 라우팅 지원 (sites 탭 research_ai/writing_ai/review_ai)
 """
 import time
@@ -8,13 +8,17 @@ from abc import ABC, abstractmethod
 
 # ── AI 모델 슬롯 → provider/model 매핑 ───────────────────────────────────────
 AI_PROFILE_MAP = {
-    "gemini_flash":  {"provider": "gemini",  "model": "gemini-2.0-flash-exp"},
-    "gemini_pro":    {"provider": "gemini",  "model": "gemini-2.5-pro"},
-    "gpt4o":         {"provider": "openai",  "model": "gpt-4o"},
-    "gpt4o_mini":    {"provider": "openai",  "model": "gpt-4o-mini"},
-    "claude_sonnet": {"provider": "claude",  "model": "claude-sonnet-4-6"},
-    "claude_haiku":  {"provider": "claude",  "model": "claude-haiku-4-5-20251001"},
-    "claude_opus":   {"provider": "claude",  "model": "claude-opus-4-6"},
+    "gemini_flash":  {"provider": "gemini",      "model": "gemini-2.0-flash-exp"},
+    "gemini_pro":    {"provider": "gemini",      "model": "gemini-2.5-pro"},
+    "gpt4o":         {"provider": "openai",      "model": "gpt-4o"},
+    "gpt4o_mini":    {"provider": "openai",      "model": "gpt-4o-mini"},
+    "claude_sonnet": {"provider": "claude",      "model": "claude-sonnet-4-6"},
+    "claude_haiku":  {"provider": "claude",      "model": "claude-haiku-4-5-20251001"},
+    "claude_opus":   {"provider": "claude",      "model": "claude-opus-4-6"},
+    # ── OpenRouter 보조 개발자 슬롯 ──────────────────────────────────────────
+    "or_deepseek":   {"provider": "openrouter",  "model": "deepseek/deepseek-r1-0528"},
+    "or_qwen_coder": {"provider": "openrouter",  "model": "qwen/qwen2.5-coder-32b-instruct"},
+    "or_free":       {"provider": "openrouter",  "model": "deepseek/deepseek-r1:free"},
 }
 
 # ── Provider 클래스 ────────────────────────────────────────────────────────────
@@ -55,6 +59,38 @@ class ClaudeProvider(AIProvider):
         return resp.content[0].text, tokens
 
 
+class OpenRouterProvider(AIProvider):
+    """OpenRouter — OpenAI-compatible API 경유 다중 모델 접근.
+    openai SDK 재사용(base_url 교체). 별도 SDK 불필요.
+    """
+    _BASE_URL = "https://openrouter.ai/api/v1"
+
+    def __init__(self, api_key: str):
+        if not api_key or not api_key.strip():
+            raise ValueError(
+                "OPENROUTER_API_KEY가 설정되지 않았습니다. "
+                "config/secrets.yaml에 OPENROUTER_API_KEY를 입력하세요."
+            )
+        from openai import OpenAI
+        self.client = OpenAI(api_key=api_key, base_url=self._BASE_URL)
+
+    def chat(self, system: str, user: str, model: str, max_tokens: int = 4000,
+             json_mode: bool = False) -> tuple[str, int]:
+        kwargs: dict = dict(
+            model=model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user",   "content": user},
+            ],
+            max_tokens=max_tokens,
+        )
+        if json_mode:
+            kwargs["response_format"] = {"type": "json_object"}
+        resp = self.client.chat.completions.create(**kwargs)
+        tokens = resp.usage.total_tokens if resp.usage else 0
+        return resp.choices[0].message.content or "", tokens
+
+
 class GeminiProvider(AIProvider):
     def __init__(self, api_key: str):
         # google-genai (신규 SDK). 구 google-generativeai 는 deprecated.
@@ -85,6 +121,8 @@ def build_provider(provider_name: str, cfg: dict) -> AIProvider:
         return ClaudeProvider(cfg["CLAUDE_API_KEY"])
     elif p == "gemini":
         return GeminiProvider(cfg["GEMINI_API_KEY"])
+    elif p in ("openrouter", "or"):
+        return OpenRouterProvider(cfg.get("OPENROUTER_API_KEY", ""))
     raise ValueError(f"알 수 없는 provider: {provider_name}")
 
 
