@@ -740,6 +740,31 @@ def _build_contract_enforcement_prompt(contract: dict) -> str:
             lines.append(f"  입력 {tc.get('input')} → 예상 {tc.get('expected')}")
         lines.append("  (참고가 아니라 필수 통과 기준 — 이 값이 나오지 않으면 formula가 틀린 것이다)")
 
+    # CA-1B-4 P1-B: scope_exclusions — 생성 텍스트 제한 (계산 범위/계산식 제외 아님)
+    se_a, se_b, se_o = _scope_exclusions_by_type(
+        contract.get("scope_exclusions"), contract.get("legal_refs"))
+    if se_a or se_b or se_o:
+        se_lines = [
+            "",
+            "[CONTRACT SCOPE EXCLUSIONS — 생성 텍스트 제한 (계산 범위/계산식 제외 조건이 아님)]",
+        ]
+        if se_a:
+            se_lines += [
+                "[인용 금지 조항] — 설명/안내/법적 근거 텍스트에서 아래 조항을 인용하거나 근거로 제시하지 말 것:",
+                *[f"  - {x}" for x in se_a],
+            ]
+        if se_b:
+            se_lines += [
+                "[사용 금지 표현] — 설명/안내/FAQ/콘텐츠 텍스트에서 아래 표현을 사용하지 말 것:",
+                *[f"  - {x}" for x in se_b],
+            ]
+        if se_o:
+            se_lines += [
+                "[기타 제한] — 아래 제한을 원문 그대로 준수할 것:",
+                *[f"  - {x}" for x in se_o],
+            ]
+        lines += se_lines
+
     lines += [
         "",
         "【핵심 규칙】",
@@ -857,7 +882,24 @@ def generate_app(cfg: dict, name: str, category: str = "", desc: str = "", tier:
     sys3 = ("너는 SEO 카피라이터다. 아래 계산기에 대한 SEO와 FAQ, 블로그 초안을 작성하라. "
             "순수 JSON만 반환: "
             '{"seo_title":"","seo_desc":"","faq":[{"q":"","a":""}],"blog_draft":""}')
-    u3 = f"계산기명: {name}\n카테고리: {category}\n설명: {desc}"
+    # CA-1B-4 P1-B: writer 단계(설명/SEO/FAQ/블로그)에 생성 텍스트 제한 전달
+    _se3_a, _se3_b, _se3_o = _scope_exclusions_by_type(
+        (_contract or {}).get("scope_exclusions"), (_contract or {}).get("legal_refs"))
+    _se3_block = ""
+    if _se3_a or _se3_b or _se3_o:
+        _se3_lines = [
+            "",
+            "[Contract 생성 텍스트 제한 — 반드시 준수]",
+            "(계산 범위/계산식 제외 조건이 아니라 생성 텍스트에 대한 제한이다)",
+        ]
+        if _se3_a:
+            _se3_lines += ["[인용 금지 조항]", *[f"- {x}" for x in _se3_a]]
+        if _se3_b:
+            _se3_lines += ["[사용 금지 표현]", *[f"- {x}" for x in _se3_b]]
+        if _se3_o:
+            _se3_lines += ["[기타]", *[f"- {x}" for x in _se3_o]]
+        _se3_block = "\n" + "\n".join(_se3_lines)
+    u3 = f"계산기명: {name}\n카테고리: {category}\n설명: {desc}" + _se3_block
     t3, m3, k3 = _chat(cfg, "writer", sys3, u3, 1500)
     seo = parse_json_lenient(t3)
     steps.append(("작성(SEO/FAQ/초안)", m3, k3))
@@ -1075,6 +1117,45 @@ def _delete_contract_instance(calc_slug: str) -> bool:
 
 
 # ── CA-1B-3-A: Registry→Contract 프리필 브릿지 + Instance Loader ─────────
+
+
+def _scope_exclusions_by_type(scope_exclusions, legal_refs=None,
+                               legal_master: dict = None):
+    """Contract scope_exclusions를 TYPE A(인용 금지 조항)/TYPE B(사용 금지 표현)/기타로 분류.
+
+    CA-1B-4 P1-B: Prompt에 유형을 구분해 전달하기 위한 분류기.
+    임의 추론이 아니라 legal_master의 forbidden_articles/forbidden_phrases 값과
+    데이터 매칭으로 분류한다. 어느 집합에도 없는 값(운영자 수동 추가 등)은
+    '기타'로 분리해 원문 그대로 보존한다 — 임의 분류하지 않는다.
+
+    scope_exclusions: Contract의 list (문자열)
+    legal_refs:       Contract의 legal_master entity_id 목록 (분류 기준 조회용)
+    legal_master:     entity_id → 법령필드 dict. None이면 load_legal_master() 기본 사용.
+
+    반환: (인용_금지_조항_list, 사용_금지_표현_list, 기타_list)
+    """
+    if legal_master is None:
+        from .registry_loader import load_legal_master
+        legal_master = load_legal_master()
+
+    articles, phrases = set(), set()
+    for ref in (legal_refs or []):
+        entity = (legal_master or {}).get(ref)
+        if not isinstance(entity, dict):
+            continue
+        articles.update(str(x) for x in (entity.get("forbidden_articles") or []))
+        phrases.update(str(x) for x in (entity.get("forbidden_phrases") or []))
+
+    type_a, type_b, other = [], [], []
+    for item in (scope_exclusions or []):
+        s = str(item)
+        if s in articles:
+            type_a.append(s)
+        elif s in phrases:
+            type_b.append(s)
+        else:
+            other.append(s)
+    return type_a, type_b, other
 
 
 def _collect_scope_exclusions(entry: dict, legal_master: dict = None) -> list:

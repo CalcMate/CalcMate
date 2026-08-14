@@ -2347,10 +2347,11 @@ elif tab == "🏭 App Factory":
                 st.success(_af_prefill_text)
 
         # CA-1B-3-B P1: 프리필로 매핑된 scope_exclusions를 운영자가 확인할 수 있게 표시 (read-only)
+        # CA-1B-4 P1-B: AI 생성 prompt(enforcement + writer)에 전달되므로 문구 갱신
         _af_scope_exclusions = st.session_state.get("af_contract_scope_exclusions") or []
         if _af_scope_exclusions:
             st.caption(
-                "🚫 제외 대상 (scope_exclusions — legal_master 자동 매핑, AI 생성에 전달되지 않음): "
+                "🚫 제외 대상 (scope_exclusions — legal_master 자동 매핑, AI 생성 prompt에 전달됨): "
                 + ", ".join(str(s) for s in _af_scope_exclusions))
 
         _af_formula = st.text_area(
