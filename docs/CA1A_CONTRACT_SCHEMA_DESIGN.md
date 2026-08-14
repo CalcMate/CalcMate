@@ -162,14 +162,16 @@ validation_rules:
     note: "validate_formula() 통과 시에만 formula_status=operator_confirmed 가능"
   formula_status:
     type: str
-    allowed: ["not_generated", "auto_disabled", "operator_confirmed", "error"]
+    allowed: ["not_generated", "ai_suggested", "pending_validation", "operator_confirmed"]
+    note: "runtime 구현 기준 4개 상태 (CA-1B-3-B P2 문서 정합성 갱신)"
   test_cases:
     type: list[dict]
     item_keys_required: ["input", "expected"]
     note: "input/expected 모두 dict[str, number]"
   test_cases_status:
     type: str
-    allowed: ["not_generated", "auto_disabled", "operator_confirmed", "error"]
+    allowed: ["not_generated", "operator_confirmed"]
+    note: "runtime 구현 기준 2개 상태 (CA-3-4 이후 formula_status와 분리 운영)"
   legal_refs:
     type: list[str]
     note: "legal_master entity_id 목록"
@@ -215,18 +217,19 @@ validation_rules:
 
     # ── 수식 (MANUAL + 미확정 시 HOLD) ───────────────────────
     "formula":        "str | dict | None",
-    "formula_status": str,    # 4개 상태값:
-                              # "not_generated"    — 미입력 (초기 상태)
-                              # "auto_disabled"    — 자동화 불가 (CA-1A 이후 현재 항상 이 상태가 초기)
-                              # "operator_confirmed" — 운영자 입력 + validate_formula() 통과
-                              # "error"            — 입력했지만 validate_formula() 실패
+    "formula_status": str,    # 4개 상태값 (runtime 구현 기준):
+                              # "not_generated"      — formula 미입력 (초기 상태)
+                              # "ai_suggested"       — AI가 formula 제안 (운영자 확정 전)
+                              # "pending_validation" — formula 존재하나 최종 검증/확정 전
+                              # "operator_confirmed" — 운영자 확정 (validate_formula() 통과)
 
     # ── 적용 제외 (TRANSFORM, 권장확인) ──────────────────────
     "scope_exclusions": list[str],  # 명시적 제외 조건
 
     # ── 테스트 케이스 (MANUAL + 미확정 시 HOLD) ──────────────
     "test_cases":        list[dict],  # [{"input": {...}, "expected": {...}}]
-    "test_cases_status": str,   # formula_status와 동일한 4개 상태값 체계
+    "test_cases_status": str,   # runtime 구현 기준 2개 상태값:
+                                 #   "not_generated" / "operator_confirmed"
 
     # ── 생성 메타데이터 ───────────────────────────────────────
     "generation_metadata": {
@@ -249,32 +252,55 @@ validation_rules:
 
 ### 3-2. formula_status / test_cases_status 상태 전이
 
+> **CA-1B-3-B P2 문서 정합성**: 아래는 **runtime 구현 기준** 상태값이다.
+> `auto_disabled` / `error` 는 **현재 runtime 공식 상태값이 아니다** (프로덕션 코드 미사용 —
+> CA-1A 초기 설계안으로, CA-3-4에서 AI Formula 제안 도입과 함께 `ai_suggested` /
+> `pending_validation` 체계로 대체됨. 임의로 코드에 상태값을 추가하거나 rename하지 않는다).
+
+**formula_status (runtime 4-state)**:
+
 ```
-not_generated
-    │
-    │  (운영자가 값을 입력하면)
-    ▼
-auto_disabled ──────────────────────────────────────────────────────────────┐
-(CA-1A 기준: formula 입력 전                                               │
- CA-2 이후: formula_hint 미제공 시 초기 상태)                               │
+not_generated ──────────────────────────────────────────────────────────────┐
+(formula 미입력 — build_contract 자동 도출: formula 없음 → not_generated) │
     │                                                                       │
-    │  (운영자가 formula/test_cases 직접 입력 → validate_formula() 호출)   │
-    ▼                                ▼                                     │
-operator_confirmed             error                                        │
-(validate 통과)          (validate 실패)                                    │
-    │                        │                                             │
-    │                        └──→ (재입력 후 재검증) ──→ operator_confirmed │
+    ├──(🤖 AI Formula 제안 → af_contract.formula_status = ai_suggested)──► ai_suggested
     │                                                                       │
-    └──────────────────────── CONTRACT LOCK 가능 ◀──────────────────────────┘
-                              (formula: operator_confirmed
-                               test_cases: operator_confirmed 일 때)
+    └──(운영자 formula 직접 입력 → build_contract 자동 도출)              │
+                                        │                                   │
+                                        ▼                                   ▼
+                              pending_validation ──────────────► operator_confirmed
+                              (formula 존재하나 최종          (✅ 운영자 확정 —
+                               검증/확정 전)                   validate_formula() 통과)
+    ▲                        ▲                                │
+    │                        │                                │
+    └──(운영자가 제안 내용을   └──(operator_confirmed /         │
+       그대로 확정)              ai_suggested 상태에서           │
+                                 formula 수정 감지 →            │
+                                 pending_validation 복귀)       │
+                                                                ▼
+                                              CONTRACT LOCK 가능
+                                              (formula: operator_confirmed
+                                               test_cases: operator_confirmed 일 때)
+```
+
+**test_cases_status (runtime 2-state)**:
+
+```
+not_generated ──(테스트 케이스 입력)──► operator_confirmed
+(build_contract 자동 도출:            (validate_formula_with_samples() 모두 match)
+ test_cases 없음 → not_generated)
 ```
 
 **상태 규칙**:
-- `not_generated`: Contract 생성 직후, formula/test_cases를 아직 한 번도 입력하지 않은 상태
-- `auto_disabled`: 자동 생성이 불가능하다는 것이 확인된 상태 (CA-1A 이후 모든 신규 Contract의 초기 formula 상태)
-- `operator_confirmed`: 운영자가 입력하고 `validate_formula()` 통과 (또는 test_cases의 경우 `validate_formula_with_samples()` 모두 match)
-- `error`: 입력값이 있으나 검증 실패 상태
+- `not_generated`: Contract 생성 직후, formula/test_cases를 아직 한 번도 입력하지 않은 상태 (`build_contract()` 자동 도출)
+- `ai_suggested`: AI가 formula를 제안했지만 운영자가 아직 확정하지 않은 상태 (CA-3-4 신규)
+- `pending_validation`: formula가 존재하지만 아직 최종 검증/확정되지 않은 상태 — `operator_confirmed`/
+  `ai_suggested` 상태에서 formula가 수정되면 복귀 (CA-3-4 신규)
+- `operator_confirmed`: 운영자가 입력/확정하고 `validate_formula()` 통과 (또는 test_cases의 경우
+  `validate_formula_with_samples()` 모두 match)
+- ~~`auto_disabled`~~: 자동 생성 불가 상태 — **runtime 미사용 (legacy 설계안)**
+- ~~`error`~~: 검증 실패 상태 — **runtime 미사용**. 검증 실패 결과는 별도 `af_formula_validation`
+  session_state로 보관하고 `pending_validation` 상태를 유지한다 (legacy 설계안)
 
 **CONTRACT LOCK 전제 조건** (변경 금지 → 저장 허용):
 - `formula_status == "operator_confirmed"` 또는 formula가 None이고 HOLD 아닌 경우
@@ -324,13 +350,15 @@ HOLD는 **해당 값이 미확정 상태에서 다음 단계 진행이 차단**�
 
 ```
 formula:     MANUAL
-  → 미입력 상태 = formula_status: "not_generated" → HOLD-1 트리거
-  → 입력+검증실패 = formula_status: "error" → HOLD-1 유지
+  → 미입력 = formula_status: "not_generated" → HOLD-1 트리거
+  → AI 제안 = formula_status: "ai_suggested" → HOLD-1 유지
+  → 검증/확정 대기 = formula_status: "pending_validation" → HOLD-1 유지
   → 입력+검증통과 = formula_status: "operator_confirmed" → HOLD-1 해소
 
 test_cases:  MANUAL
   → 비어있음 + 법령 계산기 = test_cases_status: "not_generated" → HOLD-2 트리거
-  → 입력+일부 match 실패 = test_cases_status: "error" → HOLD-2 유지
+  → 입력+일부 match 실패 = test_cases_status: "pending_validation"(실패 결과는
+    별도 validation 저장) → HOLD-2 유지
   → 입력+전체 match = test_cases_status: "operator_confirmed" → HOLD-2 해소
 ```
 
@@ -560,7 +588,7 @@ Section 5에서 "확장 가능 조건"으로 기재한 HOLD-6(date_based+formula
 |------|---------|
 | Contract Schema 버전 | `1.0.0` (SemVer 정책 정의됨) |
 | `desc` | 공식 필드 확정. CA-1B에서 `build_contract()` 파라미터 추가 |
-| `formula_status` / `test_cases_status` | 4개 상태값 체계 확정 (`not_generated / auto_disabled / operator_confirmed / error`) |
+| `formula_status` / `test_cases_status` | runtime 구현 기준 확정 — formula_status 4개 (`not_generated / ai_suggested / pending_validation / operator_confirmed`), test_cases_status 2개 (`not_generated / operator_confirmed`) |
 | formula / test_cases | 항상 MANUAL. CA-1A 이후 자동화 불가 상태로 고정 |
 | HOLD 기준 | 5개 기본 + 2개 확장 후보 확정 |
 | Contract 인스턴스 영속 저장 | **필요**. `docs/contract_schema/instances/{slug}.yaml` |

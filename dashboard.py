@@ -2267,11 +2267,15 @@ elif tab == "🏭 App Factory":
             else:
                 st.session_state["af_contract_input_fields"] = ", ".join(_pf["input_fields"])
                 st.session_state["af_contract_output_fields"] = ", ".join(_pf["output_fields"])
+                # CA-1B-3-B P1: legal_refs → legal_master → scope_exclusions 자동 매핑
+                _se = _pf.get("scope_exclusions") or []
+                st.session_state["af_contract_scope_exclusions"] = list(_se)
+                _se_note = f" / 제외조건 {len(_se)}개" if _se else ""
                 st.session_state["af_prefill_msg"] = (
                     "success",
                     f"✅ Registry에서 불러옴: {_pf.get('name') or _slug} — "
-                    f"input {len(_pf['input_fields'])}개 / output {len(_pf['output_fields'])}개. "
-                    "확인 후 [📋 Contract 기반 생성]을 실행하세요.")
+                    f"input {len(_pf['input_fields'])}개 / output {len(_pf['output_fields'])}개"
+                    f"{_se_note}. 확인 후 [📋 Contract 기반 생성]을 실행하세요.")
 
         st.button(
             "📥 Registry에서 불러오기 (input/output 필드)",
@@ -2289,6 +2293,13 @@ elif tab == "🏭 App Factory":
                 st.warning(_af_prefill_text)
             else:
                 st.success(_af_prefill_text)
+
+        # CA-1B-3-B P1: 프리필로 매핑된 scope_exclusions를 운영자가 확인할 수 있게 표시 (read-only)
+        _af_scope_exclusions = st.session_state.get("af_contract_scope_exclusions") or []
+        if _af_scope_exclusions:
+            st.caption(
+                "🚫 제외 대상 (scope_exclusions — legal_master 자동 매핑, AI 생성에 전달되지 않음): "
+                + ", ".join(str(s) for s in _af_scope_exclusions))
 
         _af_formula = st.text_area(
             "확정 Formula (선택 — str 또는 JSON dict)",
@@ -2527,6 +2538,9 @@ elif tab == "🏭 App Factory":
                         tier=_tier_map_int_to_str.get(af_tier, "Tier2-A"),
                         input_fields=_input_list,
                         output_fields=_output_list,
+                        # CA-1B-3-B P1: Registry prefill로 매핑된 scope_exclusions 전달 (없으면 빈 리스트)
+                        scope_exclusions=list(
+                            st.session_state.get("af_contract_scope_exclusions") or []),
                         formula=_formula_val,
                         formula_status=_fv_prior_status,
                         test_cases=_test_cases_val,

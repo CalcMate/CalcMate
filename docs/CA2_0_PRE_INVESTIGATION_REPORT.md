@@ -81,9 +81,11 @@ test_cases_status:
   test_cases provided      → "operator_confirmed"
 ```
 
-CA-1A에서 정의한 4개 상태(`not_generated / auto_disabled / operator_confirmed / error`) 중  
+CA-1A에서 정의한 상태 체계 중  
 AF-Contract 경로에서 실제 발생 가능한 상태는 `not_generated` / `operator_confirmed` 두 개.  
-(`auto_disabled`는 HOLD 규칙 트리거, `error` 는 validate 실패 시 — 추후 추가 가능)
+(CA-1B-3-B P2 문서 정합성: CA-1A 최종 정의는 runtime 기준 `not_generated / ai_suggested /
+ pending_validation / operator_confirmed` — CA-3-4에서 AI Formula 제안 도입으로 `ai_suggested` /
+ `pending_validation`이 추가됨. `auto_disabled` / `error` 는 runtime 미사용 legacy 설계안)
 
 ---
 

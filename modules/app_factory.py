@@ -1077,15 +1077,59 @@ def _delete_contract_instance(calc_slug: str) -> bool:
 # ── CA-1B-3-A: Registry→Contract 프리필 브릿지 + Instance Loader ─────────
 
 
-def prefill_contract_from_registry(slug: str, registry: dict = None) -> dict:
+def _collect_scope_exclusions(entry: dict, legal_master: dict = None) -> list:
+    """Registry 엔트리의 legal_refs → legal_master의 forbidden_articles/phrases 수집 (CA-1B-3-B P1).
+
+    변환 규칙 (CA1A 설계):
+      Registry entry.legal_refs (entity_id 목록)
+        → docs/legal_master/*.yaml 각 entity의
+            forbidden_articles + forbidden_phrases 값을 그대로 수집
+        → 중복 제거 + 문서 순서 유지 (deterministic)
+
+    - 원본 YAML 값을 그대로 사용하며 법률 문구를 임의로 생성하지 않는다.
+    - 데이터가 없으면 빈 리스트 (추측 금지).
+    - 존재하지 않는 legal_ref는 임의 추측하지 않고 LOG.warning 후 건너뛴다.
+
+    entry:        Registry v3 엔트리 dict
+    legal_master: entity_id → 법령필드 dict. None이면 load_legal_master() 기본 사용.
+    """
+    if legal_master is None:
+        from .registry_loader import load_legal_master
+        legal_master = load_legal_master()
+
+    legal_refs = list((entry or {}).get("legal_refs") or [])
+    if not legal_refs:
+        return []
+
+    collected: list = []
+    seen: set = set()
+    for ref in legal_refs:
+        entity = (legal_master or {}).get(ref)
+        if not isinstance(entity, dict):
+            LOG.warning("legal_master에 없는 legal_ref 무시: %s", ref)
+            continue
+        for key in ("forbidden_articles", "forbidden_phrases"):
+            for item in entity.get(key) or []:
+                if isinstance(item, str) and item.strip() and item not in seen:
+                    seen.add(item)
+                    collected.append(item)
+    return collected
+
+
+def prefill_contract_from_registry(slug: str, registry: dict = None,
+                                   legal_master: dict = None) -> dict:
     """Registry v3 엔트리의 input_labels/output_labels로 Contract 프리필 데이터 생성.
 
     CA-1B-3-A: Registry → Contract 자동 프리필 브릿지.
+    CA-1B-3-B P1: legal_refs → legal_master forbidden_articles/phrases →
+                  scope_exclusions 자동 매핑 추가.
     build_contract()를 직접 수정하지 않고, 프리필 데이터 dict를 반환한다.
     Registry에 없는 slug나 metadata는 추측하지 않고 빈 리스트로 처리한다.
 
-    slug:     Registry v3 key (예: "weekly-holiday-allowance")
-    registry: 로더 결과 dict. None이면 load_registry_v3() 기본 사용.
+    slug:          Registry v3 key (예: "weekly-holiday-allowance")
+    registry:      로더 결과 dict. None이면 load_registry_v3() 기본 사용.
+    legal_master:  entity_id → 법령필드 dict. None이면 load_legal_master() 기본 사용.
+                   (테스트/주입용 선택 파라미터 — 기존 호출부 영향 없음)
 
     반환:
       {
@@ -1094,12 +1138,14 @@ def prefill_contract_from_registry(slug: str, registry: dict = None) -> dict:
         "slug": str, "name": str, "category": str,
         "input_fields": list,   # ← Registry input_labels
         "output_fields": list,  # ← Registry output_labels
+        "scope_exclusions": list,  # ← CA-1B-3-B P1: legal_refs → 법령 제외 조건
         "message": str,         # 실패 사유 (없으면 "")
       }
 
     원칙: 프리필은 기본값일 뿐 강제 overwrite가 아니다.
     - Registry에 slug 없음 → found=False, 빈 리스트 (호출자가 기존 입력 유지)
     - input_labels/output_labels 없음 → 빈 리스트 (추측 금지)
+    - legal_refs/forbidden 없음 → scope_exclusions 빈 리스트 (추측 금지)
     """
     from .registry_loader import load_registry_v3
 
@@ -1110,6 +1156,7 @@ def prefill_contract_from_registry(slug: str, registry: dict = None) -> dict:
         return {"found": False, "entry": None, "slug": clean_slug,
                 "name": "", "category": "",
                 "input_fields": [], "output_fields": [],
+                "scope_exclusions": [],
                 "message": f"Registry v3에 '{slug}' 엔트리가 없습니다"}
     return {
         "found": True,
@@ -1119,6 +1166,7 @@ def prefill_contract_from_registry(slug: str, registry: dict = None) -> dict:
         "category": entry.get("category", ""),
         "input_fields": list(entry.get("input_labels") or []),
         "output_fields": list(entry.get("output_labels") or []),
+        "scope_exclusions": _collect_scope_exclusions(entry, legal_master),
         "message": "",
     }
 
@@ -1137,6 +1185,71 @@ def _safe_contract_slug(slug) -> str:
     return s
 
 
+_FORMULA_STATUS_ALLOWED = {"not_generated", "ai_suggested", "pending_validation", "operator_confirmed"}
+_TEST_CASES_STATUS_ALLOWED = {"not_generated", "operator_confirmed"}
+
+
+def validate_contract_instance(data) -> list:
+    """Contract instance의 최소 필수 구조/타입 검증 (CA-1B-3-B P0).
+
+    잘못된 instance를 기본값으로 보정하지 않는다 — 오류 메시지 리스트를 반환하고
+    호출자(load_contract_instance)가 ValueError로 처리한다.
+
+    반환: 오류 메시지 list[str]. 비어 있으면 검증 통과.
+    """
+    errors = []
+    if not isinstance(data, dict) or not data:
+        return ["Contract instance가 dict가 아닙니다 (또는 비어 있습니다)"]
+
+    # slug — str, 빈 문자열 금지
+    slug = data.get("slug")
+    if not isinstance(slug, str) or not slug.strip():
+        errors.append("slug: str 타입의 비어있지 않은 값이어야 합니다")
+
+    # name — str, 빈 문자열 금지
+    name = data.get("name")
+    if not isinstance(name, str) or not name.strip():
+        errors.append("name: str 타입의 비어있지 않은 값이어야 합니다")
+
+    # formula_status — runtime vocabulary만 허용
+    formula_status = data.get("formula_status")
+    if formula_status not in _FORMULA_STATUS_ALLOWED:
+        errors.append(
+            f"formula_status: 허용 값이 아닙니다: {formula_status!r} "
+            f"(허용: {sorted(_FORMULA_STATUS_ALLOWED)})"
+        )
+
+    # test_cases_status — not_generated / operator_confirmed
+    test_cases_status = data.get("test_cases_status")
+    if test_cases_status not in _TEST_CASES_STATUS_ALLOWED:
+        errors.append(
+            f"test_cases_status: 허용 값이 아닙니다: {test_cases_status!r} "
+            f"(허용: {sorted(_TEST_CASES_STATUS_ALLOWED)})"
+        )
+
+    # list 타입 필드
+    for field in ("input_fields", "output_fields", "scope_exclusions", "legal_refs"):
+        if not isinstance(data.get(field), list):
+            errors.append(f"{field}: list 타입이어야 합니다")
+
+    # generated_at — str + ISO datetime
+    generated_at = data.get("generated_at")
+    if not isinstance(generated_at, str) or not generated_at.strip():
+        errors.append("generated_at: str 타입의 ISO datetime이어야 합니다")
+    else:
+        try:
+            datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
+        except ValueError:
+            errors.append(f"generated_at: ISO datetime 형식이 아닙니다: {generated_at!r}")
+
+    # formula — optional. 존재하면 str 또는 dict, None 허용.
+    if "formula" in data and data["formula"] is not None:
+        if not isinstance(data["formula"], (str, dict)):
+            errors.append("formula: str 또는 dict (또는 None)이어야 합니다")
+
+    return errors
+
+
 def load_contract_instance(slug: str) -> dict | None:
     """docs/contract_schema/instances/{slug}.yaml에서 Contract instance를 읽는다.
 
@@ -1144,6 +1257,7 @@ def load_contract_instance(slug: str) -> dict | None:
     - 파일 없음 → None
     - YAML malformed → ValueError (명확한 오류)
     - instance 구조가 dict가 아님 → ValueError
+    - validate_contract_instance() 실패 → ValueError (CA-1B-3-B P0)
     예외를 무시하고 빈 Contract를 만들어 반환하지 않는다.
     """
     import yaml
@@ -1157,6 +1271,11 @@ def load_contract_instance(slug: str) -> dict | None:
         raise ValueError(f"Contract instance YAML 파싱 실패: {safe} — {e}") from e
     if not isinstance(data, dict) or not data:
         raise ValueError(f"Contract instance 구조가 올바르지 않습니다: {safe}")
+    errors = validate_contract_instance(data)
+    if errors:
+        raise ValueError(
+            f"Contract instance 스키마 검증 실패: {safe} — " + "; ".join(errors)
+        )
     return data
 
 

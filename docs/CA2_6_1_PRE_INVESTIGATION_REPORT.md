@@ -214,6 +214,11 @@ not_generated / auto_disabled / operator_confirmed / error
 CA-2-1에서 "현재 AF-Contract 경로에서 발생 가능한 상태는 2개"로 단순화.  
 CA-2-6에서는 이 2개를 CA-3 준비를 위해 확장하는 것이 목적.
 
+> **CA-1B-3-B P2 문서 정합성**: CA-3-4에서 AI Formula 제안이 도입되어 runtime 공식 상태는
+> `not_generated / ai_suggested / pending_validation / operator_confirmed` 4개로 확장됨.
+> 위 CA-1A 초기 설계안의 `auto_disabled` / `error` 는 runtime 미사용 legacy 어휘이며,
+> 최신 정의는 `docs/CA1A_CONTRACT_SCHEMA_DESIGN.md` §3-2를 따른다.
+
 ---
 
 ### 후보 A: 현재 구조 유지
