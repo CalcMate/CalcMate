@@ -1074,6 +1074,114 @@ def _delete_contract_instance(calc_slug: str) -> bool:
     return existed
 
 
+# ── CA-1B-3-A: Registry→Contract 프리필 브릿지 + Instance Loader ─────────
+
+
+def prefill_contract_from_registry(slug: str, registry: dict = None) -> dict:
+    """Registry v3 엔트리의 input_labels/output_labels로 Contract 프리필 데이터 생성.
+
+    CA-1B-3-A: Registry → Contract 자동 프리필 브릿지.
+    build_contract()를 직접 수정하지 않고, 프리필 데이터 dict를 반환한다.
+    Registry에 없는 slug나 metadata는 추측하지 않고 빈 리스트로 처리한다.
+
+    slug:     Registry v3 key (예: "weekly-holiday-allowance")
+    registry: 로더 결과 dict. None이면 load_registry_v3() 기본 사용.
+
+    반환:
+      {
+        "found": bool,          # Registry에 slug 존재 여부
+        "entry": dict|None,     # Registry 엔트리 전체 (없으면 None)
+        "slug": str, "name": str, "category": str,
+        "input_fields": list,   # ← Registry input_labels
+        "output_fields": list,  # ← Registry output_labels
+        "message": str,         # 실패 사유 (없으면 "")
+      }
+
+    원칙: 프리필은 기본값일 뿐 강제 overwrite가 아니다.
+    - Registry에 slug 없음 → found=False, 빈 리스트 (호출자가 기존 입력 유지)
+    - input_labels/output_labels 없음 → 빈 리스트 (추측 금지)
+    """
+    from .registry_loader import load_registry_v3
+
+    reg = dict(registry) if registry is not None else load_registry_v3()
+    clean_slug = str(slug or "").strip()
+    entry = (reg or {}).get(clean_slug)
+    if entry is None:
+        return {"found": False, "entry": None, "slug": clean_slug,
+                "name": "", "category": "",
+                "input_fields": [], "output_fields": [],
+                "message": f"Registry v3에 '{slug}' 엔트리가 없습니다"}
+    return {
+        "found": True,
+        "entry": entry,
+        "slug": entry.get("slug") or clean_slug,
+        "name": entry.get("name", ""),
+        "category": entry.get("category", ""),
+        "input_fields": list(entry.get("input_labels") or []),
+        "output_fields": list(entry.get("output_labels") or []),
+        "message": "",
+    }
+
+
+def _safe_contract_slug(slug) -> str:
+    """Contract instance 파일명에 사용할 안전한 slug 검증.
+
+    Registry v3 slug 규칙(한글/영문/숫자/_/-)과 동일한 문자만 허용해
+    filesystem path traversal("/", "\\", "..")을 차단한다.
+    """
+    s = str(slug or "").strip()
+    if not s:
+        raise ValueError("slug가 비어 있습니다")
+    if not re.fullmatch(r"[0-9a-zA-Z가-힣_\-]+", s):
+        raise ValueError(f"slug에 허용되지 않은 문자가 있습니다: {slug!r}")
+    return s
+
+
+def load_contract_instance(slug: str) -> dict | None:
+    """docs/contract_schema/instances/{slug}.yaml에서 Contract instance를 읽는다.
+
+    CA-1B-3-A: _save_contract_instance()에 대응하는 로더.
+    - 파일 없음 → None
+    - YAML malformed → ValueError (명확한 오류)
+    - instance 구조가 dict가 아님 → ValueError
+    예외를 무시하고 빈 Contract를 만들어 반환하지 않는다.
+    """
+    import yaml
+    safe = _safe_contract_slug(slug)
+    instance_path = _SCHEMA_DIR / "instances" / f"{safe}.yaml"
+    if not instance_path.exists():
+        return None
+    try:
+        data = yaml.safe_load(instance_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        raise ValueError(f"Contract instance YAML 파싱 실패: {safe} — {e}") from e
+    if not isinstance(data, dict) or not data:
+        raise ValueError(f"Contract instance 구조가 올바르지 않습니다: {safe}")
+    return data
+
+
+def load_contract_registry() -> dict:
+    """docs/contract_schema/registry.yaml의 instances 매핑을 읽는다.
+
+    CA-1B-3-A: _update_contract_registry()가 쓰는 인덱스를 읽는 로더.
+    - 파일 없음 → {} (빈 인덱스)
+    - YAML malformed → ValueError
+    반환: {calc_slug: {contract_slug, generated_at, formula_status, test_cases_status}}
+    """
+    import yaml
+    registry_path = _SCHEMA_DIR / "registry.yaml"
+    if not registry_path.exists():
+        return {}
+    try:
+        data = yaml.safe_load(registry_path.read_text(encoding="utf-8")) or {}
+    except Exception as e:
+        raise ValueError(f"Contract Schema Registry YAML 파싱 실패: {e}") from e
+    if not isinstance(data, dict):
+        raise ValueError("Contract Schema Registry 구조가 올바르지 않습니다")
+    instances = data.get("instances") or {}
+    return instances if isinstance(instances, dict) else {}
+
+
 def save_app(cfg: dict, app: dict, site_id: str = "", slug: str = None) -> tuple:
     """생성 결과를 calculators + app_templates 시트에 저장(Repository 경유).
     slug: 신규 계산기의 영문 식별자(폴더/URL/내부참조). 미지정 시 _slug(name)로 폴백(하위호환).

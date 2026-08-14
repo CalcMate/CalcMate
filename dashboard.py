@@ -2241,6 +2241,55 @@ elif tab == "🏭 App Factory":
             "출력 필드 (쉼표 구분) *", placeholder="total_days, remaining_days",
             key="af_contract_output_fields",
             help="법령에서 확정한 출력 필드명(영문). 예: total_days, remaining_days")
+
+        # ── CA-1B-3-A: Registry에서 input/output 필드 자동 프리필 ───────────
+        # CA-1B-3-A-FIX: Streamlit lifecycle 상 위젯(key=af_contract_input_fields 등)이
+        # 이미 instantiation된 뒤 같은 run에서 해당 session_state를 직접 수정하면
+        # StreamlitAPIException이 발생하므로, on_click callback에서 세팅한다.
+        # (callback은 다음 rerun에서 위젯이 생성되기 전에 실행됨 → 프리필 값이 반영됨)
+        def _af_prefill_from_registry() -> None:
+            _slug = (st.session_state.get("af_contract_slug_pre") or "").strip()
+            if not _slug:
+                st.session_state["af_prefill_msg"] = (
+                    "warning", "⚠️ Registry에서 불러오려면 먼저 [확정 slug]를 입력하세요.")
+                return
+            _pf = AF.prefill_contract_from_registry(_slug)
+            if not _pf.get("found"):
+                st.session_state["af_prefill_msg"] = (
+                    "warning",
+                    f"⚠️ Registry v3에 '{_slug}' 엔트리가 없습니다. "
+                    "자동 프리필하지 않고 기존 입력을 유지합니다.")
+            elif not _pf.get("input_fields") and not _pf.get("output_fields"):
+                st.session_state["af_prefill_msg"] = (
+                    "warning",
+                    f"⚠️ Registry 엔트리에 input_labels/output_labels가 없습니다. "
+                    "자동 프리필하지 않고 기존 입력을 유지합니다.")
+            else:
+                st.session_state["af_contract_input_fields"] = ", ".join(_pf["input_fields"])
+                st.session_state["af_contract_output_fields"] = ", ".join(_pf["output_fields"])
+                st.session_state["af_prefill_msg"] = (
+                    "success",
+                    f"✅ Registry에서 불러옴: {_pf.get('name') or _slug} — "
+                    f"input {len(_pf['input_fields'])}개 / output {len(_pf['output_fields'])}개. "
+                    "확인 후 [📋 Contract 기반 생성]을 실행하세요.")
+
+        st.button(
+            "📥 Registry에서 불러오기 (input/output 필드)",
+            key="af_registry_prefill",
+            on_click=_af_prefill_from_registry,
+            help=(
+                "확정 slug에 해당하는 Registry v3 엔트리의 input_labels/output_labels를 "
+                "입력·출력 필드에 채웁니다. 프리필 후 운영자가 확인·수정할 수 있습니다."
+            ),
+        )
+        _af_prefill_msg = st.session_state.pop("af_prefill_msg", None)
+        if _af_prefill_msg:
+            _af_prefill_kind, _af_prefill_text = _af_prefill_msg
+            if _af_prefill_kind == "warning":
+                st.warning(_af_prefill_text)
+            else:
+                st.success(_af_prefill_text)
+
         _af_formula = st.text_area(
             "확정 Formula (선택 — str 또는 JSON dict)",
             placeholder='{"total_days": "15 + min(max(0, (years_of_service-1)//2), 10)", ...}',
