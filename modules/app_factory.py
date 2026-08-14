@@ -1301,6 +1301,58 @@ def load_contract_registry() -> dict:
     return instances if isinstance(instances, dict) else {}
 
 
+def contract_instance_restore(slug: str) -> dict:
+    """저장된 Contract instance를 Dashboard 복원용 dict로 정규화 (CA-1B-4 P0).
+
+    load_contract_instance()의 반환값을 위젯 복원에 필요한 형태로 정리한다.
+    예외를 전파하지 않고 found=False + message로 변환해 UI에서 안전하게 표시한다.
+
+    - 파일 없음 / slug 안전성 오류 / malformed / 스키마 오류 → found=False + message
+    - 정상 → found=True + input/output/scope_exclusions/formula/formula_status/test_cases
+
+    반환:
+      {
+        "found": bool,
+        "instance": dict|None,     # 로드된 원본 instance (없으면 None)
+        "slug": str,
+        "name": str,
+        "input_fields": list,
+        "output_fields": list,
+        "scope_exclusions": list,
+        "formula": str|dict|None,
+        "formula_status": str,
+        "test_cases": list,
+        "message": str,             # 실패 사유 (없으면 "")
+      }
+    """
+    clean_slug = str(slug or "").strip()
+    try:
+        instance = load_contract_instance(clean_slug)
+    except ValueError as e:
+        return {"found": False, "instance": None, "slug": clean_slug,
+                "name": "", "input_fields": [], "output_fields": [],
+                "scope_exclusions": [], "formula": None, "formula_status": "",
+                "test_cases": [], "message": str(e)}
+    if instance is None:
+        return {"found": False, "instance": None, "slug": clean_slug,
+                "name": "", "input_fields": [], "output_fields": [],
+                "scope_exclusions": [], "formula": None, "formula_status": "",
+                "test_cases": [], "message": f"Contract instance가 없습니다: '{clean_slug}'"}
+    return {
+        "found": True,
+        "instance": instance,
+        "slug": instance.get("slug") or clean_slug,
+        "name": instance.get("name", ""),
+        "input_fields": list(instance.get("input_fields") or []),
+        "output_fields": list(instance.get("output_fields") or []),
+        "scope_exclusions": list(instance.get("scope_exclusions") or []),
+        "formula": instance.get("formula"),
+        "formula_status": instance.get("formula_status", "not_generated"),
+        "test_cases": list(instance.get("test_cases") or []),
+        "message": "",
+    }
+
+
 def save_app(cfg: dict, app: dict, site_id: str = "", slug: str = None) -> tuple:
     """생성 결과를 calculators + app_templates 시트에 저장(Repository 경유).
     slug: 신규 계산기의 영문 식별자(폴더/URL/내부참조). 미지정 시 _slug(name)로 폴백(하위호환).

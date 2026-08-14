@@ -2277,13 +2277,65 @@ elif tab == "🏭 App Factory":
                     f"input {len(_pf['input_fields'])}개 / output {len(_pf['output_fields'])}개"
                     f"{_se_note}. 확인 후 [📋 Contract 기반 생성]을 실행하세요.")
 
-        st.button(
+        # ── CA-1B-4 P0: 저장된 Contract instance에서 기존 Contract 복원 ──────
+        # CA-1B-3-A/B에서 저장(instance 파일 + registry 인덱스)과 로더
+        # (load_contract_instance)는 구현됐지만 읽는 경로가 없어, App Factory 재진입 시
+        # 기존 Contract를 위젯에 복원해 재검증/재사용할 수 있게 연결한다.
+        # 위젯 key는 on_click callback에서 세팅 (Streamlit lifecycle 안전 패턴 유지)
+        def _af_load_contract_instance() -> None:
+            _slug = (st.session_state.get("af_contract_slug_pre") or "").strip()
+            if not _slug:
+                st.session_state["af_prefill_msg"] = (
+                    "warning", "⚠️ Contract를 불러오려면 먼저 [확정 slug]를 입력하세요.")
+                return
+            _rest = AF.contract_instance_restore(_slug)
+            if not _rest.get("found"):
+                st.session_state["af_prefill_msg"] = (
+                    "warning", f"⚠️ {_rest.get('message')} 기존 입력을 유지합니다.")
+                return
+            st.session_state["af_contract_input_fields"] = ", ".join(_rest["input_fields"])
+            st.session_state["af_contract_output_fields"] = ", ".join(_rest["output_fields"])
+            st.session_state["af_contract_scope_exclusions"] = list(
+                _rest["scope_exclusions"])
+            _f = _rest.get("formula")
+            _f_str = ""
+            if _f is not None:
+                _f_str = (json.dumps(_f, ensure_ascii=False)
+                          if isinstance(_f, dict) else str(_f))
+            st.session_state["af_contract_formula"] = _f_str
+            _tc = _rest.get("test_cases") or []
+            st.session_state["af_contract_test_cases"] = json.dumps(
+                _tc, ensure_ascii=False)
+            # operator_confirmed로 저장된 Contract는 재생성 시에도 상태 보존
+            if _rest.get("formula_status") == "operator_confirmed" and _f_str:
+                st.session_state["af_formula_confirmed_text"] = _f_str
+            else:
+                st.session_state.pop("af_formula_confirmed_text", None)
+            st.session_state["af_prefill_msg"] = (
+                "success",
+                f"✅ Contract instance 복원: {_rest.get('name') or _rest['slug']} — "
+                f"input {len(_rest['input_fields'])}개 / output {len(_rest['output_fields'])}개 "
+                f"/ formula_status: {_rest.get('formula_status')}. "
+                "확인 후 [📋 Contract 기반 생성]으로 재검증하세요.")
+
+        _btn_col1, _btn_col2 = st.columns(2)
+        _btn_col1.button(
             "📥 Registry에서 불러오기 (input/output 필드)",
             key="af_registry_prefill",
             on_click=_af_prefill_from_registry,
             help=(
                 "확정 slug에 해당하는 Registry v3 엔트리의 input_labels/output_labels를 "
                 "입력·출력 필드에 채웁니다. 프리필 후 운영자가 확인·수정할 수 있습니다."
+            ),
+        )
+        _btn_col2.button(
+            "📂 Contract Instance 불러오기 (저장된 Contract 복원)",
+            key="af_contract_load",
+            on_click=_af_load_contract_instance,
+            help=(
+                "확정 slug의 저장된 Contract instance(docs/contract_schema/instances/)를 "
+                "입력·출력·formula·test_cases·제외조건에 복원합니다. "
+                "복원 후 [📋 Contract 기반 생성]으로 재검증/재사용할 수 있습니다."
             ),
         )
         _af_prefill_msg = st.session_state.pop("af_prefill_msg", None)
