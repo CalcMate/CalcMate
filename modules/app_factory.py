@@ -1220,6 +1220,7 @@ def prefill_contract_from_registry(slug: str, registry: dict = None,
         "input_fields": list,   # ← Registry input_labels
         "output_fields": list,  # ← Registry output_labels
         "scope_exclusions": list,  # ← CA-1B-3-B P1: legal_refs → 법령 제외 조건
+        "legal_refs": list,     # ← CA-1B-4 P1-D: Registry legal_refs (HOLD-3/Type D/분류용)
         "message": str,         # 실패 사유 (없으면 "")
       }
 
@@ -1237,7 +1238,7 @@ def prefill_contract_from_registry(slug: str, registry: dict = None,
         return {"found": False, "entry": None, "slug": clean_slug,
                 "name": "", "category": "",
                 "input_fields": [], "output_fields": [],
-                "scope_exclusions": [],
+                "scope_exclusions": [], "legal_refs": [],
                 "message": f"Registry v3에 '{slug}' 엔트리가 없습니다"}
     return {
         "found": True,
@@ -1248,6 +1249,7 @@ def prefill_contract_from_registry(slug: str, registry: dict = None,
         "input_fields": list(entry.get("input_labels") or []),
         "output_fields": list(entry.get("output_labels") or []),
         "scope_exclusions": _collect_scope_exclusions(entry, legal_master),
+        "legal_refs": list(entry.get("legal_refs") or []),
         "message": "",
     }
 

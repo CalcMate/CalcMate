@@ -2270,6 +2270,8 @@ elif tab == "🏭 App Factory":
                 # CA-1B-3-B P1: legal_refs → legal_master → scope_exclusions 자동 매핑
                 _se = _pf.get("scope_exclusions") or []
                 st.session_state["af_contract_scope_exclusions"] = list(_se)
+                # CA-1B-4 P1-D: Registry legal_refs 보존 (HOLD-3/Type D/분류용)
+                st.session_state["af_contract_legal_refs"] = list(_pf.get("legal_refs") or [])
                 _se_note = f" / 제외조건 {len(_se)}개" if _se else ""
                 st.session_state["af_prefill_msg"] = (
                     "success",
@@ -2393,7 +2395,8 @@ elif tab == "🏭 App Factory":
                         desc=af_desc or "",
                         input_fields=_sf_input_list,
                         output_fields=_sf_output_list,
-                        legal_refs=[],
+                        legal_refs=list(
+                            st.session_state.get("af_contract_legal_refs") or []),
                         slug=(_af_slug_pre or "").strip() or None,
                     )
                 if _sf_result["success"]:
@@ -2594,6 +2597,9 @@ elif tab == "🏭 App Factory":
                         # CA-1B-3-B P1: Registry prefill로 매핑된 scope_exclusions 전달 (없으면 빈 리스트)
                         scope_exclusions=list(
                             st.session_state.get("af_contract_scope_exclusions") or []),
+                        # CA-1B-4 P1-D: Registry legal_refs 전달 (HOLD-3/Type D/P1-B 분류용)
+                        legal_refs=list(
+                            st.session_state.get("af_contract_legal_refs") or []),
                         formula=_formula_val,
                         formula_status=_fv_prior_status,
                         test_cases=_test_cases_val,
