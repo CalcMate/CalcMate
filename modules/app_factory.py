@@ -686,6 +686,11 @@ def generate_app_with_contract(cfg: dict, contract: dict) -> dict:
     result["_contract_validation"] = validation
     result["_schema_drift"] = validation["schema_drift"]
 
+    # CA-4-A Gap A: Contract의 legal_refs를 app dict로 전달 — save_app() →
+    # extract_checklist() 경로에서 실제 법적 근거가 표시되도록 한다.
+    # (Mode A는 _contract 없이 generate_app()만 사용하므로 이 함수를 거치지 않아 무영향)
+    result["legal_refs"] = list(contract.get("legal_refs") or [])
+
     if not validation["valid"]:
         LOG.warning(
             "Contract 불일치 — 운영자 검토 필요: %s → %s",
