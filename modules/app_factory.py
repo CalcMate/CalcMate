@@ -1390,6 +1390,7 @@ def contract_instance_restore(slug: str) -> dict:
     load_contract_instance()의 반환값을 위젯 복원에 필요한 형태로 정리한다.
     예외를 전파하지 않고 found=False + message로 변환해 UI에서 안전하게 표시한다.
 
+    - 파일 없음 + Registry contract_source 존재 → Registry snapshot 부분 복원 (CA-1B-4 P1-E)
     - 파일 없음 / slug 안전성 오류 / malformed / 스키마 오류 → found=False + message
     - 정상 → found=True + input/output/scope_exclusions/formula/formula_status/test_cases
 
@@ -1417,6 +1418,36 @@ def contract_instance_restore(slug: str) -> dict:
                 "scope_exclusions": [], "formula": None, "formula_status": "",
                 "test_cases": [], "message": str(e)}
     if instance is None:
+        # CA-1B-4 P1-E: Registry contract_source fallback
+        # instance 파일이 없어도 Registry에 저장된 최소 snapshot으로 부분 복원(프리필 지원).
+        # 발동 조건: slug의 instance 파일 없음 AND Registry entry 존재 AND
+        #           entry["contract_source"]가 dict (Mode B 저장분만. Mode A는 null → 미발동).
+        # formula/test_cases는 snapshot에 없으므로 추측하지 않는다(항상 None/[]).
+        from .registry_loader import load_registry_v3
+        try:
+            _reg = load_registry_v3() or {}
+        except Exception as _re:
+            LOG.warning("contract_source fallback Registry 조회 실패(무시): %s", _re)
+            _reg = {}
+        _entry = (_reg or {}).get(clean_slug)
+        _cs = (_entry or {}).get("contract_source") if isinstance(_entry, dict) else None
+        if isinstance(_cs, dict) and _cs:
+            return {
+                "found": True,
+                "instance": None,   # 실제 instance 파일 없음 — Registry snapshot 기반
+                "slug": _cs.get("contract_slug") or clean_slug,
+                "name": _entry.get("name", ""),
+                "input_fields": list(_cs.get("input_fields") or []),
+                "output_fields": list(_cs.get("output_fields") or []),
+                "scope_exclusions": _collect_scope_exclusions(_entry),
+                "legal_refs": list(_entry.get("legal_refs") or []),
+                "formula": None,
+                "formula_status": _cs.get("formula_status", "not_generated"),
+                "test_cases_status": _cs.get("test_cases_status", "not_generated"),
+                "test_cases": [],
+                "message": ("Registry contract_source snapshot으로 부분 복원 "
+                             f"(instance 파일 없음: '{clean_slug}')"),
+            }
         return {"found": False, "instance": None, "slug": clean_slug,
                 "name": "", "input_fields": [], "output_fields": [],
                 "scope_exclusions": [], "formula": None, "formula_status": "",
