@@ -2228,6 +2228,11 @@ elif tab == "🏭 App Factory":
             "Contract는 AI 호출 전에 확정되어야 합니다. "
             "AI 결과를 보고 나서 Contract를 채우는 것은 검증 의미가 없습니다."
         )
+        _af_is_tier2b = st.checkbox(
+            "🗓️ Tier2-B (날짜형 계산기) — AI 없이 결정적 HTML 생성",
+            key="af_contract_is_tier2b",
+            help="입영일·전역일 등 날짜 연산 계산기. 체크 시 AI 호출 없이 날짜 계산 HTML을 직접 생성합니다.",
+        )
         _bc1, _bc2 = st.columns(2)
         _af_slug_pre = _bc1.text_input(
             "확정 slug *", placeholder="annual-leave-remaining",
@@ -2581,17 +2586,18 @@ elif tab == "🏭 App Factory":
                             _test_cases_val = []
 
                     # CA-2-6-2: 이전 확정 상태 전달 — formula 미변경 시 operator_confirmed 보존
+                    # Tier2-B는 날짜 계산 방법이 확정됐으므로 formula_status=operator_confirmed
                     _fv_prior_raw = st.session_state.get("af_formula_confirmed_text", "")
                     _fv_prior_status = (
                         "operator_confirmed"
-                        if _fv_prior_raw and _formula_raw == _fv_prior_raw
+                        if _af_is_tier2b or (_fv_prior_raw and _formula_raw == _fv_prior_raw)
                         else None
                     )
                     _contract = AF.build_contract(
                         slug=_slug_clean,
                         name=af_name.strip(),
                         category=af_cat or "",
-                        tier=_tier_map_int_to_str.get(af_tier, "Tier2-A"),
+                        tier="Tier2-B" if _af_is_tier2b else _tier_map_int_to_str.get(af_tier, "Tier2-A"),
                         input_fields=_input_list,
                         output_fields=_output_list,
                         # CA-1B-3-B P1: Registry prefill로 매핑된 scope_exclusions 전달 (없으면 빈 리스트)

@@ -27,6 +27,7 @@ _CATEGORY_AF_YAML_MAP: dict[str, str] = {
     "고용/보험": "employment_af",
     "노무/급여/보험": "insurance_af",
     "부동산/임대": "realty_af",
+    "병역/공무": "defense_af",
 }
 
 from adapters.db.factory import get_db_adapter
@@ -63,6 +64,8 @@ AF_SESSION_DISCARD_KEYS: tuple[str, ...] = (
     "af_formula_validation",      # [🔍 Formula 검증] 결과 dict
     "af_formula_ai_suggested_text",  # AI 제안 추적 (ai_suggested 수정 감지용)
     "_af_ai_suggest_override",    # 2-click 덮어쓰기 확인 플래그
+    # ── Tier2-B (날짜형) 전용 키 ─────────────────────────────
+    "af_contract_is_tier2b",      # Tier2-B 체크박스 상태
 )
 
 
@@ -163,6 +166,11 @@ def _build_v3_entry(app: dict, slug: str, tier: int = 2, contract: dict = None) 
     }
     if app.get("compute_rules"):
         entry["compute_rules"] = app["compute_rules"]
+    # Tier2-B 날짜형: Registry에 추가 메타 필드 기록
+    if _c.get("tier") == "Tier2-B" or app.get("compute_type") == "date_based_custom":
+        entry["tier_subtype"] = "B"
+        entry["html_source"] = "template_db"
+        entry["compute_type"] = "date_based_custom"
     return entry
 
 
@@ -664,6 +672,171 @@ def suggest_formula(
     }
 
 
+# ── Tier2-B: 군인전역일 계산기 HTML 템플릿 ──────────────────────────────────────
+# 전역일 = 입영일 + N개월 - 1일 (민간 관행식, 병무청 공식 미확인)
+# 민법 제160조 준용: 월 가산 시 해당 월에 대응하는 날이 없으면 그 달의 마지막 날
+_MILITARY_DISCHARGE_HTML = """<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>군인 전역일 계산기 — CalcMate</title>
+<meta name="description" content="입영일과 군별(육군·해군·공군·해병대·사회복무요원)을 선택하면 예상 전역일과 남은 복무일을 계산합니다.">
+<style>
+:root{--primary:#2563eb;--primary-dark:#1d4ed8;--bg:#f8fafc;--card:#fff;--border:#e2e8f0;--text:#1e293b;--sub:#64748b}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:2rem 1rem}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:2rem;width:100%;max-width:480px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+h1{font-size:1.4rem;font-weight:700;margin-bottom:.25rem}
+.sub{color:var(--sub);font-size:.85rem;margin-bottom:1.5rem}
+.field{margin-bottom:1rem}
+label{display:block;font-size:.85rem;font-weight:600;margin-bottom:.35rem;color:var(--sub)}
+input[type=date],select{width:100%;padding:.6rem .8rem;border:1px solid var(--border);border-radius:8px;font-size:1rem;outline:none;transition:border .2s}
+input[type=date]:focus,select:focus{border-color:var(--primary)}
+.btn{width:100%;padding:.75rem;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;margin-top:.5rem;transition:background .2s}
+.btn:hover{background:var(--primary-dark)}
+.result{margin-top:1.5rem;padding:1.25rem;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;display:none}
+.result-row{display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-bottom:1px solid #e0f2fe}
+.result-row:last-of-type{border-bottom:none}
+.result-label{font-size:.85rem;color:var(--sub)}
+.result-value{font-size:1.05rem;font-weight:700}
+.progress-bar{margin-top:.75rem;background:#e0f2fe;border-radius:99px;height:8px;overflow:hidden}
+.progress-fill{height:100%;background:var(--primary);border-radius:99px;transition:width .4s}
+.disclaimer{margin-top:1rem;font-size:.78rem;color:var(--sub);line-height:1.5;padding:.75rem;background:#fefce8;border:1px solid #fde68a;border-radius:6px}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>군인 전역일 계산기</h1>
+  <p class="sub">입영일과 군별을 선택하면 예상 전역일을 계산합니다.</p>
+  <div class="field">
+    <label for="enlistment_date">입영일</label>
+    <input type="date" id="enlistment_date">
+  </div>
+  <div class="field">
+    <label for="branch">군별 / 복무형태</label>
+    <select id="branch">
+      <option value="army">육군 (18개월)</option>
+      <option value="marine">해병대 (18개월)</option>
+      <option value="navy">해군 (20개월)</option>
+      <option value="air_force">공군 (21개월)</option>
+      <option value="social_service">사회복무요원 (21개월)</option>
+    </select>
+  </div>
+  <button class="btn" onclick="calculate()">계산하기</button>
+  <div class="result" id="result">
+    <div class="result-row">
+      <span class="result-label">예상 전역일</span>
+      <span class="result-value" id="discharge_date">—</span>
+    </div>
+    <div class="result-row">
+      <span class="result-label">복무 기간</span>
+      <span class="result-value" id="service_period">—</span>
+    </div>
+    <div class="result-row">
+      <span class="result-label">남은 일수</span>
+      <span class="result-value" id="remaining_days">—</span>
+    </div>
+    <div class="result-row">
+      <span class="result-label">복무 진행률</span>
+      <span class="result-value" id="progress_pct">—</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progress_fill" style="width:0%"></div></div>
+    <div class="disclaimer">
+      <strong>참고용 계산 결과</strong> — 관행적 계산 방법(입영일+복무기간-1일)에 따른 결과입니다.
+      <strong>실제 전역일은 병무청 확인이 필요합니다.</strong>
+      군기교육·복무이탈·개인별 조정 등은 반영되지 않습니다.
+    </div>
+  </div>
+</div>
+<script>
+var MONTHS={army:18,marine:18,navy:20,air_force:21,social_service:21};
+var NAMES={army:'육군',marine:'해병대',navy:'해군',air_force:'공군',social_service:'사회복무요원'};
+function addMonths(d,n){
+  var sd=d.getDate(),tm=d.getMonth()+n,ty=d.getFullYear()+Math.floor(tm/12),nm=((tm%12)+12)%12;
+  var ld=new Date(ty,nm+1,0).getDate();
+  return new Date(ty,nm,Math.min(sd,ld));
+}
+function fmt(d){return d.getFullYear()+'년 '+(d.getMonth()+1)+'월 '+d.getDate()+'일';}
+function calculate(){
+  var s=document.getElementById('enlistment_date').value;
+  var b=document.getElementById('branch').value;
+  if(!s){alert('입영일을 선택해 주세요.');return;}
+  var en=new Date(s+'T00:00:00'),m=MONTHS[b];
+  var dc=addMonths(en,m);dc.setDate(dc.getDate()-1);
+  var today=new Date();today.setHours(0,0,0,0);
+  var tot=Math.round((dc-en)/86400000)+1;
+  var rem=Math.round((dc-today)/86400000);
+  var srv=Math.min(Math.max(0,Math.round((today-en)/86400000)),tot);
+  var pct=Math.min(100,Math.max(0,Math.round(srv/tot*100)));
+  document.getElementById('discharge_date').textContent=fmt(dc);
+  document.getElementById('service_period').textContent=NAMES[b]+' '+m+'개월';
+  document.getElementById('remaining_days').textContent=rem>0?'D-'+rem:rem===0?'D-Day (오늘 전역)':'전역 완료';
+  document.getElementById('progress_pct').textContent=pct+'%';
+  document.getElementById('progress_fill').style.width=pct+'%';
+  document.getElementById('result').style.display='block';
+}
+</script>
+</body>
+</html>"""
+
+
+def _build_tier2b_app(contract: dict) -> dict:
+    """Tier2-B(날짜형) 계산기 — AI 없이 결정적 HTML 생성.
+
+    군인전역일 전용. 입영일+N개월-1일 관행 계산식을 JS로 구현한 HTML을
+    app_templates.html_template에 저장한다.
+    """
+    name = contract.get("name", "군인 전역일 계산기")
+    category = contract.get("category", "")
+    desc = (contract.get("desc") or "").strip()
+    seo_title = f"{name} | CalcMate"
+    seo_desc = (
+        desc
+        or "입영일과 군별(육군·해군·공군·해병대·사회복무요원)을 선택하면 "
+           "예상 전역일과 남은 복무일을 계산합니다."
+    )
+    return {
+        "name": name,
+        "category": category,
+        "calculator_type": "date_based",
+        "compute_type": "date_based_custom",
+        "tier": 2,
+        "html": _MILITARY_DISCHARGE_HTML,
+        "css": "",
+        "js": "",
+        "faq": [],
+        "seo_title": seo_title,
+        "seo_desc": seo_desc,
+        "input_schema": {
+            "enlistment_date": {"type": "date", "label": "입영일"},
+            "branch": {
+                "type": "select",
+                "label": "군별",
+                "options": ["army", "marine", "navy", "air_force", "social_service"],
+            },
+        },
+        "output_schema": {
+            "discharge_date": {"label": "예상 전역일"},
+            "remaining_days": {"label": "남은 일수"},
+            "progress_pct": {"label": "복무 진행률"},
+        },
+        "formula": None,
+        "labels": {
+            "enlistment_date": "입영일",
+            "branch": "군별",
+            "discharge_date": "예상 전역일",
+            "remaining_days": "남은 일수",
+            "progress_pct": "복무 진행률",
+        },
+        "_tokens": 0,
+        "_steps": [("Tier2-B 날짜형 결정적 생성", "내부 생성 (AI 없음)", 0)],
+        "_formula_valid": True,
+        "_formula_msg": "",
+        "description": desc,
+    }
+
+
 def generate_app_with_contract(cfg: dict, contract: dict) -> dict:
     """Contract 기반 계산기 생성.
 
@@ -677,6 +850,15 @@ def generate_app_with_contract(cfg: dict, contract: dict) -> dict:
     tier_str = contract.get("tier", "Tier2-A")
     tier_int = 1 if tier_str == "Tier1" else 2
     desc = contract.get("desc", "")
+
+    # Tier2-B: AI 없이 결정적 HTML 생성 (날짜형 계산기)
+    if tier_str == "Tier2-B":
+        result = _build_tier2b_app(contract)
+        result["_contract"] = contract
+        result["_contract_validation"] = {"valid": True, "messages": [], "schema_drift": {}}
+        result["_schema_drift"] = {}
+        result["legal_refs"] = list(contract.get("legal_refs") or [])
+        return result
 
     result = generate_app(cfg, name, category=category, desc=desc, tier=tier_int,
                           _contract=contract)

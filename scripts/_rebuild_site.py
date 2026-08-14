@@ -41,9 +41,30 @@ except Exception as e:
 print("\n=== 계산기 재생성 (status=HOLD 제외) ===")
 for c in calcs:
     slug = c.get("slug", "")
+    v3_entry = _v3.get(slug) or {}
     # App Factory HOLD 계산기 — READY 전환 후에만 빌드
-    if (_v3.get(slug) or {}).get("status") == "HOLD":
+    if v3_entry.get("status") == "HOLD":
         print(f"  [SKIP] {slug} — HOLD 상태 (READY 전환 후 재빌드)")
+        continue
+    # Tier2-B: html_template을 DB에서 직접 복사 (AI 재생성 없음)
+    if v3_entry.get("tier_subtype") == "B":
+        tpl_id = c.get("template_id")
+        if not tpl_id:
+            print(f"  [SKIP] {slug} — Tier2-B이나 template_id 없음")
+            continue
+        try:
+            from repositories.template_repository import TemplateRepository
+            tpl = TemplateRepository(get_db_adapter(cfg)).get_by_id(tpl_id)
+            html = (tpl or {}).get("html_template", "")
+            if not html:
+                raise ValueError("html_template이 비어있음")
+            slug_dir = SITE_DIR / slug
+            slug_dir.mkdir(parents=True, exist_ok=True)
+            (slug_dir / "index.html").write_text(html, encoding="utf-8")
+            print(f"  [OK] {slug} (Tier2-B 템플릿 직접 복사)")
+        except Exception as e:
+            print(f"  [ERROR] {slug}: {e}")
+            errors.append(f"{slug}: {e}")
         continue
     try:
         files = AG.generate_calculator(c, cfg)
