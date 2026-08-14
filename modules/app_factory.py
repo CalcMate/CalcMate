@@ -1443,6 +1443,21 @@ def save_app(cfg: dict, app: dict, site_id: str = "", slug: str = None) -> tuple
     tpl_repo = TemplateRepository(db)
     name = app.get("name", "")
     new_slug = (slug or "").strip().lower() or _slug(name)   # 명시 영문 slug 우선, 없으면 기존 방식
+    # ── CA-1B-4 P1-C: Mode B(Contract 기반) 전용 formula_status Hard-Gate ──
+    # operator_confirmed 상태에서만 저장 허용. Mode A(_contract 없음)는 기존 동작 100% 유지.
+    _contract = app.get("_contract")
+    if _contract:
+        _fs = _contract.get("formula_status")
+        if _fs != "operator_confirmed":
+            _fs_msg = {
+                "not_generated": "Contract Formula가 아직 생성되지 않아 저장할 수 없습니다. "
+                                 "Formula를 생성하고 검증을 완료한 후 확정하세요.",
+                "ai_suggested": "AI가 제안한 Formula가 아직 확정되지 않아 저장할 수 없습니다. "
+                                "Formula 검증 후 Operator Confirm을 완료하세요.",
+                "pending_validation": "Formula가 변경되었지만 아직 검증 및 확정되지 않아 저장할 수 없습니다. "
+                                       "Formula 검증을 완료한 후 Operator Confirm을 수행하세요.",
+            }.get(_fs, "Contract Formula 상태가 유효하지 않아 저장할 수 없습니다.")
+            return False, f"🔒 {_fs_msg} (현재 상태: {_fs})"
     try:
         _all = calc_repo.get_all()
         # 중복 체크(이름)

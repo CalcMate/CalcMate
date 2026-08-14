@@ -2750,9 +2750,14 @@ elif tab == "🏭 App Factory":
 
         # ── Contract 저장 차단 상태 사전 판정 ────────────────────────
         _cv_for_save = app.get("_contract_validation")
-        _contract_save_blocked = (
+        _contract_validation_failed = (
             _cv_for_save is not None and not _cv_for_save.get("valid", True)
         )
+        # CA-1B-4 P1-C: Mode B(Contract 기반)는 operator_confirmed 상태에서만 저장 허용
+        _contract_for_save = app.get("_contract") or {}
+        _fs_for_save = _contract_for_save.get("formula_status")
+        _fs_not_confirmed = bool(_contract_for_save) and _fs_for_save != "operator_confirmed"
+        _contract_save_blocked = _contract_validation_failed or _fs_not_confirmed
 
         # ── 액션 버튼: 저장 / 폐기 ──────────────────────────────────
         _btn_save_col, _btn_discard_col = st.columns([3, 2])
@@ -2764,7 +2769,10 @@ elif tab == "🏭 App Factory":
             help=(
                 "Contract 불일치로 저장이 차단됩니다. "
                 "Contract를 수정하거나 재생성하세요."
-            ) if _contract_save_blocked else None,
+            ) if _contract_validation_failed else (
+                f"🔒 저장하려면 Formula 검증 통과 후 Operator Confirm이 필요합니다. "
+                f"현재 상태: {_fs_for_save}"
+            ) if _fs_not_confirmed else None,
         ):
             import re as _re_slug
             slug_in = (af_slug or "").strip().lower()
@@ -2785,10 +2793,16 @@ elif tab == "🏭 App Factory":
                     st.error(msg)
 
         if _contract_save_blocked:
-            st.error(
-                "⛔ Contract 불일치로 저장이 차단됩니다. "
-                "Contract 폼을 수정하고 [📋 Contract 기반 생성]을 다시 실행하세요."
-            )
+            if _fs_not_confirmed and not _contract_validation_failed:
+                st.error(
+                    f"🔒 저장하려면 Formula 검증 통과 후 Operator Confirm이 필요합니다. "
+                    f"현재 Formula 상태: {_fs_for_save}."
+                )
+            else:
+                st.error(
+                    "⛔ Contract 불일치로 저장이 차단됩니다. "
+                    "Contract 폼을 수정하고 [📋 Contract 기반 생성]을 다시 실행하세요."
+                )
 
         if _btn_discard_col.button("🗑️ 생성 결과 폐기 & 초기화", key="af_discard"):
             st.session_state["af_discard_confirm"] = True
