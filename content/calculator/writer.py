@@ -51,6 +51,7 @@ def generate_article(cfg: dict, calc: dict, seo: dict = None, faq: list = None,
     except Exception as _e:
         LOG.warning("토큰 비용 기록 실패: %s", _e)
     html = cleaner.parse_html_body(text)
+    html = cleaner.strip_prompt_artifacts(html)
 
     if review:
         try:

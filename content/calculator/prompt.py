@@ -51,75 +51,109 @@ def get_faq_prompt(calc: dict, n_min: int = 6, n_max: int = 8) -> tuple:
     return system, _ctx(calc)
 
 
+# SalaryMate에 실제 존재하는 계산기 목록 (SSOT: DB calculators 테이블, 2026-08 기준).
+# A-3 게이트: 이 목록 외 계산기를 언급/링크하는 것을 원천 차단하기 위해 프롬프트에 주입한다.
+_VALID_CALCULATORS = (
+    "- 연차수당 계산기 (annual-leave-allowance)\n"
+    "- 연차 잔여일 계산기 (annual-leave-remaining)\n"
+    "- 4대보험 계산기 (four-insurances)\n"
+    "- 프리랜서 3.3% 원천징수 계산기 (freelancer-tax-3p3)\n"
+    "- 전세 vs 월세 비교 계산기 (jeonse-vs-monthly)\n"
+    "- 군인 전역일 계산기 (military-discharge-date)\n"
+    "- 퇴직금 계산기 (severance-pay)\n"
+    "- 실업급여 계산기 (unemployment-benefit)\n"
+    "- 주휴수당 계산기 (weekly-holiday-allowance)\n"
+    "- 연말정산 환급액 계산기 (연말정산_환급액_계산기)\n"
+    "- 육아휴직 급여 계산기 (육아휴직_급여_계산기)\n"
+)
+
+_NO_LINK_RULE = (
+    "[계산기 링크 금지 — 반드시 준수]\n"
+    "- 관련 계산기 섹션을 본문에 작성하지 않는다. 관련 계산기/관련 글 링크는 시스템이 자동 삽입한다.\n"
+    "- 본문에 다른 계산기를 언급하거나 <a href> 링크를 생성하지 않는다.\n"
+    "- 위 목록 외에 존재하지 않는 계산기(시급 계산기, 연봉 계산기, 상여금 계산기, 세금 계산기 등)를 "
+    "언급하거나 링크하지 않는다.\n"
+    "- CTA(계산기 사용하기) 섹션은 작성하지 않는다. 시스템이 본문 뒤에 자동 삽입한다.\n"
+)
+
+_H2_RULE = (
+    "[H2 제목 규칙 — 반드시 준수]\n"
+    "- 각 섹션의 <h2> 제목은 아래 지정된 이름 그대로만 사용한다. 임의 변경 절대 금지.\n"
+    "- <h2> 안에 숫자 prefix(예: '1. ', '2. ', '3. ')를 절대 포함하지 않는다.\n"
+    "- 'CTA', '행동 유도', '할인 혜택', '계산기 연결' 같은 내부 작업 용어를 "
+    "<h2> 제목으로 사용하지 않는다.\n"
+)
+
+
 def get_article_prompt(calc: dict, seo: dict = None, faq: list = None, example_context: dict = None, intent: str = None) -> tuple:
     seo = seo or {}
     example_str = json.dumps(example_context, ensure_ascii=False) if example_context else "제공된 계산 데이터 없음"
 
-    # 템플릿 분기
-    # 템플릿 분기
+    # 템플릿 분기 — H2 제목 이름을 명시적으로 지정하고 섹션 번호 prefix 없음
     if intent == "eligibility":
         structure = (
-            "1. 서론(대상자 중심 문제제기)\n"
-            "2. 지급 대상(주휴수당을 지급받을 수 있는 대상자 요건)\n"
-            "3. 근로시간 조건(주 15시간 이상 등 충족해야 할 기준)\n"
-            "4. 제외 대상(지급받지 못하는 예외 상황)\n"
-            "5. 계산 방법(공식+계산 근거)\n"
-            "6. FAQ\n"
+            "<h2>지급 대상</h2> — 대상자 중심 문제제기 및 수급 자격 요건\n"
+            "<h2>근로시간 조건</h2> — 주 15시간 이상 등 충족해야 할 기준\n"
+            "<h2>제외 대상</h2> — 지급받지 못하는 예외 상황\n"
+            "<h2>계산 방법</h2> — 공식+계산 근거+법적 근거\n"
+            "<h2>FAQ</h2> — <dl><dt>...</dt><dd>...</dd></dl> 형식, 최소 5문항\n"
         )
         system_instructions = (
             "작성 규칙: 'eligibility' 의도로 작성하라. "
-            "반드시 본문 최상단에 서론을 배치하고, 바로 뒤에 '지급 대상', '근로시간 조건', '제외 대상'을 순서대로 명확한 H2로 구성하라. "
-            "이후에 계산 방법과 FAQ를 하단에 배치하되, FAQ 섹션의 H2는 반드시 'FAQ' 그대로 사용하라('자주 묻는 질문' 등 다른 표현 금지). "
-            "계산기 자체를 소개하거나 '계산기 사용하기' 섹션을 서론 상단에 배치하는 행위를 엄격히 금지한다."
+            "본문 최상단은 짧은 도입 문단(p태그)으로 시작하고, 바로 뒤에 위 H2 순서대로 구성하라. "
+            "FAQ <h2> 제목은 반드시 'FAQ'를 그대로 사용한다('자주 묻는 질문' 등 변경 금지)."
         )
     elif intent == "documents":
         structure = (
-            "1. 서론(제출 서류의 중요성)\n"
-            "2. 필수 서류 목록\n"
-            "3. 서류 발급 방법\n"
-            "4. 제출 기한 및 절차\n"
-            "5. 주의사항(서류 미비 시)\n"
-            "6. FAQ\n"
+            "<h2>필수 서류 목록</h2> — 제출 서류의 종류와 중요성\n"
+            "<h2>서류 발급 방법</h2> — 각 서류의 발급 절차\n"
+            "<h2>제출 기한 및 절차</h2> — 제출 방법과 기한\n"
+            "<h2>주의사항</h2> — 서류 미비 시 발생하는 문제\n"
+            "<h2>FAQ</h2> — <dl><dt>...</dt><dd>...</dd></dl> 형식, 최소 5문항\n"
         )
         system_instructions = "작성 규칙: 'documents' 의도에 맞춰, 제출 서류와 발급/제출 절차를 상세히 서술하라."
     elif intent == "howto":
         structure = (
-            "1. 서론(이용 방법 요약)\n"
-            "2. 이용 절차 단계별 설명\n"
-            "3. 계산기 사용법(CTA 포함)\n"
-            "4. 계산 예시\n"
-            "5. 자주 묻는 질문\n"
+            "<h2>이용 절차</h2> — 단계별 이용 방법 설명\n"
+            "<h2>계산 예시</h2> — 실제 데이터 기반 예시(제공된 데이터만 사용)\n"
+            "<h2>주의사항</h2> — 자주 발생하는 오류와 주의점\n"
+            "<h2>FAQ</h2> — <dl><dt>...</dt><dd>...</dd></dl> 형식, 최소 5문항\n"
         )
         system_instructions = "작성 규칙: 'howto' 의도에 맞춰, 계산기 사용 절차와 예시를 상세히 서술하라."
-    else: # 기본값(calculator)
+    else:  # 기본값(calculator)
         structure = (
-            "1. 서론(문제제기+검색의도 충족)\n"
-            "2. 요약(계산기 목적+핵심 정보)\n"
-            "3. 계산기 연결(계산기 CTA+자연스러운 문구)\n"
-            "4. 계산 방법(공식 설명+계산 기준+법적 근거)\n"
-            "5. 지급조건(대상 조건+제외 조건+중요 기준)\n"
-            "6. 계산예시(아래 제공된 계산 데이터만 사용)\n"
-            "7. 주의사항(자주 발생하는 오류+잘못 이해하는 부분)\n"
-            "8. FAQ(H-3 FAQ 참조)\n"
-            "9. 출처(법령 근거+공식 기관 정보)\n"
+            "<h2>계산 원리</h2> — 법적 근거 첫 문장 명시 + 계산 단계 설명 + 예시 2개\n"
+            "<h2>지급 조건</h2> — 대상 조건, 제외 조건, 중요 기준\n"
+            "<h2>주의사항</h2> — 자주 발생하는 오류, 잘못 이해하는 부분(3항목 이상)\n"
+            "<h2>FAQ</h2> — <dl><dt>...</dt><dd>...</dd></dl> 형식, 최소 5문항\n"
         )
-        system_instructions = "작성 규칙: 계산기 중심의 구조를 유지하며, 계산 방법과 주의사항을 상세히 다룬다."
+        system_instructions = "작성 규칙: 계산기 중심의 구조를 유지하며, 계산 원리와 주의사항을 상세히 다룬다."
 
-    system = ("너는 10년차 SEO 콘텐츠 에디터다. 아래 계산기 주제로 블로그 글을 작성한다.\n"
-              f"[구조 — 다음 섹션 순서 및 명칭을 엄격히 준수한다]\n{structure}\n"
-              f"{system_instructions}\n\n"
-              "[필수 용어 사용 규칙 — Validator 통과를 위해 필수]\n"
-              "- '계산방법', '지급조건', '계산예시' (Intent용)\n"
-              "- '계산 방법', '지급 조건', '예시' (Structure용)\n"
-              "[검증된 계산 데이터]\n"
-              f"{example_str}\n\n"
-              "[숫자 보호 규칙]\n"
-              "- 숫자를 임의로 생성하거나 변경하지 않는다.\n"
-              "분량 공백 포함 1900자 이상. HTML로 출력하고 "
-              "[BODY_HTML_START]...[BODY_HTML_END] 태그로 감싼다.\n" + QUALITY)
-    user = (_ctx(calc) +
-            f"\nSEO제목: {seo.get('seo_title','')}\n메타설명: {seo.get('seo_description','')}\n"
-            f"FAQ: {json.dumps(faq or [], ensure_ascii=False)}")
+    ssot_block = (
+        "[현재 SalaryMate에 존재하는 계산기 목록 (SSOT — 이 목록 외에는 존재하지 않는다)]\n"
+        + _VALID_CALCULATORS
+    )
+
+    system = (
+        "너는 10년차 SEO 콘텐츠 에디터다. 아래 계산기 주제로 블로그 글을 작성한다.\n"
+        f"[필수 구조 — 아래 H2 이름을 그대로 사용하고 순서를 지킨다]\n{structure}\n"
+        f"{system_instructions}\n\n"
+        + _H2_RULE
+        + _NO_LINK_RULE
+        + ssot_block + "\n\n"
+        "[검증된 계산 데이터]\n"
+        f"{example_str}\n\n"
+        "[숫자 보호 규칙]\n"
+        "- 숫자를 임의로 생성하거나 변경하지 않는다.\n"
+        "분량 공백 포함 1900자 이상. HTML로 출력하고 "
+        "[BODY_HTML_START]...[BODY_HTML_END] 태그로 감싼다.\n"
+        + QUALITY
+    )
+    user = (
+        _ctx(calc)
+        + f"\nSEO제목: {seo.get('seo_title','')}\n메타설명: {seo.get('seo_description','')}\n"
+        + f"FAQ: {json.dumps(faq or [], ensure_ascii=False)}"
+    )
     return system, user
 
 

@@ -43,3 +43,24 @@ def parse_html_body(text: str) -> str:
     """STEP 9: [BODY_HTML_START]~[BODY_HTML_END] 태그 추출"""
     m = re.search(r"\[BODY_HTML_START\](.*?)\[BODY_HTML_END\]", text, re.DOTALL)
     return m.group(1).strip() if m else text.strip()
+
+
+# Gate A-1: 프롬프트 내부 지시어가 H2/H3 제목으로 노출된 경우 제거/정리.
+# 삭제 대상: CTA·행동유도·할인혜택·계산기연결 전용 헤딩.
+_ARTIFACT_LABEL_H_RE = re.compile(
+    r'<h([23])[^>]*>\s*(?:\d+[\.\)]\s*)?'
+    r'(?:CTA|행동\s*유도(?:\s*\(CTA\))?|할인\s*혜택|계산기\s*연결)'
+    r'\s*</h\1>',
+    re.I
+)
+# 번호 prefix 제거: <h2>3. 계산 원리</h2> → <h2>계산 원리</h2>
+_NUMBERED_H_RE = re.compile(r'(<h[23][^>]*>)\s*\d+[\.\)]\s+', re.I)
+
+
+def strip_prompt_artifacts(html: str) -> str:
+    """H2/H3에서 프롬프트 내부 지시어 제거: 번호 prefix 및 CTA·행동유도 전용 헤딩."""
+    if not html:
+        return html
+    html = _ARTIFACT_LABEL_H_RE.sub('', html)
+    html = _NUMBERED_H_RE.sub(r'\1', html)
+    return html

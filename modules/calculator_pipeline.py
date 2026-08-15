@@ -238,8 +238,9 @@ def _write_article(cfg: dict, calc: dict, keyword: str, seo: dict, faq: list,
     
     # 본문에서 첫 번째 <h1> 제거 (워드프레스 제목과 중복 방지)
     body = cleaner.parse_html_body(text)
+    body = cleaner.strip_prompt_artifacts(body)
     body = re.sub(r'<h1>.*?</h1>', '', body, count=1, flags=re.IGNORECASE | re.DOTALL)
-    
+
     return body, tokens
 
 

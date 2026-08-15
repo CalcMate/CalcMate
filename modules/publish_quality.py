@@ -118,7 +118,55 @@ def _match_ai_style_blocklist(text: str, cfg: dict) -> list:
 # ── Gate 판정 ─────────────────────────────────────────────────────
 # 등급(§12): Critical=즉시조치, Major=부분/전체재생성, Minor=WARN 감점.
 _GATE_GRADE = {"G1": "major", "G2": "major", "G3": "major", "G4": "major",
-               "G5": "critical", "G6": "critical", "G7": "minor"}
+               "G5": "critical", "G6": "critical", "G7": "minor",
+               "A1": "major", "A2": "critical", "A3": "major", "A4": "major"}
+
+# A-1: 프롬프트 내부 지시어 헤딩 — CTA/행동유도/할인혜택/계산기연결
+_A1_LABEL_H_RE = re.compile(
+    r'<h[23][^>]*>\s*(?:\d+[\.\)]\s*)?'
+    r'(?:CTA|행동\s*유도(?:\s*\(CTA\))?|할인\s*혜택|계산기\s*연결)'
+    r'\s*</h[23]>',
+    re.I
+)
+# A-1: 번호 prefix가 붙은 H2/H3
+_A1_NUMBERED_H_RE = re.compile(r'<h[23][^>]*>\s*\d+[\.\)]\s+', re.I)
+
+# A-3: SalaryMate에 실제 존재하는 계산기 slug SSOT (DB calculators 테이블과 동기화).
+_VALID_CALC_SLUGS = frozenset({
+    "annual-leave-allowance", "annual-leave-remaining",
+    "four-insurances", "freelancer-tax-3p3", "jeonse-vs-monthly",
+    "military-discharge-date", "severance-pay", "unemployment-benefit",
+    "weekly-holiday-allowance",
+    "연말정산_환급액_계산기", "육아휴직_급여_계산기",
+})
+_A3_CALC_LINK_RE = re.compile(
+    r'href\s*=\s*"[^"]*?/calculator/([^/"]+)"', re.I
+)
+
+# A-4: 미채워진 플레이스홀더 — data-ph 속성 또는 {{...}}
+_A4_PH_RE = re.compile(r'data-ph="|{{[^}]+}}')
+
+
+def _count_prompt_artifacts(html: str) -> int:
+    """A1: 프롬프트 지시어가 H2/H3 제목으로 노출된 개수(번호 prefix 포함)."""
+    n = len(_A1_LABEL_H_RE.findall(html or ""))
+    n += len(_A1_NUMBERED_H_RE.findall(html or ""))
+    return n
+
+
+def _count_hallucinated_calc_links(html: str) -> list:
+    """A3: SSOT 외 계산기 slug 링크 목록. 빈 리스트=통과."""
+    bad = []
+    for m in _A3_CALC_LINK_RE.finditer(html or ""):
+        slug = m.group(1)
+        if slug not in _VALID_CALC_SLUGS:
+            bad.append(slug)
+    return bad
+
+
+def _count_placeholders(html: str) -> int:
+    """A4: 미채워진 data-ph 속성 또는 {{...}} 플레이스홀더 개수."""
+    return len(_A4_PH_RE.findall(html or ""))
 
 
 def check_gates(body_html: str, final_html: str, cfg: dict, link_pool_size: int = 0) -> tuple:
@@ -191,6 +239,30 @@ def check_gates(body_html: str, final_html: str, cfg: dict, link_pool_size: int 
     if style:
         failed.append({"gate": "G7", "grade": "minor",
                        "detail": f"AI 문체 금지표현 {len(style)}건: {', '.join(style[:3])}"})
+
+    # A1: 프롬프트 내부 지시어가 H2/H3에 노출된 경우
+    art = _count_prompt_artifacts(body_html)
+    if art:
+        failed.append({"gate": "A1", "grade": "major",
+                       "detail": f"H2/H3 프롬프트 지시어 {art}건 (번호 prefix 또는 CTA/행동유도 헤딩)"})
+
+    # A2: body_html 단계에서 href="#" 데드링크 (cleaner 미적용 시 잔존 확인)
+    body_dead = _count_dead_links(body_html)
+    if body_dead:
+        failed.append({"gate": "A2", "grade": "critical", "critical": True,
+                       "detail": f'body_html에 href="#" 데드링크 {body_dead}개'})
+
+    # A3: SSOT 외 계산기 링크(환각 계산기)
+    hallucinated = _count_hallucinated_calc_links(body_html)
+    if hallucinated:
+        failed.append({"gate": "A3", "grade": "major",
+                       "detail": f"존재하지 않는 계산기 링크: {', '.join(hallucinated[:5])}"})
+
+    # A4: 미채워진 플레이스홀더
+    ph = _count_placeholders(body_html)
+    if ph:
+        failed.append({"gate": "A4", "grade": "major",
+                       "detail": f"미채워진 플레이스홀더 {ph}개 (data-ph 또는 {{{{...}}}})"})
 
     return (len(failed) == 0, failed)
 
