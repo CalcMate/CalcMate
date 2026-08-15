@@ -15,8 +15,8 @@ annual-leave-remaining:
   field_labels:
     years_of_service: 근속연수
     used_days: 이미 사용한 연차일수
-    total_days: 올해 총 연차일수
-    remaining_days: 잔여 연차일수
+    total_days: 올해 총 연차일수(일)
+    remaining_days: 잔여 연차일수(일)
   input_labels:
   - years_of_service
   - used_days

@@ -74,7 +74,11 @@ annual-leave-remaining:
   content:
     evergreen: null
     update_cycle: null
-  related_slugs: []
+  related_slugs:
+  - annual-leave-allowance
+  - weekly-holiday-allowance
+  - severance-pay
+  - unemployment-benefit
 military-discharge-date:
   slug: military-discharge-date
   name: 군인 전역일 계산기
