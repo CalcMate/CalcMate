@@ -577,7 +577,7 @@ window.computeResult = function(inputs){
   var years_of_service = inputs["years_of_service"] || 0;
   var used_days = inputs["used_days"] || 0;
   var out = {};
-  out["total_days"] = (15 + Math.min(Math.max(0, (years_of_service - 1) // 2), 10));
-  out["remaining_days"] = (15 + Math.min(Math.max(0, (years_of_service - 1) // 2), 10) - used_days);
+  out["total_days"] = (15 + Math.min(Math.max(0, Math.floor((years_of_service - 1) / 2)), 10));
+  out["remaining_days"] = (15 + Math.min(Math.max(0, Math.floor((years_of_service - 1) / 2)), 10) - used_days);
   return out;
 };
