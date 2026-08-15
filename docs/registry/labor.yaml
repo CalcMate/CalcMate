@@ -26,12 +26,11 @@ weekly-holiday-allowance:
     update_cycle: null
     content_caveat: null
   related_slugs:
-  - severance-pay
   - annual-leave-allowance
+  - severance-pay
   - unemployment-benefit
   - four-insurances
-  - 연말정산_환급액_계산기
-  - 육아휴직_급여_계산기
+  - annual-leave-remaining
   legal_refs:
   - labor_standards_act_55
   writer_context:
@@ -75,12 +74,11 @@ severance-pay:
     update_cycle: null
     content_caveat: null
   related_slugs:
-  - weekly-holiday-allowance
-  - annual-leave-allowance
   - unemployment-benefit
+  - annual-leave-allowance
+  - weekly-holiday-allowance
+  - annual-leave-remaining
   - four-insurances
-  - 연말정산_환급액_계산기
-  - 육아휴직_급여_계산기
   legal_refs:
   - worker_retirement_benefit_act_8
   writer_context:
@@ -120,12 +118,10 @@ annual-leave-allowance:
     update_cycle: null
     content_caveat: null
   related_slugs:
+  - annual-leave-remaining
   - weekly-holiday-allowance
   - severance-pay
   - unemployment-benefit
-  - four-insurances
-  - 연말정산_환급액_계산기
-  - 육아휴직_급여_계산기
   legal_refs:
   - labor_standards_act_60
   writer_context:

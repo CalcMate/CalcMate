@@ -30,12 +30,11 @@ unemployment-benefit:
     update_cycle: null
     content_caveat: null
   related_slugs:
-  - weekly-holiday-allowance
   - severance-pay
+  - weekly-holiday-allowance
   - annual-leave-allowance
+  - annual-leave-remaining
   - four-insurances
-  - 연말정산_환급액_계산기
-  - 육아휴직_급여_계산기
   legal_refs:
   - employment_insurance_act_40
   writer_context:
@@ -79,12 +78,10 @@ unemployment-benefit:
     update_cycle: null
     content_caveat: null
   related_slugs:
-  - weekly-holiday-allowance
-  - severance-pay
-  - annual-leave-allowance
   - unemployment-benefit
+  - annual-leave-allowance
+  - weekly-holiday-allowance
   - four-insurances
-  - 연말정산_환급액_계산기
   legal_refs:
   - employment_insurance_act_70
   writer_context:

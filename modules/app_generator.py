@@ -1368,30 +1368,36 @@ def render_cpa_slot(cfg: dict = None) -> str:
 
 
 # ── Phase C: 추가 섹션 렌더 함수 ──────────────────────────────────
+_CTA1 = {
+    "weekly-holiday-allowance":  ("연차수당도 계산해 보기",   "/annual-leave-allowance/"),
+    "severance-pay":             ("실업급여도 계산해 보기",   "/unemployment-benefit/"),
+    "unemployment-benefit":      ("퇴직금도 계산해 보기",     "/severance-pay/"),
+    "four-insurances":           ("주휴수당도 계산해 보기",   "/weekly-holiday-allowance/"),
+    "annual-leave-allowance":    ("연차잔여일도 계산해 보기", "/annual-leave-remaining/"),
+    "육아휴직_급여_계산기":      ("실업급여도 확인해 보기",   "/unemployment-benefit/"),
+    "연말정산_환급액_계산기":    ("4대보험도 계산해 보기",    "/four-insurances/"),
+    "freelancer-tax-3p3":        ("연말정산도 계산해 보기",   "/연말정산_환급액_계산기/"),
+    "annual-leave-remaining":    ("연차수당도 계산해 보기",   "/annual-leave-allowance/"),
+}
+
+
 def render_result_cta(calc: dict, cfg: dict = None) -> str:
-    """결과 카드 내 CTA (Phase D: JS Rule Engine 구동, 정적 default 폴백 내장).
-    SM_CTA_RULES 없으면 slug 기반 기본값으로 폴백 (Progressive Enhancement)."""
+    """결과 카드 내 CTA — CA-CTA-1 확정 매핑표 기준 (slug 정확 일치)."""
     slug = str(calc.get("slug", ""))
-    category = calc.get("category", "")
     _base = str((cfg or {}).get("SITE_URL", "")).rstrip("/")
     def _u(path): return f"{_base}{path}" if _base else path
-    # default 폴백 (JS 없는 환경 + SM_CTA_RULES 미적용 케이스)
-    if "세금" in category or "연말정산" in slug:
-        text, links = "절세 방법이 궁금하다면", [("육아휴직 급여 계산하기", _u("/육아휴직_급여_계산기/")), ("전체 계산기 보기", _u("/"))]
-    elif "육아" in slug or "parental" in slug:
-        text, links = "육아휴직 관련 계산기", [("실업급여도 확인해 보기", _u("/unemployment-benefit/")), ("전체 계산기 보기", _u("/"))]
-    elif "실업" in slug or "unemployment" in slug:
-        text, links = "실업급여 더 알아보기", [("퇴직금도 계산해 보기", _u("/severance-pay/")), ("전체 계산기 보기", _u("/"))]
-    elif "퇴직" in slug or "severance" in slug:
-        text, links = "퇴직 관련 계산기", [("실업급여도 계산해 보기", _u("/unemployment-benefit/")), ("전체 계산기 보기", _u("/"))]
+    cta1 = _CTA1.get(slug)
+    if cta1:
+        label, path = cta1
+        links = [(label, _u(path)), ("전체 계산기 보기", _u("/"))]
+        text = label
     else:
-        text, links = "더 알아보기", [("전체 계산기 보기", _u("/")), ("CalcMate 홈", _u("/"))]
+        links = [("전체 계산기 보기", _u("/"))]
+        text = "더 알아보기"
     link_html = "".join(
-        f'<a class="sm-result-cta-link" href="{_html.escape(href)}">{_html.escape(label)}</a>'
-        for label, href in links
+        f'<a class="sm-result-cta-link" href="{_html.escape(href)}">{_html.escape(lbl)}</a>'
+        for lbl, href in links
     )
-    # Phase D: id="sm-result-cta" → JS가 계산 후 SM_CTA_RULES로 동적 교체
-    # data-default는 JS 없는 환경의 정적 폴백
     return (
         '    <div id="sm-result-cta" class="sm-result-cta">\n'
         f'      <p class="sm-result-cta-text">{_html.escape(text)}</p>\n'

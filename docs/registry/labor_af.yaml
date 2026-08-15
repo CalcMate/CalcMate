@@ -34,7 +34,11 @@ annual-leave-remaining:
     evergreen: true
     update_cycle: null
     content_caveat: null
-  related_slugs: []
+  related_slugs:
+  - annual-leave-allowance
+  - weekly-holiday-allowance
+  - severance-pay
+  - unemployment-benefit
   legal_refs: []
   writer_context:
     emphasize: []

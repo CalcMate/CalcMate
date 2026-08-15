@@ -32,10 +32,9 @@ four-insurances:
   related_slugs:
   - weekly-holiday-allowance
   - severance-pay
-  - annual-leave-allowance
   - unemployment-benefit
+  - freelancer-tax-3p3
   - 연말정산_환급액_계산기
-  - 육아휴직_급여_계산기
   legal_refs:
   - four_major_insurances
   writer_context:

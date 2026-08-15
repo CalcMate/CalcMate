@@ -28,12 +28,10 @@
     update_cycle: null
     content_caveat: crude_estimate
   related_slugs:
-  - weekly-holiday-allowance
-  - severance-pay
-  - annual-leave-allowance
-  - unemployment-benefit
   - four-insurances
-  - 육아휴직_급여_계산기
+  - freelancer-tax-3p3
+  - severance-pay
+  - weekly-holiday-allowance
   legal_refs:
   - income_tax_act_137
   # 강조 대상/예시 패턴만(법적 수치는 legal_master.deduction_rules 참조). writer 프롬프트 합성용.
@@ -78,6 +76,7 @@ freelancer-tax-3p3:
   - 연말정산_환급액_계산기
   - four-insurances
   - weekly-holiday-allowance
+  - unemployment-benefit
   legal_refs:
   - income_tax_act_127
   writer_context:
