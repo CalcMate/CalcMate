@@ -132,6 +132,9 @@ def _to_js(expr: str) -> str:
     s = str(expr)
     for fn, jsfn in _JS_FUNCS.items():
         s = re.sub(rf"\b{fn}\s*\(", f"{jsfn}(", s)
+    # Python floor division (//) → JS Math.floor(a / b)
+    # JS에서 // 는 한 줄 주석이므로 반드시 변환해야 함
+    s = re.sub(r'(\([^()]*\)|\w+)\s*//\s*(\d+(?:\.\d+)?|\w+)', r'Math.floor(\1 / \2)', s)
     return s
 
 
