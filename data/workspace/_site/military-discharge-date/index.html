@@ -3,8 +3,88 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>군인 전역일 계산기 — CalcMate</title>
-<meta name="description" content="입영일과 군별(육군·해군·공군·해병대·사회복무요원)을 선택하면 예상 전역일과 남은 복무일을 계산합니다.">
+<meta name="theme-color" content="#2563EB">
+<meta name="naver-site-verification" content="de4ad3f1575284b5a8ea58baab7bc7a77b7cf07e">
+<title>2026 군인 전역일 계산기 | 예상 전역일·남은 복무일 — CalcMate</title>
+<meta name="description" content="육군·해군·공군·해병대·사회복무요원 입영일을 입력하면 예상 전역일과 남은 복무일을 계산합니다. 관행 계산식(입영일+복무기간-1일) 기반 참고용 결과이며, 실제 전역일은 병무청에서 확인하세요.">
+<link rel="canonical" href="https://calcmate.kr/military-discharge-date/">
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-EP2Q8035VF"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag("js",new Date());gtag("config","G-EP2Q8035VF");</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "이 계산기 결과가 실제 전역일과 다를 수 있나요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "네, 이 계산기는 일반적으로 통용되는 관행 계산 방식(입영일 + 복무기간 - 1일)을 사용하는 참고용 도구입니다. 군기교육, 복무이탈, 개인별 복무기간 조정 등은 반영되지 않으므로, 정확한 전역일은 병무청(www.mma.go.kr)에서 직접 확인하시기 바랍니다."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "군별 복무기간은 어떻게 다른가요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "2026년 기준으로 육군·해병대는 18개월, 해군은 20개월, 공군·사회복무요원은 21개월입니다. 복무기간은 병역법 및 하위 행정규칙에 따라 변경될 수 있습니다."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "사회복무요원도 이 계산기를 이용할 수 있나요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "네, 군별 선택 목록에 사회복무요원(21개월)이 포함되어 있습니다. 다만 소집 형태에 따라 실제 기간이 다를 수 있으므로 담당 기관에 확인하세요."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "복무기간이 법령 개정으로 바뀌면 어떻게 되나요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "이 계산기의 복무기간은 2026년 기준 수치(국방부 고시·소집업무규정 별표5)를 사용합니다. 법령 개정으로 복무기간이 변경될 경우 계산 결과가 실제와 달라질 수 있습니다. 항상 병무청 공지를 함께 확인하시기 바랍니다."
+      }
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "CalcMate",
+  "url": "https://calcmate.kr",
+  "description": "급여·노무 계산기 모음 — 퇴직금·주휴수당·실업급여·4대보험·연말정산·육아휴직"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "CalcMate",
+      "item": "https://calcmate.kr"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "병역/공무",
+      "item": "https://calcmate.kr/#calculators"
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "name": "군인 전역일 계산기",
+      "item": "https://calcmate.kr/military-discharge-date/"
+    }
+  ]
+}
+</script>
 <style>
 :root{--primary:#2563eb;--primary-dark:#1d4ed8;--bg:#f8fafc;--card:#fff;--border:#e2e8f0;--text:#1e293b;--sub:#64748b}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -26,6 +106,35 @@ input[type=date]:focus,select:focus{border-color:var(--primary)}
 .progress-bar{margin-top:.75rem;background:#e0f2fe;border-radius:99px;height:8px;overflow:hidden}
 .progress-fill{height:100%;background:var(--primary);border-radius:99px;transition:width .4s}
 .disclaimer{margin-top:1rem;font-size:.78rem;color:var(--sub);line-height:1.5;padding:.75rem;background:#fefce8;border:1px solid #fde68a;border-radius:6px}
+/* 콘텐츠 섹션 */
+.content-wrap{width:100%;max-width:480px;margin-top:1.5rem}
+.c-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.75rem;margin-bottom:1.25rem;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.c-card h2{font-size:1.05rem;font-weight:700;margin-bottom:.75rem;color:var(--text)}
+.c-card h3{font-size:.92rem;font-weight:700;margin-top:1rem;margin-bottom:.4rem;color:var(--text)}
+.c-card p{font-size:.87rem;color:var(--sub);line-height:1.75;margin-bottom:.6rem}
+.c-card ul{font-size:.87rem;color:var(--sub);line-height:1.75;padding-left:1.2rem;margin-bottom:.6rem}
+.c-card li{margin-bottom:.35rem}
+.c-card a{color:var(--primary);text-decoration:none}
+.duty-table{width:100%;border-collapse:collapse;font-size:.85rem;margin:.75rem 0}
+.duty-table th,.duty-table td{padding:.45rem .7rem;border:1px solid var(--border);text-align:left}
+.duty-table th{background:#f1f5f9;font-weight:600;color:var(--text)}
+.duty-table td{color:var(--sub)}
+.example-box{background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:.9rem 1rem;margin:.75rem 0;font-size:.86rem;color:var(--text);line-height:1.7}
+.example-box strong{color:var(--primary)}
+.example-note{font-size:.79rem;color:var(--sub);margin-top:.35rem}
+.faq-item{border-bottom:1px solid var(--border);padding:.65rem 0}
+.faq-item:last-child{border-bottom:none;padding-bottom:0}
+.faq-q{width:100%;background:none;border:none;text-align:left;font-size:.88rem;font-weight:600;color:var(--text);cursor:pointer;padding:.2rem 0;display:flex;justify-content:space-between;align-items:center;gap:.5rem}
+.faq-a{display:none;font-size:.84rem;color:var(--sub);line-height:1.75;padding:.5rem 0 .1rem}
+.faq-icon{font-size:1rem;color:var(--primary);flex-shrink:0}
+.related-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.65rem;margin-top:.75rem}
+.related-item{display:flex;flex-direction:column;align-items:center;gap:.3rem;background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:.7rem .5rem;text-decoration:none;color:var(--text);font-size:.8rem;font-weight:600;text-align:center;transition:background .15s}
+.related-item:hover{background:#eff6ff}
+.related-emoji{font-size:1.2rem}
+.site-footer{text-align:center;padding:1.5rem 0 1rem;border-top:1px solid var(--border);font-size:.8rem;color:var(--sub);width:100%;max-width:480px;margin-top:.5rem}
+.site-footer-brand{font-size:1rem;font-weight:800;color:var(--primary);margin:.5rem 0}
+.site-footer-nav{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;margin:.5rem 0}
+.site-footer-nav a{color:var(--sub);text-decoration:none;font-size:.78rem}
 </style>
 </head>
 <body>
@@ -68,10 +177,144 @@ input[type=date]:focus,select:focus{border-color:var(--primary)}
     <div class="disclaimer">
       <strong>참고용 계산 결과</strong> — 관행적 계산 방법(입영일+복무기간-1일)에 따른 결과입니다.
       <strong>실제 전역일은 병무청 확인이 필요합니다.</strong>
-      군기교육·복무이탈·개인별 조정 등은 반영되지 않습니다.
+      군기교육·복무이탈·개인별 복무기간 조정 등은 반영되지 않습니다.
     </div>
   </div>
 </div>
+
+<div class="content-wrap">
+
+  <!-- 설명 + 복무기간 + 계산방법 -->
+  <section class="c-card">
+    <h2>군인 전역일 계산기</h2>
+    <p>입영일과 군별(육군·해군·공군·해병대·사회복무요원)을 선택하면 예상 전역일과 남은 복무일을 계산합니다. 일반적으로 통용되는 관행 계산 방식을 사용하며, <strong>계산 결과는 참고용입니다.</strong> 실제 전역일은 병무청(mma.go.kr)에서 반드시 확인하세요.</p>
+
+    <h2>복무기간 안내</h2>
+    <p>2026년 기준 군별 복무기간은 다음과 같습니다. 복무기간은 병역법 및 국방부 고시·소집업무규정 별표5를 근거로 하며, 법령 개정 시 변경될 수 있습니다.</p>
+    <table class="duty-table">
+      <thead>
+        <tr><th>군별</th><th>복무기간</th><th>근거</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>육군</td><td>18개월</td><td>병역법 제18조</td></tr>
+        <tr><td>해병대</td><td>18개월</td><td>병역법 제18조</td></tr>
+        <tr><td>해군</td><td>20개월</td><td>병역법 제18조</td></tr>
+        <tr><td>공군</td><td>21개월</td><td>병역법 제18조</td></tr>
+        <tr><td>사회복무요원</td><td>21개월</td><td>병역법 제30조</td></tr>
+      </tbody>
+    </table>
+    <p style="font-size:.8rem">※ 세부 복무기간은 국방부 고시 및 소집업무규정 별표5에서 규정하며, 이 계산기는 해당 수치를 참고 기준으로 사용합니다.</p>
+
+    <h2>계산 방법</h2>
+    <p>예상 전역일 = 입영일 + 복무기간(개월) − 1일</p>
+    <p>예를 들어 입영일이 1월 15일이고 복무기간이 18개월이면, 18개월 후 날짜인 7월 15일에서 1일을 뺀 <strong>7월 14일</strong>이 예상 전역일입니다. 이 계산 방식은 일반적으로 통용되는 관행 방식이며, 개인별 상황에 따라 실제 전역일과 다를 수 있습니다.</p>
+    <p>월의 마지막 날에 입대하였고 해당 월에 대응일이 없는 경우(예: 5월 31일 → 21개월 후 2월), 해당 월의 말일을 기준으로 처리한 뒤 1일을 뺍니다.</p>
+  </section>
+
+  <!-- 계산 예시 -->
+  <section class="c-card">
+    <h2>계산 예시</h2>
+    <p>아래 예시는 이 계산기의 검증된 계산 결과입니다.</p>
+
+    <h3>예시 1 — 육군 (2025년 1월 15일 입대)</h3>
+    <div class="example-box">
+      입영일: 2025년 1월 15일 / 복무기간: 18개월 (육군)<br>
+      18개월 후 = 2026년 7월 15일<br>
+      − 1일 → <strong>예상 전역일: 2026년 7월 14일</strong>
+    </div>
+
+    <h3>예시 2 — 윤년 2월 29일 입대 (육군)</h3>
+    <div class="example-box">
+      입영일: 2024년 2월 29일 / 복무기간: 18개월 (육군)<br>
+      18개월 후 = 2025년 8월 29일<br>
+      − 1일 → <strong>예상 전역일: 2025년 8월 28일</strong>
+      <p class="example-note">※ 2024년은 윤년(2월 29일 존재)이며, 18개월 후 날짜는 2025년 8월 29일입니다. 여기서 1일을 빼면 8월 28일이 됩니다.</p>
+    </div>
+
+    <h3>예시 3 — 말일 입대·말일 클램프 (공군)</h3>
+    <div class="example-box">
+      입영일: 2025년 5월 31일 / 복무기간: 21개월 (공군)<br>
+      21개월 후 = 2027년 2월 → 28일(말일)로 처리<br>
+      − 1일 → <strong>예상 전역일: 2027년 2월 27일</strong>
+      <p class="example-note">※ 2027년 2월은 28일까지이므로 31일에 해당하는 날짜가 없어 말일(28일)을 기준으로 처리한 뒤 1일을 뺍니다.</p>
+    </div>
+  </section>
+
+  <!-- 주의사항 -->
+  <section class="c-card">
+    <h2>주의사항</h2>
+
+    <h3>계산 범위에서 제외되는 항목</h3>
+    <p>이 계산기는 다음 항목을 계산에 반영하지 않습니다. 해당 상황이 있는 경우 실제 전역일이 달라질 수 있으며, 병무청에 개별 문의하세요.</p>
+    <ul>
+      <li><strong>군기교육 기간</strong> — 군기교육대 처분 시 해당 기간만큼 복무기간이 산입되지 않을 수 있습니다.</li>
+      <li><strong>복무이탈</strong> — 무단 복무이탈 기간은 복무기간에 산입되지 않습니다.</li>
+      <li><strong>개인별 복무기간 조정</strong> — 징계, 질병 등에 따른 개인별 복무기간 변동은 반영되지 않습니다.</li>
+    </ul>
+
+    <h3>법령 변경 가능성</h3>
+    <p>복무기간은 병역법 및 하위 행정규칙(국방부 고시 등)에 따라 변경될 수 있습니다. 이 계산기는 2026년 기준 복무기간을 사용하며, 법령 개정 내용은 반영 시점에 차이가 있을 수 있습니다. 항상 병무청 공지를 함께 확인하세요.</p>
+
+    <div class="disclaimer" style="margin-top:.75rem">
+      <strong>참고용 계산 결과</strong> — 이 계산기의 결과는 참고용이며, 실제 전역일은 병무청에서 확인해야 합니다.
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="c-card">
+    <h2>자주 묻는 질문</h2>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">이 계산기 결과가 실제 전역일과 다를 수 있나요?<span class="faq-icon">+</span></button>
+      <div class="faq-a">네, 이 계산기는 일반적으로 통용되는 관행 계산 방식(입영일 + 복무기간 - 1일)을 사용하는 참고용 도구입니다. 군기교육, 복무이탈, 개인별 복무기간 조정 등은 반영되지 않으므로 정확한 전역일은 병무청에서 직접 확인하시기 바랍니다.</div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">군별 복무기간은 어떻게 다른가요?<span class="faq-icon">+</span></button>
+      <div class="faq-a">2026년 기준으로 육군·해병대는 18개월, 해군은 20개월, 공군·사회복무요원은 21개월입니다. 복무기간은 병역법 및 하위 행정규칙에 따라 변경될 수 있으므로 병무청 공지를 함께 확인하세요.</div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">사회복무요원도 이 계산기를 이용할 수 있나요?<span class="faq-icon">+</span></button>
+      <div class="faq-a">네, 군별 선택 목록에 사회복무요원(21개월)이 포함되어 있습니다. 다만 소집 형태에 따라 실제 복무기간이 다를 수 있으므로 담당 기관에 확인하세요.</div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">복무기간이 법령 개정으로 바뀌면 어떻게 되나요?<span class="faq-icon">+</span></button>
+      <div class="faq-a">이 계산기의 복무기간은 2026년 기준 수치(국방부 고시·소집업무규정 별표5)를 사용합니다. 법령 개정으로 복무기간이 변경될 경우 계산 결과가 실제와 달라질 수 있습니다. 항상 병무청 공지를 함께 확인하시기 바랍니다.</div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">전역일이 공휴일이면 앞당겨지나요?<span class="faq-icon">+</span></button>
+      <div class="faq-a">전역일과 공휴일의 관계는 개인별 명령에 따라 다를 수 있습니다. 이 계산기는 공휴일 여부를 반영하지 않습니다. 개별 사항은 소속 부대 및 병무청에 문의하세요.</div>
+    </div>
+  </section>
+
+  <!-- 관련 계산기 -->
+  <section class="c-card">
+    <h2>관련 계산기</h2>
+    <div class="related-grid">
+      <a class="related-item" href="../annual-leave-remaining/" target="_self"><span class="related-emoji">📅</span><span>연차 잔여일 계산기</span></a>
+      <a class="related-item" href="../severance-pay/" target="_self"><span class="related-emoji">💼</span><span>퇴직금 계산기</span></a>
+      <a class="related-item" href="../weekly-holiday-allowance/" target="_self"><span class="related-emoji">💰</span><span>주휴수당 계산기</span></a>
+      <a class="related-item" href="../four-insurances/" target="_self"><span class="related-emoji">🏢</span><span>4대보험 계산기</span></a>
+    </div>
+  </section>
+
+</div>
+
+<footer class="site-footer">
+  <p>본 계산기는 참고용이며 실제 전역일은 병무청에서 확인해야 합니다.</p>
+  <div class="site-footer-brand">CalcMate</div>
+  <nav class="site-footer-nav">
+    <a href="https://calcmate.kr/about/">소개</a>
+    <a href="https://calcmate.kr/privacy/">개인정보처리방침</a>
+    <a href="https://calcmate.kr/terms/">이용약관</a>
+    <a href="https://calcmate.kr/contact/">문의하기</a>
+  </nav>
+  <p>© 2026 CalcMate. All rights reserved.</p>
+</footer>
+
 <script>
 var MONTHS={army:18,marine:18,navy:20,air_force:21,social_service:21};
 var NAMES={army:'육군',marine:'해병대',navy:'해군',air_force:'공군',social_service:'사회복무요원'};
@@ -98,6 +341,12 @@ function calculate(){
   document.getElementById('progress_pct').textContent=pct+'%';
   document.getElementById('progress_fill').style.width=pct+'%';
   document.getElementById('result').style.display='block';
+}
+function toggleFaq(btn){
+  var a=btn.nextElementSibling;
+  var icon=btn.querySelector('.faq-icon');
+  if(a.style.display==='block'){a.style.display='none';icon.textContent='+';}
+  else{a.style.display='block';icon.textContent='−';}
 }
 </script>
 </body>
