@@ -1,4 +1,6 @@
-# Contract Schema Registry — App Factory 자동 관리
-# save_app() / delete_app() 경유로만 갱신됨. 직접 편집 금지.
-# instances 키: {calc_slug: {contract_slug, generated_at, formula_status, test_cases_status}}
-instances: {}
+instances:
+  military-discharge-date:
+    contract_slug: military-discharge-date
+    generated_at: '2026-08-15T09:01:25.356689+09:00'
+    formula_status: operator_confirmed
+    test_cases_status: not_generated

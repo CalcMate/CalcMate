@@ -1,0 +1,24 @@
+slug: military-discharge-date
+name: 군인 전역일 계산기
+category: 병역/공무
+tier: Tier2-B
+input_fields:
+- enlistment_date
+- branch
+output_fields:
+- discharge_date
+- remaining_days
+- progress_pct
+formula: null
+formula_status: operator_confirmed
+scope_exclusions:
+- 군기교육 복무 미산입
+- 복무이탈 미산입
+- 개인별 복무기간 조정
+test_cases: []
+test_cases_status: not_generated
+desc: '입영일과 군별을 선택하면 예상 전역일을 계산합니다. (관행 계산식: 입영일+N개월-1일)'
+legal_refs:
+- military_service_act_18
+- military_service_act_30
+generated_at: '2026-08-15T09:01:25.356689+09:00'

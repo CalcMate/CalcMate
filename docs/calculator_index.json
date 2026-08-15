@@ -19,6 +19,10 @@
     "category": "부동산/임대",
     "name": "전세 vs 월세 비교 계산기"
   },
+  "military-discharge-date": {
+    "category": "병역/공무",
+    "name": "군인 전역일 계산기"
+  },
   "severance-pay": {
     "category": "노무/급여",
     "name": "퇴직금 계산기"

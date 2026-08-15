@@ -1,0 +1,102 @@
+# registry/defense_af.yaml — App Factory 자동생성 계산기 (v3 SSOT)
+# ⚠️ 이 파일은 App Factory(modules/app_factory)가 자동으로 씁니다. 직접 편집 주의.
+# status: HOLD = legal 검증 대기 중 (index/sitemap 비노출)
+# status: READY = 공개 (index/sitemap 포함, CalcMate 정적 사이트 빌드 대상)
+
+military-discharge-date:
+  name: 군인 전역일 계산기
+  slug: military-discharge-date
+  category: 병역/공무
+  emoji: 🧮
+  card_label: 군인 전역일 계산기
+  compute_type: date_based_custom
+  date_fields:
+  - enlistment_date
+  validation_mode: skip
+  field_labels:
+    enlistment_date: 입영일
+    branch: 군별
+    discharge_date: 예상 전역일
+    remaining_days: 남은 일수
+    progress_pct: 복무 진행률
+  input_labels:
+  - enlistment_date
+  - branch
+  output_labels:
+  - discharge_date
+  - remaining_days
+  - progress_pct
+  display_order: 11
+  card_desc: '입영일과 군별을 선택하면 예상 전역일을 계산합니다. (관행 계산식: 입영일+N개월…'
+  difficulty: date_based
+  difficulty_status: provisional
+  status: READY
+  tier: 2
+  source: app_factory
+  content:
+    evergreen: true
+    update_cycle: null
+    content_caveat: null
+  related_slugs: []
+  legal_refs:
+  - military_service_act_18
+  - military_service_act_30
+  writer_context:
+    emphasize: []
+    example_patterns:
+    - '입영일과 군별을 선택하면 예상 전역일을 계산합니다. (관행 계산식: 입영일+N개월-1일)'
+    calculation_story: []
+  contract_source:
+    contract_slug: military-discharge-date
+    input_fields:
+    - enlistment_date
+    - branch
+    output_fields:
+    - discharge_date
+    - remaining_days
+    - progress_pct
+    formula_status: operator_confirmed
+    test_cases_status: not_generated
+  tier_subtype: B
+  html_source: template_db
+  review_checklist:
+  - id: legal_basis
+    severity: critical
+    label: 법적 근거 (법령/조항)
+    display_value: '[''military_service_act_18'', ''military_service_act_30'']'
+    auto_source: legal_refs_present
+    checked: true
+    checked_by: operator
+    checked_at: '2026-08-15'
+  - id: base_year
+    severity: critical
+    label: 기준 연도/시행일 확인
+    display_value: 2026년 기준 — 육군/해병대 18개월, 해군 20개월, 공군/사복요원 21개월 (국방부 고시·소집업무규정 별표5)
+    auto_source: critical_category
+    checked: true
+    checked_by: operator
+    checked_at: '2026-08-15'
+  - id: schema_match
+    severity: critical
+    label: Schema 일치 확인 (Contract vs AI 생성)
+    display_value: ✅ Schema 일치 — Contract 확정 필드명과 동일 (Tier2-B AI 생성 없음)
+    auto_source: contract_schema_drift
+    checked: true
+    checked_by: operator
+    checked_at: '2026-08-15'
+  - id: description_text
+    severity: advisory
+    label: 화면 안내문 확인
+    display_value: '입영일과 군별을 선택하면 예상 전역일을 계산합니다. (관행 계산식: 입영일+N개월-1일)'
+    auto_source: description_field
+    checked: false
+    checked_by: null
+    checked_at: null
+  - id: seo_title
+    severity: advisory
+    label: SEO 제목 검토
+    display_value: 군인 전역일 계산기 | CalcMate
+    auto_source: seo_title_field
+    checked: false
+    checked_by: null
+    checked_at: null

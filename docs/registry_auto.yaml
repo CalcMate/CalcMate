@@ -75,3 +75,37 @@ annual-leave-remaining:
     evergreen: null
     update_cycle: null
   related_slugs: []
+military-discharge-date:
+  slug: military-discharge-date
+  name: 군인 전역일 계산기
+  category: 병역/공무
+  emoji: 🧮
+  card_label: 군인 전역일 계산기
+  compute_type: date_based
+  date_fields:
+  - enlistment_date
+  validation_mode: skip
+  field_labels:
+    enlistment_date: 입영일
+    branch: 군별
+    discharge_date: 예상 전역일
+    remaining_days: 남은 일수
+    progress_pct: 복무 진행률
+  difficulty: date_based
+  difficulty_status: provisional
+  needs_human_legal: true
+  law: null
+  article: null
+  authority: null
+  related_articles: []
+  writer_note: null
+  reviewer_expectation: []
+  forbidden_articles: []
+  forbidden_phrases: []
+  confidence: null
+  last_verified: null
+  verification_source: []
+  content:
+    evergreen: null
+    update_cycle: null
+  related_slugs: []
