@@ -266,10 +266,154 @@ def check_g_style_plus(body_html: str) -> list[dict]:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# G-LEGAL-CURRENT : 법정수치 최신성 검사 (SSOT 대조)
+# ═══════════════════════════════════════════════════════════════════════════
+
+def check_g_legal_current(body_html: str, slug: str | None) -> list[dict]:
+    """
+    content_ssot.forbidden_in_content 목록의 값이 본문에 있으면 CRITICAL fail.
+    주 검증: SSOT 대조. 금지 목록은 보조 방어선.
+    """
+    if not slug:
+        return []
+    try:
+        from modules.law_ssot import get_forbidden_in_content
+        forbidden = get_forbidden_in_content(slug)
+    except Exception:
+        return []
+
+    fails: list[dict] = []
+    text = _strip_html(body_html)
+    for entry in forbidden:
+        if entry["value"] in text:
+            fails.append({
+                "gate": "G-LEGAL-CURRENT",
+                "grade": "critical",
+                "detail": (
+                    f"금지 수치 '{entry['value']}' 탐지 ({entry['item']}): "
+                    f"현행 값 '{entry['current']}' 사용 필요 "
+                    f"[근거: {entry['legal_basis']}]"
+                ),
+            })
+    return fails
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# G-CONSISTENCY : FAQ 수치 ↔ 본문 수치 일관성 검사
+# ═══════════════════════════════════════════════════════════════════════════
+
+# 보험료율 범위 (0.5%~30%) — 이 범위 내 퍼센트만 비교
+_RATE_RE = re.compile(r'(\d+\.?\d*)%')
+_RATE_RANGE = (0.5, 30.0)
+
+
+def _extract_insurance_rates(text: str) -> set[str]:
+    """텍스트에서 보험료율 범위(0.5%~30%)의 퍼센트 값 추출."""
+    rates: set[str] = set()
+    for m in _RATE_RE.finditer(text):
+        try:
+            v = float(m.group(1))
+        except ValueError:
+            continue
+        if _RATE_RANGE[0] <= v <= _RATE_RANGE[1]:
+            rates.add(m.group(0))  # e.g. "3.52%"
+    return rates
+
+
+def check_g_consistency(body_html: str) -> list[dict]:
+    """
+    FAQ 섹션의 보험료율 수치 vs 본문 본문 수치 비교.
+    FAQ에만 있고 본문에 없는 rate가 있으면 불일치로 판정.
+    """
+    faq_match = re.search(r'<h2[^>]*>FAQ</h2>(.*)', body_html, re.I | re.S)
+    if not faq_match:
+        return []
+
+    faq_text = _strip_html(faq_match.group(1))
+    body_text = _strip_html(body_html[:faq_match.start()])
+
+    if not body_text.strip():
+        return []
+
+    faq_rates = _extract_insurance_rates(faq_text)
+    body_rates = _extract_insurance_rates(body_text)
+
+    # FAQ에만 있고 body에 없는 rate → 불일치 의심
+    only_in_faq = faq_rates - body_rates
+    if not only_in_faq or not body_rates:
+        return []
+
+    fails: list[dict] = []
+    for rate in sorted(only_in_faq):
+        fails.append({
+            "gate": "G-CONSISTENCY",
+            "grade": "major",
+            "detail": (
+                f"FAQ 요율 {rate}가 본문에 없음 "
+                f"(본문 요율: {', '.join(sorted(body_rates)[:3])})"
+            ),
+        })
+    return fails
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# G-H2 : intent별 필수 H2 구조 검증
+# ═══════════════════════════════════════════════════════════════════════════
+
+_INTENT_REQUIRED_H2: dict[str, list[str]] = {
+    "eligibility": ["지급 대상", "제외 대상", "계산 방법", "FAQ"],
+    "howto":       ["이용 절차", "계산 예시", "FAQ"],
+    "documents":   ["필수 서류 목록", "서류 발급 방법", "FAQ"],
+    "calculator":  ["계산 원리", "지급 조건", "FAQ"],
+}
+
+# 구 파이프라인 H2 패턴 (확장) — 이 패턴이 등장하면 FAIL
+_LEGACY_H2_RE = re.compile(
+    r'<h2[^>]*>\s*(?:계산기\s*소개|입력\s*방법|결과\s*확인|'
+    r'계산기\s*이용\s*방법|이용\s*방법|사용\s*방법|사용\s*안내)\s*</h2>',
+    re.I,
+)
+
+
+def check_g_h2_structure(body_html: str, intent: str | None) -> list[dict]:
+    """
+    intent별 필수 H2가 존재하는지 + 구 파이프라인 H2 패턴이 없는지 검사.
+    """
+    fails: list[dict] = []
+
+    # 구 패턴 탐지
+    legacy_hits = _LEGACY_H2_RE.findall(body_html)
+    if legacy_hits:
+        fails.append({
+            "gate": "G-H2",
+            "grade": "major",
+            "detail": f"구 파이프라인 H2 패턴 탐지: {legacy_hits}",
+        })
+
+    # intent별 필수 H2 검사
+    required = _INTENT_REQUIRED_H2.get(intent or "", [])
+    actual_h2s = re.findall(r'<h2[^>]*>(.*?)</h2>', body_html, re.I | re.S)
+    actual_texts = [_strip_html(h).strip() for h in actual_h2s]
+
+    for req in required:
+        if not any(req in t for t in actual_texts):
+            fails.append({
+                "gate": "G-H2",
+                "grade": "major",
+                "detail": f"필수 H2 '{req}' 없음 (intent={intent})",
+            })
+
+    return fails
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # 통합 실행 함수
 # ═══════════════════════════════════════════════════════════════════════════
 
-_ALL_GATES = {"G-CALC", "G-NUMCON", "G-LEGAL", "G-STYLE+"}
+_ALL_GATES = {
+    "G-CALC", "G-NUMCON", "G-LEGAL", "G-STYLE+",
+    "G-LEGAL-CURRENT", "G-CONSISTENCY", "G-H2",
+}
 
 
 def run_integrity_gates(
@@ -287,6 +431,9 @@ def run_integrity_gates(
     all_failed.extend(check_g_calc(body_html, example_context, intent=intent))
     all_failed.extend(check_g_legal(body_html, slug))
     all_failed.extend(check_g_style_plus(body_html))
+    all_failed.extend(check_g_legal_current(body_html, slug))
+    all_failed.extend(check_g_consistency(body_html))
+    all_failed.extend(check_g_h2_structure(body_html, intent))
 
     failed_names = {f["gate"] for f in all_failed}
     passed = sorted(_ALL_GATES - failed_names)

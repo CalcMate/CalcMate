@@ -220,13 +220,20 @@ class TestGStylePlus:
 class TestRunIntegrityGates:
 
     def test_all_pass_clean_body(self):
-        """오류 없는 본문 → 4개 게이트 모두 passed 목록에 포함."""
-        body = "<p>퇴직금은 근로자퇴직급여보장법 제9조에 따라 지급됩니다. 총액은 600만원입니다.</p>"
+        """오류 없는 본문 → 원래 4개 게이트 모두 passed 목록에 포함."""
+        # G-H2 gate를 위해 eligibility intent 필수 H2 포함
+        body = (
+            "<h2>지급 대상</h2><p>1년 이상 근로자.</p>"
+            "<h2>제외 대상</h2><p>1년 미만 제외.</p>"
+            "<h2>계산 방법</h2><p>퇴직금은 근로자퇴직급여보장법 제9조에 따라 지급됩니다. 총액은 600만원입니다.</p>"
+            "<h2>FAQ</h2><dl><dt>질문</dt><dd>답변입니다.</dd></dl>"
+        )
         ctx = {"examples": [{"inputs": {}, "result": {"total": 6_000_000}}]}
         passed, failed = run_integrity_gates(body, slug="severance-pay", example_context=ctx, intent="eligibility")
         assert "G-CALC" in passed
         assert "G-LEGAL" in passed
-        assert not any(f["grade"] == "major" for f in failed)
+        major_fails = [f for f in failed if f["grade"] == "major"]
+        assert not major_fails, f"예상치 못한 major 실패: {major_fails}"
 
     def test_multiple_gate_fail(self):
         """여러 게이트 동시 실패 시 각각 보고."""
