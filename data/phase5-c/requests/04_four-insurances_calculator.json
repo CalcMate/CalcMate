@@ -21,7 +21,7 @@
     },
     {
       "question": "일부 근로자가 4대보험에 가입되지 않는 경우는 어떤 경우인가요?",
-      "answer": "주 60시간 미만으로 근무하며, 고령자, 외국인 근로자 등 일부 조건에 해당하면 4대보험 적용이 예외가 될 수 있습니다. 이를 확인하고 근로계약서와 관련 법령 조항을 참조해야 합니다."
+      "answer": "1개월 소정근로시간이 60시간 미만인 경우, 고령자, 외국인 근로자 등 일부 조건에 해당하면 4대보험 적용이 예외가 될 수 있습니다. 이를 확인하고 근로계약서와 관련 법령 조항을 참조해야 합니다."
     },
     {
       "question": "실수로 월 급여 입력값에 세후 금액을 넣었습니다. 계산에 어떤 영향을 미치나요?",
@@ -37,7 +37,7 @@
     },
     {
       "question": "4대보험 중 건보료는 어떻게 부과되며, 장기요양보험은 어떻게 관련되나요?",
-      "answer": "건강보험료는 월 급여의 3.545%가 부과되며, 장기요양보험료는 건보료의 12.96%가 추가로 부과됩니다. 최종 산출금액은 두 보험의 합산액으로 결정됩니다."
+      "answer": "건강보험료는 월 급여의 3.595%가 부과되며, 장기요양보험료는 건보료의 13.14%가 추가로 부과됩니다. 최종 산출금액은 두 보험의 합산액으로 결정됩니다."
     }
   ],
   "example_context": {
@@ -47,26 +47,26 @@
           "monthly_salary": 3000000
         },
         "result": {
-          "national_pension": 135000,
-          "health_insurance": 106350,
-          "long_term_care": 13783,
+          "national_pension": 142500,
+          "health_insurance": 107850,
+          "long_term_care": 14171,
           "employment_insurance": 27000,
-          "total": 282133
+          "worker_compensation": 0
         },
-        "narrative": "월급 300만원 기준: 국민연금 135,000원(4.5%) + 건강보험 106,350원(3.545%) + 장기요양 13,783원(건강보험료의 12.96%) + 고용보험 27,000원(0.9%) = 약 282,133원"
+        "narrative": "월급 300만원 기준: 국민연금 142,500원(4.75%) + 건강보험 107,850원(3.595%) + 장기요양 14,171원(건강보험료의 13.14%) + 고용보험 27,000원(0.9%) = 약 291,521원"
       },
       {
         "inputs": {
           "monthly_salary": 4000000
         },
         "result": {
-          "national_pension": 180000,
-          "health_insurance": 141800,
-          "long_term_care": 18377,
+          "national_pension": 190000,
+          "health_insurance": 143800,
+          "long_term_care": 18895,
           "employment_insurance": 36000,
-          "total": 376177
+          "worker_compensation": 0
         },
-        "narrative": "월급 400만원 기준: 국민연금 180,000원 + 건강보험 141,800원 + 장기요양 18,377원 + 고용보험 36,000원 = 약 376,177원"
+        "narrative": "월급 400만원 기준: 국민연금 190,000원(4.75%) + 건강보험 143,800원(3.595%) + 장기요양 18,895원(건강보험료의 13.14%) + 고용보험 36,000원(0.9%) = 약 388,695원"
       }
     ],
     "formula": "{\"national_pension\": \"monthly_salary * 0.045\", \"health_insurance\": \"monthly_salary * 0.03545\", \"employment_insurance\": \"monthly_salary * 0.009\", \"total\": \"monthly_salary * 0.045 + monthly_salary * 0.03545 * 1.1296 + monthly_salary * 0.009\"}",
@@ -109,41 +109,61 @@
     "text_length": 2049
   },
   "regen_5e": {
-    "regenerated_at": "2026-08-16T23:07:12.115354",
-    "reason": "G-LEGAL-CURRENT: 구 요율(3.52%/12.95%) 검출",
+    "regenerated_at": "2026-08-17T07:38:15.103028",
+    "reason": "STEP5-B: 장기요양보험료율 12.96% → 13.14% (2026 공식값 반영)",
     "ssot_log": {
       "slug": "four-insurances",
       "has_ssot": true,
-      "injected_at": "2026-08-16T23:07:12.115354",
+      "injected_at": "2026-08-17T07:38:15.103028",
       "ssot_values": [
         {
           "item": "건강보험료율 (근로자 부담)",
-          "current": "3.545%",
+          "current": "3.595%",
           "forbidden": "3.52%"
         },
         {
           "item": "건강보험료율 (근로자 부담)",
-          "current": "3.545%",
+          "current": "3.595%",
           "forbidden": "3.535%"
         },
         {
           "item": "건강보험료율 (근로자 부담)",
-          "current": "3.545%",
+          "current": "3.595%",
           "forbidden": "3.53%"
         },
         {
+          "item": "건강보험료율 (근로자 부담)",
+          "current": "3.595%",
+          "forbidden": "3.545%"
+        },
+        {
+          "item": "국민연금 근로자 부담 요율",
+          "current": "4.75%",
+          "forbidden": "4.5%"
+        },
+        {
+          "item": "국민연금 근로자 부담 요율",
+          "current": "4.75%",
+          "forbidden": "4.50%"
+        },
+        {
           "item": "장기요양보험료율",
-          "current": "건보료의 12.96%",
+          "current": "건보료의 13.14%",
+          "forbidden": "12.96%"
+        },
+        {
+          "item": "장기요양보험료율",
+          "current": "건보료의 13.14%",
           "forbidden": "12.95%"
         },
         {
           "item": "장기요양보험료율",
-          "current": "건보료의 12.96%",
+          "current": "건보료의 13.14%",
           "forbidden": "12.81%"
         },
         {
           "item": "장기요양보험료율",
-          "current": "건보료의 12.96%",
+          "current": "건보료의 13.14%",
           "forbidden": "12.27%"
         },
         {
@@ -160,7 +180,7 @@
     },
     "token_info": {
       "model": "gpt-4o",
-      "tokens": 4931
+      "tokens": 5140
     },
     "body_file": "04_four-insurances_4대보험_계산.html",
     "new_gate_result": {
@@ -179,32 +199,10 @@
       "all_clear": true
     },
     "old_gate_result": {
-      "passed": false,
-      "all_failed": [
-        {
-          "gate": "G-NEW2",
-          "grade": "major",
-          "detail": "'= 숫자원' 형식 예시 1개 → 최소 2개 필요 (intent=calculator)"
-        },
-        {
-          "gate": "G1",
-          "grade": "major",
-          "detail": "본문 1776자 → 최소 1850자(intent=calculator) 필요, 74자 추가 작성 필요"
-        }
-      ],
+      "passed": true,
+      "all_failed": [],
       "critical": [],
-      "major": [
-        {
-          "gate": "G-NEW2",
-          "grade": "major",
-          "detail": "'= 숫자원' 형식 예시 1개 → 최소 2개 필요 (intent=calculator)"
-        },
-        {
-          "gate": "G1",
-          "grade": "major",
-          "detail": "본문 1776자 → 최소 1850자(intent=calculator) 필요, 74자 추가 작성 필요"
-        }
-      ],
+      "major": [],
       "minor": [],
       "h2_list": [
         "계산 원리",
@@ -214,7 +212,7 @@
       ],
       "h2_count": 4,
       "faq_count": 6,
-      "text_length": 1776
+      "text_length": 1926
     }
   }
 }
