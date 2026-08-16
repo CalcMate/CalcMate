@@ -48,6 +48,25 @@ def get_forbidden_in_content(slug: str) -> list[dict]:
     return result
 
 
+def get_positive_check_items(slug: str, intent: str) -> list[dict]:
+    """
+    content_ssot.items 중 requires_in_content_for_intents에 intent가 포함된 항목 반환.
+    각 항목: {value, item, effective_year, legal_basis}
+    """
+    ssot = get_slug_ssot(slug)
+    result: list[dict] = []
+    for item in ssot.get("items", []):
+        required_for = item.get("requires_in_content_for_intents", [])
+        if intent in required_for:
+            result.append({
+                "value": item.get("value", ""),
+                "item": item.get("item", ""),
+                "effective_year": item.get("effective_year"),
+                "legal_basis": item.get("legal_basis", ""),
+            })
+    return result
+
+
 def get_ssot_prompt_block(slug: str) -> str:
     """
     생성 프롬프트에 주입할 SSOT 블록 문자열 반환.

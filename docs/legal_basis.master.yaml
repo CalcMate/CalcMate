@@ -103,6 +103,22 @@ severance-pay:
     - 자발적으로 퇴사한 경우나 근무 기간이 1년 미만인 경우에는 퇴직금을 받을 수 없
     - 자발적 퇴사 또는 퇴사 후 1년이 경과된 경우에는 퇴직금을 지급받지 못
     - 자발적 퇴사나 비위행위로 인해 해고될 경우에도 받을 수 없는 상황
+  content_ssot:
+    effective_year: 2026
+    source:
+      authority: "고용노동부"
+      verified_at: "2026-08-15"
+    items:
+      - item: "징계해고 퇴직금 지급 원칙"
+        value: "퇴직사유 무관 — 계속근로 1년 이상이면 지급"
+        effective_year: 2026
+        legal_basis: "근로자퇴직급여보장법 제8조"
+        source: "고용노동부"
+        applies_to: "모든 근로자"
+        forbidden_in_content:
+          - "징계해고인 경우 퇴직금을 받을 수 없"
+          - "비위행위에 의한 징계해고인 경우 퇴직금"
+          - "징계해고를 당한 경우 퇴직금을 지급받지 못"
   # --- registry v2 (Phase A: 읽기전용 미러) ---
   slug: severance-pay
   category: 노무/급여
@@ -224,8 +240,8 @@ unemployment-benefit:
   # 요건(180일·수급자격)은 계산기가 산출하지 않고 급여액만 계산 — writer_note는 글 맥락용.
   benefit_amounts:
     # 구직급여 상한/하한 수치 — 매년 확인 필요 (연초에 갱신)
-    daily_max: 66000          # 고용노동부 고시 (2019년 이후, 2025년 기준 — 매년 재확인)
-    min_wage_hourly: 10030    # 최저임금 시간급 (2025년 기준, 2026년 미확인 — law.go.kr 접근 실패)
+    daily_max: 68100          # 고용노동부 고시 2026년 기준 (1일 상한액 68,100원)
+    min_wage_hourly: 10030    # 최저임금 시간급 (2025년 기준, 2026년 재확인 필요)
     # 하한 = min_wage_hourly × 8 × 0.8 (고용보험법 제46조 제2항)
   benefit_days_table:
     # 고용보험법 별표1 소정급여일수 (2019년 개정 이후 현행)
@@ -242,6 +258,22 @@ unemployment-benefit:
       - {months_lo: 36,  months_hi: 60,  days: 210}
       - {months_lo: 60,  months_hi: 120, days: 240}
       - {months_lo: 120, months_hi: null, days: 270}
+  content_ssot:
+    effective_year: 2026
+    source:
+      authority: "고용노동부"
+      verified_at: "2026-08-15"
+    items:
+      - item: "구직급여 1일 상한액"
+        value: "68,100원"
+        effective_year: 2026
+        legal_basis: "고용보험법 제46조 / 고용노동부 고시"
+        source: "고용노동부"
+        applies_to: "구직급여 수급자"
+        forbidden_in_content:
+          - "66,000원"
+          - "66000원"
+          - "60,120원"
 
 four-insurances:
   name: 4대보험 계산기
@@ -297,36 +329,57 @@ four-insurances:
   # 코드정합: output은 국민연금/건강보험/장기요양/고용보험 4종+total(산재 없음, 설계상 맞음).
   insurance_rates:
     # 매년 확인 필요 — 국민연금: 7월 1일 조정 / 건강·장기요양: 1월 1일 조정
-    np_rate:  0.045        # 국민연금 근로자 요율 4.5% (국민연금법 제88조)
-    np_min:   390000       # 기준소득월액 하한 390,000원 (2024.7~2025.6 고시)
-    np_max:   6170000      # 기준소득월액 상한 6,170,000원 (2024.7~2025.6 고시)
-    hi_rate:  0.03545      # 건강보험 근로자 요율 3.545% (2025년, 총 7.09%)
-    ltc_rate: 0.1296       # 장기요양보험 = 건강보험료 × 12.96% (2025년) ← 급여 아닌 건강보험료에 곱
+    np_rate:  0.0475       # 국민연금 근로자 요율 4.75% (2026년, 총 9.5% / 국민연금법 제88조)
+    np_min:   390000       # 기준소득월액 하한 390,000원 (2026년 재확인 필요)
+    np_max:   6170000      # 기준소득월액 상한 6,170,000원 (2026년 재확인 필요)
+    hi_rate:  0.03595      # 건강보험 근로자 요율 3.595% (2026년, 총 7.19%)
+    ltc_rate: 0.1296       # 장기요양보험 = 건강보험료 × 12.96% (2026년 재확인 필요)
     ei_rate:  0.009        # 고용보험 근로자 요율 0.9%
-    reference_year: 2025
+    reference_year: 2026
   content_ssot:
     # G-LEGAL-CURRENT Gate가 읽는 콘텐츠 수치 SSOT
     # forbidden_in_content: 이 값이 게시물 본문/FAQ에 등장하면 CRITICAL fail
+    # requires_in_content_for_intents: 해당 intent 글에서 현행값이 반드시 등장해야 함 (긍정검증)
     effective_year: 2026
+    source:
+      authority: "보건복지부·고용노동부"
+      verified_at: "2026-08-15"
+      note: "2026년 공식값. 건보료 3.595%(총 7.19%), 국민연금 4.75%(총 9.5%)"
     items:
       - item: "건강보험료율 (근로자 부담)"
-        value: "3.545%"
+        value: "3.595%"
         effective_year: 2026
-        effective_period: "2025년 1월 이후"
+        effective_period: "2026년 1월 이후"
         legal_basis: "국민건강보험법 시행령 제44조 / 보건복지부 고시"
-        source: "건강보험공단"
+        source: "보건복지부"
         applies_to: "사업장 가입 근로자"
         exceptions: "지역가입자 상이"
+        requires_in_content_for_intents:
+          - calculator
         forbidden_in_content:
           - "3.52%"
           - "3.535%"
           - "3.53%"
+          - "3.545%"
+      - item: "국민연금 근로자 부담 요율"
+        value: "4.75%"
+        effective_year: 2026
+        effective_period: "2026년 이후"
+        legal_basis: "국민연금법 제88조"
+        source: "보건복지부"
+        applies_to: "사업장 가입자"
+        exceptions: "기준소득월액 상한/하한 적용"
+        requires_in_content_for_intents:
+          - calculator
+        forbidden_in_content:
+          - "4.5%"
+          - "4.50%"
       - item: "장기요양보험료율"
         value: "건보료의 12.96%"
         effective_year: 2026
-        effective_period: "2025년 1월 이후"
+        effective_period: "2026년 (재확인 필요)"
         legal_basis: "노인장기요양보험법 시행령 제4조"
-        source: "보건복지부 고시"
+        source: "보건복지부"
         applies_to: "건강보험 가입자"
         exceptions: null
         forbidden_in_content:

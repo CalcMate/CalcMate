@@ -47,9 +47,22 @@ class TestGLegalCurrent:
         fails = check_g_legal_current(body, "four-insurances")
         assert "G-LEGAL-CURRENT" in _gate_names(fails)
 
-    def test_correct_health_rate_passes(self):
-        """현행 요율 3.545% 사용 → PASS."""
+    def test_outdated_health_rate_545_fails(self):
+        """3.545% (2025년 구 요율) → FAIL (2026년 갱신 후 금지값)."""
         body = "<p>건강보험료는 3.545%입니다.</p>"
+        fails = check_g_legal_current(body, "four-insurances")
+        assert "G-LEGAL-CURRENT" in _gate_names(fails)
+        assert _grades(fails, "G-LEGAL-CURRENT") == {"critical"}
+
+    def test_outdated_np_rate_45_fails(self):
+        """4.5% (2025년 국민연금 구 요율) → FAIL."""
+        body = "<p>국민연금은 월급여의 4.5%입니다.</p>"
+        fails = check_g_legal_current(body, "four-insurances")
+        assert "G-LEGAL-CURRENT" in _gate_names(fails)
+
+    def test_correct_health_rate_passes(self):
+        """현행 요율 3.595% 사용 → PASS (블랙리스트 기준)."""
+        body = "<p>건강보험료는 3.595%입니다.</p>"
         fails = check_g_legal_current(body, "four-insurances")
         assert "G-LEGAL-CURRENT" not in _gate_names(fails)
 
@@ -102,11 +115,36 @@ class TestGLegalCurrent:
         assert "G-LEGAL-CURRENT" not in _gate_names(fails)
 
     def test_detail_includes_current_value(self):
-        """fail detail에 현행 값이 포함되어야 함."""
+        """fail detail에 현행 값(3.595%)이 포함되어야 함."""
         body = "<p>건강보험료 3.52%.</p>"
         fails = check_g_legal_current(body, "four-insurances")
         details = [f["detail"] for f in fails if f["gate"] == "G-LEGAL-CURRENT"]
-        assert any("3.545%" in d for d in details)
+        assert any("3.595%" in d for d in details)
+
+    def test_positive_check_current_rates_present_passes(self):
+        """긍정검증: 3.595% + 4.75% 모두 포함 + calculator intent → PASS."""
+        body = "<p>건강보험 3.595%, 국민연금 4.75% 적용.</p>"
+        fails = check_g_legal_current(body, "four-insurances", intent="calculator")
+        assert "G-LEGAL-CURRENT" not in _gate_names(fails)
+
+    def test_positive_check_missing_health_rate_fails(self):
+        """긍정검증: 3.595% 미등장 + calculator intent → FAIL (major)."""
+        body = "<p>국민연금 4.75% 적용. 건강보험은 일정 비율입니다.</p>"
+        fails = check_g_legal_current(body, "four-insurances", intent="calculator")
+        assert "G-LEGAL-CURRENT" in _gate_names(fails)
+        assert "major" in _grades(fails, "G-LEGAL-CURRENT")
+
+    def test_positive_check_noncalculator_intent_passes(self):
+        """긍정검증: eligibility intent → requires_in_content 미적용 → PASS."""
+        body = "<p>4대보험 가입 조건 안내. 비율 미언급.</p>"
+        fails = check_g_legal_current(body, "four-insurances", intent="eligibility")
+        assert "G-LEGAL-CURRENT" not in _gate_names(fails)
+
+    def test_positive_check_no_intent_passes(self):
+        """긍정검증: intent=None → 긍정검증 비적용 → PASS."""
+        body = "<p>4대보험 일반 설명. 비율 미언급.</p>"
+        fails = check_g_legal_current(body, "four-insurances", intent=None)
+        assert "G-LEGAL-CURRENT" not in _gate_names(fails)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -116,18 +154,18 @@ class TestGLegalCurrent:
 class TestGConsistency:
 
     def test_consistent_rates_passes(self):
-        """본문·FAQ 모두 3.545% → PASS."""
+        """본문·FAQ 모두 3.595% → PASS."""
         body = (
-            "<h2>계산 원리</h2><p>건강보험 3.545% 적용.</p>"
-            "<h2>FAQ</h2><dl><dt>건보료율?</dt><dd>건강보험료는 3.545%입니다.</dd></dl>"
+            "<h2>계산 원리</h2><p>건강보험 3.595% 적용.</p>"
+            "<h2>FAQ</h2><dl><dt>건보료율?</dt><dd>건강보험료는 3.595%입니다.</dd></dl>"
         )
         fails = check_g_consistency(body)
         assert "G-CONSISTENCY" not in _gate_names(fails)
 
     def test_inconsistent_rates_fails(self):
-        """본문 3.545%, FAQ 3.52% → 불일치 → FAIL."""
+        """본문 3.595%, FAQ 3.52% → 불일치 → FAIL."""
         body = (
-            "<h2>계산 원리</h2><p>건강보험 3.545% 적용.</p>"
+            "<h2>계산 원리</h2><p>건강보험 3.595% 적용.</p>"
             "<h2>FAQ</h2><dl><dt>건보료율?</dt><dd>건강보험료는 3.52%입니다.</dd></dl>"
         )
         fails = check_g_consistency(body)
@@ -136,7 +174,7 @@ class TestGConsistency:
 
     def test_no_faq_section_passes(self):
         """FAQ 섹션 없는 본문 → G-CONSISTENCY 면제."""
-        body = "<h2>계산 원리</h2><p>건강보험 3.545% 적용.</p>"
+        body = "<h2>계산 원리</h2><p>건강보험 3.595% 적용.</p>"
         fails = check_g_consistency(body)
         assert "G-CONSISTENCY" not in _gate_names(fails)
 
@@ -144,7 +182,7 @@ class TestGConsistency:
         """본문에 rate 없고 FAQ에만 있어도 body_rates가 empty면 PASS (비교 불가)."""
         body = (
             "<h2>소개</h2><p>일반 설명.</p>"
-            "<h2>FAQ</h2><dl><dt>질문?</dt><dd>3.545%입니다.</dd></dl>"
+            "<h2>FAQ</h2><dl><dt>질문?</dt><dd>3.595%입니다.</dd></dl>"
         )
         fails = check_g_consistency(body)
         assert "G-CONSISTENCY" not in _gate_names(fails)
@@ -152,8 +190,8 @@ class TestGConsistency:
     def test_out_of_range_rate_ignored(self):
         """범위 밖 퍼센트(예: 80% 육아휴직 급여율)는 비교 대상 제외."""
         body = (
-            "<h2>지급 조건</h2><p>통상임금의 80%를 지급합니다. 건보료 3.545%.</p>"
-            "<h2>FAQ</h2><dl><dt>급여율?</dt><dd>통상임금의 80%. 건보료 3.545%.</dd></dl>"
+            "<h2>지급 조건</h2><p>통상임금의 80%를 지급합니다. 건보료 3.595%.</p>"
+            "<h2>FAQ</h2><dl><dt>급여율?</dt><dd>통상임금의 80%. 건보료 3.595%.</dd></dl>"
         )
         fails = check_g_consistency(body)
         assert "G-CONSISTENCY" not in _gate_names(fails)
@@ -161,13 +199,73 @@ class TestGConsistency:
     def test_detail_includes_faq_and_body_rates(self):
         """fail detail에 FAQ 수치와 본문 수치가 모두 포함."""
         body = (
-            "<h2>계산 원리</h2><p>건강보험 3.545% 적용.</p>"
+            "<h2>계산 원리</h2><p>건강보험 3.595% 적용.</p>"
             "<h2>FAQ</h2><dl><dt>?</dt><dd>3.52%입니다.</dd></dl>"
         )
         fails = check_g_consistency(body)
         details = [f["detail"] for f in fails if f["gate"] == "G-CONSISTENCY"]
         assert any("3.52%" in d for d in details)
-        assert any("3.545%" in d for d in details)
+        assert any("3.595%" in d for d in details)
+
+    # ── 기간(N일 이내) 불일치 ──────────────────────────────────────────────────
+
+    def test_period_inconsistency_fails(self):
+        """본문 '14일 이내', FAQ '7일 이내' → 법정기간 불일치 → FAIL."""
+        body = (
+            "<h2>지급 조건</h2><p>취득신고는 14일 이내에 해야 합니다.</p>"
+            "<h2>FAQ</h2><dl><dt>신고기한?</dt><dd>취득신고는 7일 이내입니다.</dd></dl>"
+        )
+        fails = check_g_consistency(body)
+        assert "G-CONSISTENCY" in _gate_names(fails)
+        details = [f["detail"] for f in fails if f["gate"] == "G-CONSISTENCY"]
+        assert any("7일" in d for d in details)
+
+    def test_period_consistent_passes(self):
+        """본문·FAQ 모두 '14일 이내' → PASS."""
+        body = (
+            "<h2>지급 조건</h2><p>취득신고는 14일 이내.</p>"
+            "<h2>FAQ</h2><dl><dt>기한?</dt><dd>14일 이내에 신고해야 합니다.</dd></dl>"
+        )
+        fails = check_g_consistency(body)
+        assert "G-CONSISTENCY" not in _gate_names(fails)
+
+    def test_period_faq_only_no_body_period_passes(self):
+        """본문에 'N일 이내' 없고 FAQ에만 있어도 body_periods empty면 PASS."""
+        body = (
+            "<h2>소개</h2><p>일반 안내.</p>"
+            "<h2>FAQ</h2><dl><dt>기한?</dt><dd>14일 이내.</dd></dl>"
+        )
+        fails = check_g_consistency(body)
+        assert "G-CONSISTENCY" not in _gate_names(fails)
+
+    # ── 법정 상한/하한 금액 불일치 ───────────────────────────────────────────────
+
+    def test_ceiling_inconsistency_fails(self):
+        """본문 '상한 68,100원', FAQ '상한 66,000원' → 법정금액 불일치 → FAIL."""
+        body = (
+            "<h2>지급 조건</h2><p>구직급여 1일 상한 68,100원이 적용됩니다.</p>"
+            "<h2>FAQ</h2><dl><dt>상한?</dt><dd>구직급여 상한 66,000원입니다.</dd></dl>"
+        )
+        fails = check_g_consistency(body)
+        assert "G-CONSISTENCY" in _gate_names(fails)
+
+    def test_ceiling_consistent_passes(self):
+        """본문·FAQ 모두 '상한 68,100원' → PASS."""
+        body = (
+            "<h2>지급 조건</h2><p>구직급여 1일 상한 68,100원.</p>"
+            "<h2>FAQ</h2><dl><dt>상한?</dt><dd>상한 68,100원입니다.</dd></dl>"
+        )
+        fails = check_g_consistency(body)
+        assert "G-CONSISTENCY" not in _gate_names(fails)
+
+    def test_arithmetic_amount_no_false_positive(self):
+        """산술 결과 금액('200만원 × 80% = 160만원')은 상한/하한 패턴 아님 → PASS."""
+        body = (
+            "<h2>지급 조건</h2><p>통상임금 200만원 × 80% = 160만원 예시.</p>"
+            "<h2>FAQ</h2><dl><dt>예시?</dt><dd>150만원 × 80% = 120만원.</dd></dl>"
+        )
+        fails = check_g_consistency(body)
+        assert "G-CONSISTENCY" not in _gate_names(fails)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -287,9 +385,9 @@ class TestRunIntegrityGatesExtended:
         assert any(f["grade"] == "critical" for f in failed if f["gate"] == "G-LEGAL-CURRENT")
 
     def test_inconsistent_faq_body_caught_in_integration(self):
-        """통합 실행에서 G-CONSISTENCY 탐지."""
+        """통합 실행에서 G-CONSISTENCY 탐지 (본문 3.595%, FAQ 3.52%)."""
         body = (
-            "<h2>계산 원리</h2><p>건강보험 3.545% 부과됩니다.</p>"
+            "<h2>계산 원리</h2><p>건강보험 3.595% 부과됩니다.</p>"
             "<h2>지급 조건</h2><p>조건.</p>"
             "<h2>FAQ</h2><dl><dt>Q</dt><dd>건보료 3.52%.</dd></dl>"
         )

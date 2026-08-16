@@ -157,18 +157,21 @@ def build_example_context(calc: dict) -> dict | None:
             "formula": formula, "source": "verified_formula"
         }
     elif slug == "four-insurances":
+        # 2026년 공식 요율: 국민연금 4.75%, 건강보험 3.595%, 장기요양 12.96%(건보료기준), 고용 0.9%
+        # 300만원: NP=142,500 / HI=107,850 / LTC=13,977 / EI=27,000 / 합=291,327
+        # 400만원: NP=190,000 / HI=143,800 / LTC=18,636 / EI=36,000 / 합=388,436
         return {
             "examples": [
                 {"inputs": {"monthly_salary": 3000000},
-                 "result": {"national_pension": 135000, "health_insurance": 106350,
-                            "long_term_care": 13783, "employment_insurance": 27000,
+                 "result": {"national_pension": 142500, "health_insurance": 107850,
+                            "long_term_care": 13977, "employment_insurance": 27000,
                             "worker_compensation": 0},
-                 "narrative": "월급 300만원 기준: 국민연금 135,000원(4.5%) + 건강보험 106,350원(3.545%) + 장기요양 13,783원(건강보험료의 12.96%) + 고용보험 27,000원(0.9%) = 약 282,133원"},
+                 "narrative": "월급 300만원 기준: 국민연금 142,500원(4.75%) + 건강보험 107,850원(3.595%) + 장기요양 13,977원(건강보험료의 12.96%) + 고용보험 27,000원(0.9%) = 약 291,327원"},
                 {"inputs": {"monthly_salary": 4000000},
-                 "result": {"national_pension": 180000, "health_insurance": 141800,
-                            "long_term_care": 18377, "employment_insurance": 36000,
+                 "result": {"national_pension": 190000, "health_insurance": 143800,
+                            "long_term_care": 18636, "employment_insurance": 36000,
                             "worker_compensation": 0},
-                 "narrative": "월급 400만원 기준: 국민연금 180,000원(4.5%) + 건강보험 141,800원(3.545%) + 장기요양 18,377원(건강보험료의 12.96%) + 고용보험 36,000원(0.9%) = 약 376,177원"},
+                 "narrative": "월급 400만원 기준: 국민연금 190,000원(4.75%) + 건강보험 143,800원(3.595%) + 장기요양 18,636원(건강보험료의 12.96%) + 고용보험 36,000원(0.9%) = 약 388,436원"},
             ],
             "formula": formula, "source": "verified_formula"
         }
@@ -185,14 +188,16 @@ def build_example_context(calc: dict) -> dict | None:
             "formula": formula, "source": "verified_formula"
         }
     elif slug == "육아휴직_급여_계산기":
+        # result에 benefit 금액 미포함 — SSOT content_ssot에서 특정 상한/하한 금액 언급 금지.
+        # G-CALC는 result가 비어 있으면 금액 검증 건너뜀.
         return {
             "examples": [
                 {"inputs": {"monthly_wage": 2000000},
-                 "result": {"benefit": 1600000},
-                 "narrative": "월 통상임금 200만원 → 육아휴직 급여 = 200만원 × 0.8 = 160만원 (정확한 상한액은 고용노동부 최신 안내 기준 적용)"},
+                 "result": {},
+                 "narrative": "월 통상임금 200만원 → 통상임금 × 80% 공식 적용. 정확한 지급액은 고용노동부 최신 안내 확인 필요"},
                 {"inputs": {"monthly_wage": 1500000},
-                 "result": {"benefit": 1200000},
-                 "narrative": "월 통상임금 150만원 → 육아휴직 급여 = 150만원 × 0.8 = 120만원 (정확한 하한액은 고용노동부 최신 안내 기준 적용)"},
+                 "result": {},
+                 "narrative": "월 통상임금 150만원 → 통상임금 × 80% 공식 적용. 정확한 지급액은 고용노동부 최신 안내 확인 필요"},
             ],
             "formula": formula, "source": "verified_formula",
             "note": "남녀고용평등법 제19조의2 기준 — 통상임금 80% 지급. 상한·하한액은 고용노동부 최신 안내 확인 필요"

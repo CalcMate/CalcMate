@@ -269,21 +269,31 @@ def check_g_style_plus(body_html: str) -> list[dict]:
 # G-LEGAL-CURRENT : 법정수치 최신성 검사 (SSOT 대조)
 # ═══════════════════════════════════════════════════════════════════════════
 
-def check_g_legal_current(body_html: str, slug: str | None) -> list[dict]:
+def check_g_legal_current(
+    body_html: str,
+    slug: str | None,
+    intent: str | None = None,
+) -> list[dict]:
     """
-    content_ssot.forbidden_in_content 목록의 값이 본문에 있으면 CRITICAL fail.
-    주 검증: SSOT 대조. 금지 목록은 보조 방어선.
+    G-LEGAL-CURRENT: SSOT 기반 법정수치 최신성 검사.
+
+    1. 블랙리스트 검사: forbidden_in_content 값이 본문에 있으면 CRITICAL fail.
+    2. 긍정검증: requires_in_content_for_intents 항목의 현행값이 본문에 없으면 major fail.
+       단, SSOT가 관리하는 법정수치에만 적용 — 일반 산술 예시·계산 결과 제외.
     """
     if not slug:
         return []
     try:
-        from modules.law_ssot import get_forbidden_in_content
+        from modules.law_ssot import get_forbidden_in_content, get_positive_check_items
         forbidden = get_forbidden_in_content(slug)
+        positive = get_positive_check_items(slug, intent or "") if intent else []
     except Exception:
         return []
 
     fails: list[dict] = []
     text = _strip_html(body_html)
+
+    # 1. 블랙리스트 검사
     for entry in forbidden:
         if entry["value"] in text:
             fails.append({
@@ -295,6 +305,21 @@ def check_g_legal_current(body_html: str, slug: str | None) -> list[dict]:
                     f"[근거: {entry['legal_basis']}]"
                 ),
             })
+
+    # 2. 긍정검증 (intent 해당 항목만)
+    for entry in positive:
+        current_val = entry["value"]
+        if current_val and current_val not in text:
+            fails.append({
+                "gate": "G-LEGAL-CURRENT",
+                "grade": "major",
+                "detail": (
+                    f"현행 법정수치 '{current_val}' 미등장 ({entry['item']}): "
+                    f"본문에 반드시 포함 필요 "
+                    f"[근거: {entry['legal_basis']}]"
+                ),
+            })
+
     return fails
 
 
@@ -306,6 +331,12 @@ def check_g_legal_current(body_html: str, slug: str | None) -> list[dict]:
 _RATE_RE = re.compile(r'(\d+\.?\d*)%')
 _RATE_RANGE = (0.5, 30.0)
 
+# "상한[액] N원" / "하한[액] N원" 패턴 (법정 상한/하한 금액)
+_CEIL_FLOOR_RE = re.compile(r'(?:상한액?|하한액?)\s*([\d,]+)\s*원')
+
+# "N일 이내" / "N일이내" 패턴 (법정기간)
+_PERIOD_DAY_RE = re.compile(r'(\d+)\s*일\s*이내')
+
 
 def _extract_insurance_rates(text: str) -> set[str]:
     """텍스트에서 보험료율 범위(0.5%~30%)의 퍼센트 값 추출."""
@@ -316,14 +347,37 @@ def _extract_insurance_rates(text: str) -> set[str]:
         except ValueError:
             continue
         if _RATE_RANGE[0] <= v <= _RATE_RANGE[1]:
-            rates.add(m.group(0))  # e.g. "3.52%"
+            rates.add(m.group(0))  # e.g. "3.595%"
     return rates
+
+
+def _extract_legal_ceilings(text: str) -> set[int]:
+    """텍스트에서 '상한[액] N원' / '하한[액] N원' 금액(숫자) 추출."""
+    result: set[int] = set()
+    for m in _CEIL_FLOOR_RE.finditer(text):
+        try:
+            result.add(int(m.group(1).replace(",", "")))
+        except ValueError:
+            pass
+    return result
+
+
+def _extract_legal_periods(text: str) -> set[int]:
+    """텍스트에서 'N일 이내' 법정기간 일수 추출."""
+    result: set[int] = set()
+    for m in _PERIOD_DAY_RE.finditer(text):
+        try:
+            result.add(int(m.group(1)))
+        except ValueError:
+            pass
+    return result
 
 
 def check_g_consistency(body_html: str) -> list[dict]:
     """
-    FAQ 섹션의 보험료율 수치 vs 본문 본문 수치 비교.
-    FAQ에만 있고 본문에 없는 rate가 있으면 불일치로 판정.
+    FAQ ↔ 본문 수치 일관성 검사.
+    비교 대상: 보험료율(%), 법정 상한/하한 금액(원), 법정기간(N일 이내).
+    동일한 법정 사실끼리만 비교 — FAQ에만 있고 본문에 없는 값 = 불일치.
     """
     faq_match = re.search(r'<h2[^>]*>FAQ</h2>(.*)', body_html, re.I | re.S)
     if not faq_match:
@@ -335,24 +389,53 @@ def check_g_consistency(body_html: str) -> list[dict]:
     if not body_text.strip():
         return []
 
+    fails: list[dict] = []
+
+    # --- 1. 보험료율(%) 비교 ---
     faq_rates = _extract_insurance_rates(faq_text)
     body_rates = _extract_insurance_rates(body_text)
+    only_in_faq_rates = faq_rates - body_rates
+    if only_in_faq_rates and body_rates:
+        for rate in sorted(only_in_faq_rates):
+            fails.append({
+                "gate": "G-CONSISTENCY",
+                "grade": "major",
+                "detail": (
+                    f"FAQ 요율 {rate}가 본문에 없음 "
+                    f"(본문 요율: {', '.join(sorted(body_rates)[:3])})"
+                ),
+            })
 
-    # FAQ에만 있고 body에 없는 rate → 불일치 의심
-    only_in_faq = faq_rates - body_rates
-    if not only_in_faq or not body_rates:
-        return []
+    # --- 2. 법정 상한/하한 금액(원) 비교 ---
+    faq_ceilings = _extract_legal_ceilings(faq_text)
+    body_ceilings = _extract_legal_ceilings(body_text)
+    only_in_faq_ceil = faq_ceilings - body_ceilings
+    if only_in_faq_ceil and body_ceilings:
+        for amt in sorted(only_in_faq_ceil):
+            fails.append({
+                "gate": "G-CONSISTENCY",
+                "grade": "major",
+                "detail": (
+                    f"FAQ 법정금액 {amt:,}원이 본문에 없음 "
+                    f"(본문 법정금액: {', '.join(f'{a:,}원' for a in sorted(body_ceilings)[:3])})"
+                ),
+            })
 
-    fails: list[dict] = []
-    for rate in sorted(only_in_faq):
-        fails.append({
-            "gate": "G-CONSISTENCY",
-            "grade": "major",
-            "detail": (
-                f"FAQ 요율 {rate}가 본문에 없음 "
-                f"(본문 요율: {', '.join(sorted(body_rates)[:3])})"
-            ),
-        })
+    # --- 3. 법정기간(N일 이내) 비교 ---
+    faq_periods = _extract_legal_periods(faq_text)
+    body_periods = _extract_legal_periods(body_text)
+    only_in_faq_periods = faq_periods - body_periods
+    if only_in_faq_periods and body_periods:
+        for days in sorted(only_in_faq_periods):
+            fails.append({
+                "gate": "G-CONSISTENCY",
+                "grade": "major",
+                "detail": (
+                    f"FAQ 법정기간 {days}일 이내가 본문에 없음 "
+                    f"(본문 법정기간: {', '.join(f'{d}일 이내' for d in sorted(body_periods)[:3])})"
+                ),
+            })
+
     return fails
 
 
@@ -431,7 +514,7 @@ def run_integrity_gates(
     all_failed.extend(check_g_calc(body_html, example_context, intent=intent))
     all_failed.extend(check_g_legal(body_html, slug))
     all_failed.extend(check_g_style_plus(body_html))
-    all_failed.extend(check_g_legal_current(body_html, slug))
+    all_failed.extend(check_g_legal_current(body_html, slug, intent=intent))
     all_failed.extend(check_g_consistency(body_html))
     all_failed.extend(check_g_h2_structure(body_html, intent))
 
