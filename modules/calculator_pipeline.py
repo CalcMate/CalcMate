@@ -457,13 +457,16 @@ def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None, 
             body_html = content_quality.improve_content(body_html)
             final_html = _assemble(body_html)
             
+            # has_verified: 계산기에 formula가 있으면 verified 예시 있다고 간주(G4/G-NEW2 분기용)
+            _has_verified = bool((calc or {}).get("formula"))
             if skip_quality:
                 LOG.info("[QA MODE] 품질 검수(Quality Gate)를 건너뜁니다.")
                 qc = {"result": "PASS", "score": 100, "html": final_html}
             else:
                 qc = check_publish_quality(cfg, body_html, final_html, calc,
-                                           link_pool_size=_link_pool_size)
-            
+                                           link_pool_size=_link_pool_size,
+                                           intent=intent, has_verified=_has_verified)
+
             max_total = int(rcfg.get("MAX_TOTAL_RETRY", 3) or 3)     # 총 재시도 하드상한(무한루프 방지)
             crit_limit = int(rcfg.get("CRITICAL_RETRY_LIMIT", 2) or 2)  # Critical 연속실패 임계
             q_retries, consec_critical, critical_exhausted = 0, 0, False
@@ -482,7 +485,8 @@ def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None, 
                 body_html = content_quality.improve_content(body_html)
                 final_html = _assemble(body_html)
                 qc = check_publish_quality(cfg, body_html, final_html, calc,
-                                           link_pool_size=_link_pool_size)
+                                           link_pool_size=_link_pool_size,
+                                           intent=intent, has_verified=_has_verified)
 
             final_html = qc.get("html") or final_html   # G6 CTA중복 코드수정 반영본
             q_fields = {

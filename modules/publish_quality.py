@@ -169,23 +169,37 @@ def _count_placeholders(html: str) -> int:
     return len(_A4_PH_RE.findall(html or ""))
 
 
-def check_gates(body_html: str, final_html: str, cfg: dict, link_pool_size: int = 0) -> tuple:
+_G1_MIN_BY_INTENT = {
+    "howto":       1750,
+    "documents":   1850,
+    "eligibility": 2000,
+    "calculator":  1850,
+}
+
+
+def check_gates(body_html: str, final_html: str, cfg: dict, link_pool_size: int = 0,
+                intent: str = None, has_verified: bool = False) -> tuple:
     """(passed: bool, failed_gates: list[dict]). 각 항목: {gate, detail, grade, ...}.
     body 기준 게이트는 body_html, 조립 기준 게이트(G5/G6)는 final_html을 본다.
-    link_pool_size: inject_internal_links에 전달된 유효 후보 수(URL 보유). 미전달 시 0(G5 완화)."""
+    link_pool_size: inject_internal_links에 전달된 유효 후보 수(URL 보유). 미전달 시 0(G5 완화).
+    intent: howto/documents/eligibility/calculator — G1/G4/G8/G-NEW2 분기에 사용.
+    has_verified: 계산기에 검증된 예시가 존재하면 True — G4/G-NEW2 분기에 사용."""
     g = (cfg or {}).get("QUALITY_GATE", {}) or {}
     failed = []
     body_text = _plain_text(body_html)
 
     length = len(body_text)
-    min_len = g.get("MIN_LENGTH", 1800)
+    # G1: intent별 최소 분량(Phase 5-D). config 오버라이드 우선, 없으면 intent 맵 → default 1800.
+    if intent and intent in _G1_MIN_BY_INTENT:
+        min_len = _G1_MIN_BY_INTENT[intent]
+    else:
+        min_len = g.get("MIN_LENGTH", 1800)
     max_len = g.get("MAX_LENGTH", 2500)
     if not (min_len <= length <= max_len):
         if length < min_len:
-            writer_target = g.get("WRITER_TARGET_LENGTH", 1900)
-            shortfall = writer_target - length
+            shortfall = min_len - length
             detail = (
-                f"본문 {length}자 → 최소 {writer_target}자(가시 텍스트) 필요"
+                f"본문 {length}자 → 최소 {min_len}자(intent={intent or 'default'}) 필요"
                 + (f", {shortfall}자 추가 작성 필요" if shortfall > 0 else "")
             )
         else:
@@ -203,7 +217,9 @@ def check_gates(body_html: str, final_html: str, cfg: dict, link_pool_size: int 
                        "detail": f"FAQ {faq}개 → 최소 {g.get('MIN_FAQ',5)}개 필요"})
 
     ex = _count_examples(body_html)
-    if ex < g.get("MIN_EXAMPLES", 2):
+    # G4 면제: documents intent(서류 안내글에 계산 예시 불필요) 또는 verified_example 없는 계산기
+    _g4_exempt = (intent == "documents") or (not has_verified)
+    if not _g4_exempt and ex < g.get("MIN_EXAMPLES", 2):
         failed.append({"gate": "G4", "grade": "major",
                        "detail": f"계산 예시 {ex}개 → 최소 {g.get('MIN_EXAMPLES',2)}개 필요"})
 
@@ -239,6 +255,18 @@ def check_gates(body_html: str, final_html: str, cfg: dict, link_pool_size: int 
     if style:
         failed.append({"gate": "G7", "grade": "minor",
                        "detail": f"AI 문체 금지표현 {len(style)}건: {', '.join(style[:3])}"})
+
+    # G-NEW2: 계산 예시 "= 숫자원" 형식 검증 (Phase 5-D)
+    # 적용: intent==calculator AND has_verified. 면제: intent==howto 또는 has_verified==False.
+    _gnew2_apply = (intent == "calculator") and has_verified
+    if _gnew2_apply:
+        _numeric_results = re.findall(
+            r'(?:=\s*|약\s*)[\d,]+\s*(?:만|억|천)?\s*원', body_text
+        )
+        if len(_numeric_results) < 2:
+            failed.append({"gate": "G-NEW2", "grade": "major",
+                           "detail": (f"'= 숫자원' 형식 예시 {len(_numeric_results)}개 "
+                                      f"→ 최소 2개 필요 (intent=calculator, has_verified=True)")})
 
     # A1: 프롬프트 내부 지시어가 H2/H3에 노출된 경우
     art = _count_prompt_artifacts(body_html)
@@ -397,10 +425,11 @@ def _authority_mentioned(authority, ntext: str) -> bool:
     return any(_norm(o) in ntext for o in orgs) if orgs else True
 
 
-def _check_g8(body_html: str, calc: dict) -> list:
+def _check_g8(body_html: str, calc: dict, intent: str = None) -> list:
     """G8: legal_basis 대조. 반환=실패 rule 리스트(빈 리스트=통과, GPT 호출 전 결정론 판정).
     required(law/article/authority) 누락 또는 forbidden_articles/phrases 등장 → Critical.
-    검사 범위: body_html(writer FAQ 포함). legal_basis 미등록 계산기는 미적용(하위호환)."""
+    검사 범위: body_html(writer FAQ 포함). legal_basis 미등록 계산기는 미적용(하위호환).
+    intent=documents → article 조항 번호 검사 면제(서류 안내글 특성)."""
     slug = str((calc or {}).get("slug", "")).strip()
     entry = _load_legal_basis().get(slug)
     if not entry:
@@ -414,7 +443,9 @@ def _check_g8(body_html: str, calc: dict) -> list:
     if entry.get("law") and not _law_mentioned(entry["law"], ntext):
         fails.append({"gate": "G8", "grade": "critical", "critical": True,
                       "detail": f"법령명 미언급: {entry['law']}"})
-    if entry.get("article") and _norm(entry["article"]) not in ntext:
+    # G8 article 면제: documents intent(서류 안내글에서 계산 조항 번호 강요 부자연스러움)
+    _g8_article_exempt = (intent == "documents")
+    if not _g8_article_exempt and entry.get("article") and _norm(entry["article"]) not in ntext:
         fails.append({"gate": "G8", "grade": "critical", "critical": True,
                       "detail": f"정확한 조항 미언급: '{correct}'를 명시할 것"})
     if entry.get("authority") and not _authority_mentioned(entry["authority"], ntext):
@@ -439,22 +470,26 @@ def _check_g8(body_html: str, calc: dict) -> list:
 
 # ── 공개 API: Gate → Score → Rewrite Contract ─────────────────────
 def check_publish_quality(cfg: dict, body_html: str, final_html: str,
-                          calc: dict = None, link_pool_size: int = 0) -> dict:
+                          calc: dict = None, link_pool_size: int = 0,
+                          intent: str = None, has_verified: bool = False) -> dict:
     """발행 글 품질 검수. Gate(코드) 실패면 GPT 미호출 REWRITE, 통과면 Score(GPT).
 
     반환(Rewrite Contract, §9 + 운영 필드):
       {result: PASS|WARN|REWRITE, score: int|None, severity: str|None,
        failed_rules: list|None, html: <G6 코드수정 반영본>, quality_review_model: str|None}
     link_pool_size: inject_internal_links에 전달된 유효 후보 수. calculator_pipeline이 전달.
+    intent: howto/documents/eligibility/calculator — G1/G4/G8/G-NEW2 분기.
+    has_verified: 계산기에 검증된 예시 존재 여부 — G4/G-NEW2 분기.
     """
     # G6 코드수정: CTA 중복이면 초과분 제거 후 그 결과로 판정/발행
     fixed_html, removed = _dedupe_cta(final_html or "", keep=(cfg or {}).get("QUALITY_GATE", {}).get("CTA_COUNT", 1))
     if removed:
         LOG.info("[품질] CTA 중복 %d개 코드수정 제거", removed)
 
-    passed, failed = check_gates(body_html, fixed_html, cfg, link_pool_size=link_pool_size)
-    # G8(결정론적 법적근거 검증) — check_gates 시그니처 무변경, 결과만 병합(GPT 호출 전).
-    g8 = _check_g8(body_html, calc)
+    passed, failed = check_gates(body_html, fixed_html, cfg, link_pool_size=link_pool_size,
+                                 intent=intent, has_verified=has_verified)
+    # G8(결정론적 법적근거 검증) — 결과만 병합(GPT 호출 전). intent 전달로 documents 면제.
+    g8 = _check_g8(body_html, calc, intent=intent)
     if g8:
         failed = failed + g8
         passed = False
