@@ -103,5 +103,67 @@
     "h2_count": 4,
     "faq_count": 6,
     "text_length": 1916
+  },
+  "regen_5e": {
+    "regenerated_at": "2026-08-16T23:07:33.950896",
+    "reason": "G-H2: 레거시 H2('계산기 이용 방법') 검출",
+    "ssot_log": {
+      "slug": "annual-leave-allowance",
+      "has_ssot": false,
+      "injected_at": "2026-08-16T23:07:33.950896"
+    },
+    "token_info": {
+      "model": "gpt-4o",
+      "tokens": 4150
+    },
+    "body_file": "05_annual-leave-allowance_연차수당_계산방법.html",
+    "new_gate_result": {
+      "passed_gates": [
+        "G-CALC",
+        "G-CONSISTENCY",
+        "G-H2",
+        "G-LEGAL",
+        "G-LEGAL-CURRENT",
+        "G-NUMCON"
+      ],
+      "failed": [
+        {
+          "gate": "G-STYLE+",
+          "grade": "minor",
+          "detail": "AI 문체 잔존 1건: 살펴보겠습니다"
+        }
+      ],
+      "critical": [],
+      "major": [],
+      "all_clear": true
+    },
+    "old_gate_result": {
+      "passed": true,
+      "all_failed": [
+        {
+          "gate": "G7",
+          "grade": "minor",
+          "detail": "AI 문체 금지표현 1건: 살펴보겠습니다"
+        }
+      ],
+      "critical": [],
+      "major": [],
+      "minor": [
+        {
+          "gate": "G7",
+          "grade": "minor",
+          "detail": "AI 문체 금지표현 1건: 살펴보겠습니다"
+        }
+      ],
+      "h2_list": [
+        "이용 절차",
+        "계산 예시",
+        "주의사항",
+        "FAQ"
+      ],
+      "h2_count": 4,
+      "faq_count": 6,
+      "text_length": 2076
+    }
   }
 }

@@ -48,11 +48,12 @@
         },
         "result": {
           "national_pension": 135000,
-          "health_insurance": 105600,
+          "health_insurance": 106350,
+          "long_term_care": 13783,
           "employment_insurance": 27000,
-          "worker_compensation": 0
+          "total": 282133
         },
-        "narrative": "월급 300만원 기준: 국민연금 135,000원(4.5%) + 건강보험 105,600원(3.52%) + 고용보험 27,000원(0.9%) = 약 267,600원"
+        "narrative": "월급 300만원 기준: 국민연금 135,000원(4.5%) + 건강보험 106,350원(3.545%) + 장기요양 13,783원(건강보험료의 12.96%) + 고용보험 27,000원(0.9%) = 약 282,133원"
       },
       {
         "inputs": {
@@ -60,11 +61,12 @@
         },
         "result": {
           "national_pension": 180000,
-          "health_insurance": 140800,
+          "health_insurance": 141800,
+          "long_term_care": 18377,
           "employment_insurance": 36000,
-          "worker_compensation": 0
+          "total": 376177
         },
-        "narrative": "월급 400만원 기준: 국민연금 180,000원 + 건강보험 140,800원 + 고용보험 36,000원 = 약 356,800원"
+        "narrative": "월급 400만원 기준: 국민연금 180,000원 + 건강보험 141,800원 + 장기요양 18,377원 + 고용보험 36,000원 = 약 376,177원"
       }
     ],
     "formula": "{\"national_pension\": \"monthly_salary * 0.045\", \"health_insurance\": \"monthly_salary * 0.03545\", \"employment_insurance\": \"monthly_salary * 0.009\", \"total\": \"monthly_salary * 0.045 + monthly_salary * 0.03545 * 1.1296 + monthly_salary * 0.009\"}",
@@ -105,5 +107,114 @@
     "h2_count": 4,
     "faq_count": 6,
     "text_length": 2049
+  },
+  "regen_5e": {
+    "regenerated_at": "2026-08-16T23:07:12.115354",
+    "reason": "G-LEGAL-CURRENT: 구 요율(3.52%/12.95%) 검출",
+    "ssot_log": {
+      "slug": "four-insurances",
+      "has_ssot": true,
+      "injected_at": "2026-08-16T23:07:12.115354",
+      "ssot_values": [
+        {
+          "item": "건강보험료율 (근로자 부담)",
+          "current": "3.545%",
+          "forbidden": "3.52%"
+        },
+        {
+          "item": "건강보험료율 (근로자 부담)",
+          "current": "3.545%",
+          "forbidden": "3.535%"
+        },
+        {
+          "item": "건강보험료율 (근로자 부담)",
+          "current": "3.545%",
+          "forbidden": "3.53%"
+        },
+        {
+          "item": "장기요양보험료율",
+          "current": "건보료의 12.96%",
+          "forbidden": "12.95%"
+        },
+        {
+          "item": "장기요양보험료율",
+          "current": "건보료의 12.96%",
+          "forbidden": "12.81%"
+        },
+        {
+          "item": "장기요양보험료율",
+          "current": "건보료의 12.96%",
+          "forbidden": "12.27%"
+        },
+        {
+          "item": "4대보험 취득신고 기한",
+          "current": "취득일로부터 14일 이내",
+          "forbidden": "7일 이내"
+        },
+        {
+          "item": "4대보험 취득신고 기한",
+          "current": "취득일로부터 14일 이내",
+          "forbidden": "10일 이내"
+        }
+      ]
+    },
+    "token_info": {
+      "model": "gpt-4o",
+      "tokens": 4931
+    },
+    "body_file": "04_four-insurances_4대보험_계산.html",
+    "new_gate_result": {
+      "passed_gates": [
+        "G-CALC",
+        "G-CONSISTENCY",
+        "G-H2",
+        "G-LEGAL",
+        "G-LEGAL-CURRENT",
+        "G-NUMCON",
+        "G-STYLE+"
+      ],
+      "failed": [],
+      "critical": [],
+      "major": [],
+      "all_clear": true
+    },
+    "old_gate_result": {
+      "passed": false,
+      "all_failed": [
+        {
+          "gate": "G-NEW2",
+          "grade": "major",
+          "detail": "'= 숫자원' 형식 예시 1개 → 최소 2개 필요 (intent=calculator)"
+        },
+        {
+          "gate": "G1",
+          "grade": "major",
+          "detail": "본문 1776자 → 최소 1850자(intent=calculator) 필요, 74자 추가 작성 필요"
+        }
+      ],
+      "critical": [],
+      "major": [
+        {
+          "gate": "G-NEW2",
+          "grade": "major",
+          "detail": "'= 숫자원' 형식 예시 1개 → 최소 2개 필요 (intent=calculator)"
+        },
+        {
+          "gate": "G1",
+          "grade": "major",
+          "detail": "본문 1776자 → 최소 1850자(intent=calculator) 필요, 74자 추가 작성 필요"
+        }
+      ],
+      "minor": [],
+      "h2_list": [
+        "계산 원리",
+        "지급 조건",
+        "주의사항",
+        "FAQ"
+      ],
+      "h2_count": 4,
+      "faq_count": 6,
+      "text_length": 1776
+    }
   }
 }

@@ -40,8 +40,10 @@ def get_seo_prompt(calc: dict) -> tuple:
     return system, _ctx(calc)
 
 
-def get_faq_prompt(calc: dict, n_min: int = 6, n_max: int = 8) -> tuple:
-    system = (f"너는 해당 분야 전문가다. 사용자가 실제로 궁금해하는 FAQ를 {n_min}~{n_max}개 작성한다.\n"
+def get_faq_prompt(calc: dict, n_min: int = 6, n_max: int = 8, law_ssot_block: str = "") -> tuple:
+    ssot_prefix = (law_ssot_block.strip() + "\n\n") if law_ssot_block.strip() else ""
+    system = (ssot_prefix +
+              f"너는 해당 분야 전문가다. 사용자가 실제로 궁금해하는 FAQ를 {n_min}~{n_max}개 작성한다.\n"
               "반드시 다음 6가지를 모두 포함한다: "
               "①지급 조건(누가·언제 받는가) ②예외 사항(받지 못하는 경우) ③계산 기준(정확한 계산 방법) "
               "④자주 틀리는 부분(흔한 오해·실수) ⑤법적 근거(관련 법령 조항) ⑥실무 팁(사용 시 주의사항).\n"
@@ -85,7 +87,7 @@ _H2_RULE = (
 )
 
 
-def get_article_prompt(calc: dict, seo: dict = None, faq: list = None, example_context: dict = None, intent: str = None) -> tuple:
+def get_article_prompt(calc: dict, seo: dict = None, faq: list = None, example_context: dict = None, intent: str = None, law_ssot_block: str = "") -> tuple:
     seo = seo or {}
     example_str = json.dumps(example_context, ensure_ascii=False) if example_context else "제공된 계산 데이터 없음"
 
@@ -134,8 +136,10 @@ def get_article_prompt(calc: dict, seo: dict = None, faq: list = None, example_c
         + _VALID_CALCULATORS
     )
 
+    law_ssot_prefix = (law_ssot_block.strip() + "\n\n") if law_ssot_block.strip() else ""
     system = (
-        "너는 10년차 SEO 콘텐츠 에디터다. 아래 계산기 주제로 블로그 글을 작성한다.\n"
+        law_ssot_prefix
+        + "너는 10년차 SEO 콘텐츠 에디터다. 아래 계산기 주제로 블로그 글을 작성한다.\n"
         f"[필수 구조 — 아래 H2 이름을 그대로 사용하고 순서를 지킨다]\n{structure}\n"
         f"{system_instructions}\n\n"
         + _H2_RULE

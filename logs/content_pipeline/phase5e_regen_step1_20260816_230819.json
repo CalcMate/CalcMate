@@ -1,0 +1,88 @@
+{
+  "step": "STEP1",
+  "ran_at": "2026-08-16T23:08:19.747012",
+  "results": [
+    {
+      "no": 4,
+      "prefix": "04",
+      "slug": "four-insurances",
+      "keyword": "4대보험 계산",
+      "status": "OK",
+      "body_file": "04_four-insurances_4대보험_계산.html",
+      "text_len": 1776,
+      "new_gate_all_clear": true,
+      "new_gate_critical": [],
+      "new_gate_major": [],
+      "old_gate_passed": false,
+      "h2_list": [
+        "계산 원리",
+        "지급 조건",
+        "주의사항",
+        "FAQ"
+      ],
+      "ssot_injected": true
+    },
+    {
+      "no": 5,
+      "prefix": "05",
+      "slug": "annual-leave-allowance",
+      "keyword": "연차수당 계산방법",
+      "status": "OK",
+      "body_file": "05_annual-leave-allowance_연차수당_계산방법.html",
+      "text_len": 2076,
+      "new_gate_all_clear": true,
+      "new_gate_critical": [],
+      "new_gate_major": [],
+      "old_gate_passed": true,
+      "h2_list": [
+        "이용 절차",
+        "계산 예시",
+        "주의사항",
+        "FAQ"
+      ],
+      "ssot_injected": false
+    },
+    {
+      "no": 7,
+      "prefix": "07",
+      "slug": "육아휴직_급여_계산기",
+      "keyword": "육아휴직 급여 조건",
+      "status": "OK",
+      "body_file": "07_육아휴직_급여_계산기_육아휴직_급여_조건.html",
+      "text_len": 1933,
+      "new_gate_all_clear": true,
+      "new_gate_critical": [],
+      "new_gate_major": [],
+      "old_gate_passed": false,
+      "h2_list": [
+        "지급 대상",
+        "근로시간 조건",
+        "제외 대상",
+        "계산 방법",
+        "FAQ"
+      ],
+      "ssot_injected": true
+    },
+    {
+      "no": 10,
+      "prefix": "10",
+      "slug": "four-insurances",
+      "keyword": "4대보험 취득신고 서류",
+      "status": "OK",
+      "body_file": "10_four-insurances_4대보험_취득신고_서류.html",
+      "text_len": 2089,
+      "new_gate_all_clear": true,
+      "new_gate_critical": [],
+      "new_gate_major": [],
+      "old_gate_passed": true,
+      "h2_list": [
+        "필수 서류 목록",
+        "서류 발급 방법",
+        "제출 기한 및 절차",
+        "주의사항",
+        "FAQ"
+      ],
+      "ssot_injected": true
+    }
+  ]
+}
