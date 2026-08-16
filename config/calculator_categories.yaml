@@ -7,6 +7,9 @@ unemployment-benefit:
 parental-leave-benefit:
   categories: ["정부지원", "육아"]
   tags: ["육아휴직", "급여계산", "정부지원"]
+육아휴직_급여_계산기:
+  categories: ["정부지원", "육아"]
+  tags: ["육아휴직", "급여계산", "정부지원"]
 four-insurances:
   categories: ["노동", "보험"]
   tags: ["4대보험", "급여계산"]

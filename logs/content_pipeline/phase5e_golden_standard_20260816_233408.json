@@ -1,0 +1,112 @@
+{
+  "ran_at": "2026-08-16T23:34:08.864605",
+  "final": "WARN",
+  "results": [
+    {
+      "prefix": "01",
+      "keyword": "퇴직금 받는 조건",
+      "overall": "PASS",
+      "issues": [],
+      "warns": [],
+      "url": "http://salarymate.test/%ed%87%b4%ec%a7%81%ea%b8%88-%eb%b0%9b%eb%8a%94-%ec%a1%b0%ea%b1%b4/",
+      "cat_ok": true,
+      "tag_ok": true
+    },
+    {
+      "prefix": "02",
+      "keyword": "주휴수당 계산법",
+      "overall": "PASS",
+      "issues": [],
+      "warns": [],
+      "url": "http://salarymate.test/%ec%a3%bc%ed%9c%b4%ec%88%98%eb%8b%b9-%ea%b3%84%ec%82%b0%eb%b2%95/",
+      "cat_ok": true,
+      "tag_ok": true
+    },
+    {
+      "prefix": "03",
+      "keyword": "실업급여 조건",
+      "overall": "PASS",
+      "issues": [],
+      "warns": [],
+      "url": "http://salarymate.test/%ec%8b%a4%ec%97%85%ea%b8%89%ec%97%ac-%ec%a1%b0%ea%b1%b4/",
+      "cat_ok": true,
+      "tag_ok": true
+    },
+    {
+      "prefix": "04",
+      "keyword": "4대보험 계산",
+      "overall": "WARN",
+      "issues": [],
+      "warns": [
+        "G1분량부족-74자"
+      ],
+      "url": "http://salarymate.test/4%eb%8c%80%eb%b3%b4%ed%97%98-%ea%b3%84%ec%82%b0/",
+      "cat_ok": true,
+      "tag_ok": true
+    },
+    {
+      "prefix": "05",
+      "keyword": "연차수당 계산방법",
+      "overall": "WARN",
+      "issues": [],
+      "warns": [
+        "minor: G-STYLE+"
+      ],
+      "url": "http://salarymate.test/%ec%97%b0%ec%b0%a8%ec%88%98%eb%8b%b9-%ea%b3%84%ec%82%b0%eb%b0%a9%eb%b2%95/",
+      "cat_ok": true,
+      "tag_ok": true
+    },
+    {
+      "prefix": "06",
+      "keyword": "퇴직금 신청서류",
+      "overall": "PASS",
+      "issues": [],
+      "warns": [],
+      "url": "http://salarymate.test/%ed%87%b4%ec%a7%81%ea%b8%88-%ec%8b%a0%ec%b2%ad%ec%84%9c%eb%a5%98/",
+      "cat_ok": true,
+      "tag_ok": true
+    },
+    {
+      "prefix": "07",
+      "keyword": "육아휴직 급여 조건",
+      "overall": "WARN",
+      "issues": [],
+      "warns": [
+        "G1분량부족-67자"
+      ],
+      "url": "http://salarymate.test/%ec%9c%a1%ec%95%84%ed%9c%b4%ec%a7%81-%ea%b8%89%ec%97%ac-%ec%a1%b0%ea%b1%b4/",
+      "cat_ok": true,
+      "tag_ok": true
+    },
+    {
+      "prefix": "08",
+      "keyword": "연말정산 환급액",
+      "overall": "PASS",
+      "issues": [],
+      "warns": [],
+      "url": "http://salarymate.test/%ec%97%b0%eb%a7%90%ec%a0%95%ec%82%b0-%ed%99%98%ea%b8%89%ec%95%a1/",
+      "cat_ok": true,
+      "tag_ok": true
+    },
+    {
+      "prefix": "09",
+      "keyword": "실업급여 신청방법",
+      "overall": "PASS",
+      "issues": [],
+      "warns": [],
+      "url": "http://salarymate.test/%ec%8b%a4%ec%97%85%ea%b8%89%ec%97%ac-%ec%8b%a0%ec%b2%ad%eb%b0%a9%eb%b2%95/",
+      "cat_ok": true,
+      "tag_ok": true
+    },
+    {
+      "prefix": "10",
+      "keyword": "4대보험 취득신고 서류",
+      "overall": "PASS",
+      "issues": [],
+      "warns": [],
+      "url": "http://salarymate.test/4%eb%8c%80%eb%b3%b4%ed%97%98-%ec%b7%a8%eb%93%9d%ec%8b%a0%ea%b3%a0-%ec%84%9c%eb%a5%98/",
+      "cat_ok": true,
+      "tag_ok": true
+    }
+  ]
+}
