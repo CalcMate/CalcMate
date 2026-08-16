@@ -304,6 +304,46 @@ four-insurances:
     ltc_rate: 0.1296       # 장기요양보험 = 건강보험료 × 12.96% (2025년) ← 급여 아닌 건강보험료에 곱
     ei_rate:  0.009        # 고용보험 근로자 요율 0.9%
     reference_year: 2025
+  content_ssot:
+    # G-LEGAL-CURRENT Gate가 읽는 콘텐츠 수치 SSOT
+    # forbidden_in_content: 이 값이 게시물 본문/FAQ에 등장하면 CRITICAL fail
+    effective_year: 2026
+    items:
+      - item: "건강보험료율 (근로자 부담)"
+        value: "3.545%"
+        effective_year: 2026
+        effective_period: "2025년 1월 이후"
+        legal_basis: "국민건강보험법 시행령 제44조 / 보건복지부 고시"
+        source: "건강보험공단"
+        applies_to: "사업장 가입 근로자"
+        exceptions: "지역가입자 상이"
+        forbidden_in_content:
+          - "3.52%"
+          - "3.535%"
+          - "3.53%"
+      - item: "장기요양보험료율"
+        value: "건보료의 12.96%"
+        effective_year: 2026
+        effective_period: "2025년 1월 이후"
+        legal_basis: "노인장기요양보험법 시행령 제4조"
+        source: "보건복지부 고시"
+        applies_to: "건강보험 가입자"
+        exceptions: null
+        forbidden_in_content:
+          - "12.95%"
+          - "12.81%"
+          - "12.27%"
+      - item: "4대보험 취득신고 기한"
+        value: "취득일로부터 14일 이내"
+        effective_year: 2026
+        effective_period: "현행"
+        legal_basis: "국민연금법 시행규칙 제2조 / 국민건강보험법 시행규칙 제4조"
+        source: "국민건강보험공단"
+        applies_to: "사업장 취득신고 (근로자 고용 시)"
+        exceptions: null
+        forbidden_in_content:
+          - "7일 이내"
+          - "10일 이내"
 
 연말정산_환급액_계산기:
   name: 연말정산 환급액 계산기
@@ -451,6 +491,27 @@ four-insurances:
         - 3500000               # 4개월: 350만원
         - 4000000               # 5개월: 400만원
         - 4500000               # 6개월: 450만원
+  content_ssot:
+    # writer_note에서 "구체 금액은 절대 언급하지 않는다"고 명시.
+    # 특정 상한·하한 금액이 기사 본문에 등장하면 CRITICAL fail.
+    # 이유: 6+6 특례(2024~) 도입으로 단순 "상한 150만원" 서술은 불완전하고 오해를 유발.
+    effective_year: 2026
+    items:
+      - item: "육아휴직 급여 일반 상한 (게시물 내 금액 언급 금지)"
+        value: "금액 미언급 — 고용노동부 최신 안내 참고 권유"
+        effective_year: 2026
+        effective_period: "2024-01-01 이후 (6+6 특례 도입)"
+        legal_basis: "고용보험법 시행령 제95조 / 제95조의2"
+        source: "고용노동부"
+        applies_to: "육아휴직 급여 수급자"
+        exceptions: "6+6 부모육아휴직 특례 적용 시 상이"
+        forbidden_in_content:
+          - "상한 150만원"
+          - "상한액 150만원"
+          - "최대 150만원"
+          - "상한 120만원"
+          - "상한액 120만원"
+          - "최대 120만원"
 
 freelancer-tax-3p3:
   name: 프리랜서 3.3% 원천징수 계산기
