@@ -102,13 +102,66 @@ def _resolve_wp_tag_ids(names: list[str]) -> list[int]:
     return ids
 
 
-def build_content(body_html: str, calc_slug: str) -> str:
-    """inject_cta_and_links 후 Gutenberg 래핑"""
+_WP_IMAGE_RE = re.compile(
+    r"<!--\s*wp:image\b.*?-->\s*<figure.*?</figure>\s*<!--\s*/wp:image\s*-->",
+    re.DOTALL,
+)
+
+
+def extract_image_blocks(content: str) -> list[tuple[str, str]]:
+    """기존 content에서 wp:image 블록과 직전 H2 텍스트를 추출 (MINOR-2: 보존용).
+
+    반환: [(이미지 블록 원문, 직전 H2 텍스트 또는 ""), ...]
+    """
+    blocks = []
+    for m in _WP_IMAGE_RE.finditer(content):
+        before = content[: m.start()]
+        h2s = list(re.finditer(r"<h2[^>]*>(.*?)</h2>", before, re.DOTALL))
+        anchor = re.sub(r"<[^>]+>", "", h2s[-1].group(1)).strip() if h2s else ""
+        blocks.append((m.group(0), anchor))
+    return blocks
+
+
+def set_img_alt(block: str, alt: str) -> str:
+    """wp:image 블록 내 <img ... alt="..."> 의 alt 값 갱신 (MINOR-1)."""
+    if not alt:
+        return block
+    return re.sub(r'(<img\b[^>]*\salt=")[^"]*(")', rf"\g<1>{alt}\g<2>", block, count=1)
+
+
+def merge_image_blocks(body_html: str, blocks: list[tuple[str, str]], alt: str = "") -> str:
+    """새 본문에 기존 wp:image 블록을 보존한다.
+
+    - 중복 방지: 동일 src 이미지가 새 본문에 이미 있으면 스킵 (Case C)
+    - 위치: 원래 직전 H2 텍스트를 새 본문에서 찾아 그 직후에 삽입 (Case A)
+    - H2를 못 찾으면 본문 끝에 추가
+    """
+    for block, anchor in blocks:
+        src_m = re.search(r'<img\b[^>]*\bsrc="([^"]+)"', block)
+        src = src_m.group(1) if src_m else ""
+        if src and src in body_html:
+            continue  # 중복 방지
+        block = set_img_alt(block, alt)
+        if anchor:
+            m = re.search(rf"(<h2[^>]*>{re.escape(anchor)}</h2>)", body_html)
+            if m:
+                pos = m.end()
+                body_html = body_html[:pos] + "\n\n" + block + "\n" + body_html[pos:]
+                continue
+        body_html = body_html.rstrip() + "\n\n" + block
+    return body_html
+
+
+def build_content(body_html: str, calc_slug: str,
+                  image_blocks: list[tuple[str, str]] | None = None,
+                  body_alt: str = "") -> str:
+    """inject_cta_and_links 후 Gutenberg 래핑. 기존 wp:image 블록은 보존한다."""
     calc_name = get_calc_name(calc_slug)
     body_html, report = inject_cta_and_links(body_html, calc_slug, calc_name)
     cta = "✅" if report["cta_inserted"] else "⚠️(이미 존재)"
     lnk = f"✅{report['internal_links_count']}개" if report["links_inserted"] else "⚠️(이미 존재)"
     print(f"     CTA={cta}  내부링크={lnk}")
+    body_html = merge_image_blocks(body_html, image_blocks or [], body_alt)
     return f"<!-- wp:html -->\n{body_html}\n<!-- /wp:html -->"
 
 
@@ -124,6 +177,7 @@ def update_one(prefix: str, calc_slug: str, keyword: str, post_id: int) -> dict:
 
     body_html = html_files[0].read_text(encoding="utf-8")
     seo = {}
+    req_data = {}
     if req_files:
         req_data = json.loads(req_files[0].read_text(encoding="utf-8"))
         seo = req_data.get("seo", {})
@@ -133,8 +187,26 @@ def update_one(prefix: str, calc_slug: str, keyword: str, post_id: int) -> dict:
     regen = "재생성" if prefix in REGEN_PREFIXES else "후처리"
     print(f"     {regen} | HTML={html_files[0].name} ({len(body_html)}자)")
 
-    # 2. CTA + 내부링크 삽입
-    content = build_content(body_html, calc_slug)
+    # 2a. 기존 WP 게시본에서 wp:image 블록 추출 (MINOR-2: 이미지 유실 방지)
+    image_blocks: list[tuple[str, str]] = []
+    try:
+        cur = SESSION.get(
+            f"{WP_BASE}/wp-json/wp/v2/posts/{post_id}?context=edit", timeout=10,
+        )
+        cur.raise_for_status()
+        image_blocks = extract_image_blocks(cur.json().get("content", {}).get("raw", ""))
+        print(f"     기존 이미지 블록: {len(image_blocks)}개")
+    except Exception as e:
+        print(f"     ⚠️ 기존 content 조회 실패 (이미지 블록 미보존): {e}")
+
+    # 2b. request JSON의 body alt 텍스트 (MINOR-1)
+    body_alt = ""
+    img_info = (req_data.get("images") or {}).get("body") or {}
+    if isinstance(img_info, dict):
+        body_alt = img_info.get("alt", "") or ""
+
+    # 3. CTA + 내부링크 삽입 (+ 이미지 블록 보존)
+    content = build_content(body_html, calc_slug, image_blocks, body_alt)
 
     # 3. 카테고리/태그 ID 조회
     cat_entry = _CAT_MAP.get(calc_slug, {})
