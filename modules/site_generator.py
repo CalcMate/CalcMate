@@ -19,7 +19,7 @@ import datetime
 
 # _CALC_DESCS 제거 (P2-2-C) — card_desc는 registry v3에서 공급됨.
 
-_CONTACT_EMAIL = "contact@calcmate.kr"
+_CONTACT_EMAIL = "calcmate.kr@gmail.com"
 _EFFECTIVE_DATE = "2026년 8월 6일"
 
 # ── Site CSS ─────────────────────────────────────────────────────────
