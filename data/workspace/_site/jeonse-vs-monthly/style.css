@@ -30,6 +30,10 @@ body{font-family:-apple-system,'Apple SD Gothic Neo','Pretendard','Noto Sans KR'
 
 /* Hero */
 .sm-hero{padding:var(--sp-5) 0 var(--sp-3)}
+.sm-hero-nav{display:flex;gap:var(--sp-1);margin-bottom:var(--sp-2)}
+.sm-hero-nav-link{display:inline-flex;align-items:center;background:var(--c-primary-bg);color:var(--c-primary);font-size:13px;font-weight:600;padding:4px 12px;border-radius:var(--r-badge);text-decoration:none}
+.sm-hero-nav-link:hover{background:var(--c-primary);color:#fff}
+.sm-hero-nav-link:focus-visible{outline:3px solid var(--c-primary);outline-offset:2px}
 .sm-hero-badge{display:inline-flex;align-items:center;gap:6px;background:var(--c-primary-bg);color:var(--c-primary);font-size:13px;font-weight:600;padding:4px 12px;border-radius:var(--r-badge);margin-bottom:var(--sp-2)}
 .sm-hero h1{font-size:28px;font-weight:800;letter-spacing:-.5px;line-height:1.3;margin-bottom:6px}
 .sm-hero-sub{color:var(--c-text-sub);font-size:14px}

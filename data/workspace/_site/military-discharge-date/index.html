@@ -106,6 +106,9 @@ input[type=date]:focus,select:focus{border-color:var(--primary)}
 .progress-bar{margin-top:.75rem;background:#e0f2fe;border-radius:99px;height:8px;overflow:hidden}
 .progress-fill{height:100%;background:var(--primary);border-radius:99px;transition:width .4s}
 .disclaimer{margin-top:1rem;font-size:.78rem;color:var(--sub);line-height:1.5;padding:.75rem;background:#fefce8;border:1px solid #fde68a;border-radius:6px}
+.top-nav{display:flex;gap:.5rem;margin-bottom:.75rem}
+.top-nav a{font-size:.78rem;font-weight:600;color:var(--primary);background:#f0f9ff;border:1px solid #bae6fd;padding:.3rem .7rem;border-radius:999px;text-decoration:none}
+.top-nav a:hover{background:var(--primary);color:#fff;border-color:var(--primary)}
 /* 콘텐츠 섹션 */
 .content-wrap{width:100%;max-width:480px;margin-top:1.5rem}
 .c-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.75rem;margin-bottom:1.25rem;box-shadow:0 1px 3px rgba(0,0,0,.08)}
@@ -139,6 +142,10 @@ input[type=date]:focus,select:focus{border-color:var(--primary)}
 </head>
 <body>
 <div class="card">
+  <nav class="top-nav" aria-label="사이트 내비게이션">
+    <a href="https://calcmate.kr/">홈</a>
+    <a href="https://calcmate.kr/#calculators">계산기 목록</a>
+  </nav>
   <h1>군인 전역일 계산기</h1>
   <p class="sub">입영일과 군별을 선택하면 예상 전역일을 계산합니다.</p>
   <div class="field">

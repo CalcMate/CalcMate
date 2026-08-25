@@ -1453,6 +1453,20 @@ def render_related_posts(calc: dict, cfg: dict = None) -> str:
     )
 
 
+def render_top_nav(cfg: dict = None) -> str:
+    """계산기 상세 페이지 상단(Hero) 홈/계산기 목록 링크.
+    404 페이지(site_generator.generate_404)와 동일한 경로 관례(SITE_URL/, SITE_URL/#calculators)를 재사용."""
+    site_url = str((cfg or {}).get("SITE_URL", "")).rstrip("/")
+    home_url = f"{site_url}/" if site_url else "/"
+    list_url = f"{site_url}/#calculators" if site_url else "/#calculators"
+    return (
+        '    <nav class="sm-hero-nav" aria-label="사이트 내비게이션">\n'
+        f'      <a class="sm-hero-nav-link" href="{_html.escape(home_url)}">홈</a>\n'
+        f'      <a class="sm-hero-nav-link" href="{_html.escape(list_url)}">계산기 목록</a>\n'
+        '    </nav>'
+    )
+
+
 def render_footer_cta(calc: dict, cfg: dict = None) -> str:
     """페이지 하단 CTA (전체 계산기 목록 및 주요 링크)."""
     site_url = str((cfg or {}).get("SITE_URL", "")).rstrip("/")
@@ -1558,6 +1572,7 @@ def generate_html(calc: dict, cfg: dict = None) -> str:
     repl = {
         "TITLE": _html.escape(title), "DESCRIPTION": _html.escape(desc),
         "CATEGORY": f"{emoji} {_html.escape(category)}", "NAME": _html.escape(name),
+        "TOP_NAV": render_top_nav(cfg),
         "HERO_SUB": _html.escape(desc), "FORM_FIELDS": _form_fields_v2(ins, labels),
         "CALC_BTN": _html.escape(f"{short} 계산하기"),
         "RESULT_LABEL": _html.escape(plabel if plabel.startswith("예상") else f"예상 {plabel}"),
