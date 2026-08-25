@@ -1612,8 +1612,38 @@ def generate_html(calc: dict, cfg: dict = None) -> str:
             f'<script src="script.js"></script></body></html>')
 
 
+def _generate_tier2b(calc: dict, cfg: dict = None) -> dict:
+    """Tier2-B 계산기(예: military-discharge-date) 전용 경로.
+    표준 폼/수식 기반 생성기를 타지 않고, App Factory가 저장해 둔
+    app_templates.html_template을 그대로 사용한다(scripts/_rebuild_site.py의
+    기존 Tier2-B 분기와 동일한 방식 — 새 로직 아님, 재사용)."""
+    tpl_id = calc.get("template_id")
+    html = ""
+    if tpl_id:
+        try:
+            from adapters.db.factory import get_db_adapter
+            from repositories.template_repository import TemplateRepository
+            tpl = TemplateRepository(get_db_adapter(cfg or {})).get_by_id(tpl_id)
+            html = (tpl or {}).get("html_template") or ""
+        except Exception as e:
+            _log.warning("Tier2-B 템플릿 로드 실패(slug=%s): %s", calc.get("slug", ""), e)
+    return {
+        "index.html": html, "style.css": "", "script.js": "",
+        "_formula_valid": bool(html),
+        "_formula_msg": ("Tier2-B — DB 템플릿 직접 사용(재생성 아님)" if html
+                         else "Tier2-B 템플릿 로드 실패 — template_id 확인 필요"),
+    }
+
+
 def generate_calculator(calc: dict, cfg: dict = None) -> dict:
-    """index.html / style.css / script.js 3파일 dict 반환(+수식 검증). cfg 선택(Form Engine용)."""
+    """index.html / style.css / script.js 3파일 dict 반환(+수식 검증). cfg 선택(Form Engine용).
+    registry v3의 tier_subtype == "B"(Tier2-B)면 표준 생성기를 건너뛰고
+    _generate_tier2b()로 위임 — 표준 계산기 경로는 이 분기와 완전히 무관하게 그대로 동작."""
+    from .registry_loader import load_registry_v3
+    _slug = str(calc.get("slug", ""))
+    if (load_registry_v3().get(_slug) or {}).get("tier_subtype") == "B":
+        return _generate_tier2b(calc, cfg)
+
     ins = _pj(calc.get("input_schema"), {})
     formula = _pj(calc.get("formula"), calc.get("formula", ""))
     if _validation_mode(calc) == "skip":
