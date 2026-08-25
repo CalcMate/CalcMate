@@ -62,44 +62,42 @@ def load_cfg():
 
 cfg = load_cfg()
 
-# ── 예약 발행 스케줄러 백그라운드 자동 실행 ────────────────────────
-# 대시보드만 띄우고 별도 run_scheduler.bat를 안 돌리면 슬롯 예약(예: 19:35)이
-# 실행되지 않던 문제 수정. @st.cache_resource 로 프로세스당 1회만 스레드 기동
-# (Streamlit rerun/멀티세션에도 중복 실행 안 됨). scheduler 내부 파일 락이
-# run_scheduler.bat 를 병행 실행해도 동시 발행을 막아줌.
+# ── Blog Schedule 스레드 (Golden 10 블로그 콘텐츠 자동 발행) ──────────
+# Calculator Scheduler와 완전히 분리된 독립 스레드.
+# BLOG_SCHEDULE.enabled=true일 때만 기동.
 @st.cache_resource
-def _start_scheduler_thread():
+def _start_blog_scheduler_thread():
     import threading
-    # 프로세스당 1개 보장: 이미 살아있는 scheduler-loop가 있으면 새로 만들지 않음
-    # (st.cache_resource.clear() 등으로 캐시가 비워져 재호출돼도 스레드 중복 기동 방지)
     for _t in threading.enumerate():
-        if _t.name == "scheduler-loop" and _t.is_alive():
+        if _t.name == "blog-scheduler-loop" and _t.is_alive():
             return _t
     from modules.scheduler import run_scheduler_loop
     import main as _PIPE
 
+    # Blog 라인 전용 cfg 복사본 — Calculator cfg와 독립
+    blog_cfg = dict(cfg)
+    blog_cfg["scheduler_line"] = "blog"
+
     def _loop():
         try:
-            run_scheduler_loop(cfg, _PIPE.resolve_publish_fn(cfg))
-        except Exception as e:  # 스레드가 죽어도 대시보드는 유지
+            run_scheduler_loop(blog_cfg, _PIPE.resolve_blog_publish_fn(blog_cfg))
+        except Exception as e:
             import logging
-            logging.getLogger("dashboard").error("스케줄러 스레드 종료: %s", e, exc_info=True)
-            # 자동화 정지 — 운영자 즉시 인지(Sprint 1 §1-1)
+            logging.getLogger("dashboard").error("Blog 스케줄러 스레드 종료: %s", e, exc_info=True)
             try:
                 from modules import telegram_ops
-                telegram_ops.notify_level(cfg, "ERROR",
-                    "발행 스케줄러 스레드 종료 — 예약 발행 중단됨", e, event="error")
+                telegram_ops.notify_level(blog_cfg, "ERROR",
+                    "Blog 발행 스케줄러 스레드 종료", e, event="error")
             except Exception:
                 pass
 
-    t = threading.Thread(target=_loop, name="scheduler-loop", daemon=True)
+    t = threading.Thread(target=_loop, name="blog-scheduler-loop", daemon=True)
     t.start()
     return t
 
-# PUBLISH_SCHEDULE.enabled 가 true 이고 운영 모드가 scheduled 일 때만 기동
-if cfg.get("OPERATION_MODE", "scheduled") == "scheduled" \
-        and (cfg.get("PUBLISH_SCHEDULE") or {}).get("enabled", True):
-    _start_scheduler_thread()
+# Blog Scheduler: BLOG_SCHEDULE.enabled=true일 때만 기동
+if cfg.get("BLOG_SCHEDULE", {}).get("enabled", False):
+    _start_blog_scheduler_thread()
 
 # ── Content Sync(WP→Sheets 동기화) 백그라운드 자동 실행 ────────────
 # Publish Scheduler와 완전히 분리된 독립 서비스. 대시보드가 떠 있으면 매일
@@ -204,7 +202,7 @@ NAV_GROUPS = {
     "🏠 Dashboard":    ["🏠 운영센터", "📊 현황"],
     "📝 Content":      ["📋 발행 목록", "🗑️ 휴지통", "📋 작업 보드", "💬 AI Workspace", "🧠 전략회의실"],
     "🧮 Calculator":   ["🏭 App Factory", "🧮 계산기 관리"],
-    "📅 Scheduler":    ["📅 오늘 발행 일정", "📊 AI Pipeline", "🌐 사이트 관리"],
+    "📅 Scheduler":    ["📝 Blog Schedule", "📊 AI Pipeline", "🌐 사이트 관리"],
     "💰 Revenue":      ["💰 비용 모니터"],
     "📡 Logs":         ["⚠️ 오류 로그", "📡 실시간 로그", "🏥 헬스체크"],
     "🔧 Settings":     ["🔧 설정"],
@@ -440,9 +438,6 @@ def render_quick_actions():
                 _run_action("계산기 글 생성", lambda: run_calculator_once(cfg, max_count=1)); st.rerun()
             if st.button("📝 글 생성(1건)", use_container_width=True, key="qa_post"):
                 _run_action("글 생성(1건)", lambda: PIPE.run_once(cfg, max_count=1)); st.rerun()
-            if st.button("🌐 워드프레스 발행", use_container_width=True, key="qa_wp"):
-                from modules import scheduler as SCH
-                _run_action("즉시 발행", lambda: SCH.immediate_publish(cfg, PIPE.resolve_publish_fn(cfg), "pull")[1]); st.rerun()
 
 def render_recent_activity():
     with st.container(border=True):
@@ -849,50 +844,19 @@ elif tab == "💰 비용 모니터":
         st.caption(f"Retry Queue 로드 실패: {e}")
 
 # ══════════════════════════════════════════════════════════════
-# 탭: 📅 오늘 발행 일정 (슬롯 스케줄러)
+# 탭: 📝 Blog Schedule (Golden 10 블로그 자동 발행 + Content Sync)
 # ══════════════════════════════════════════════════════════════
-elif tab == "📅 오늘 발행 일정":
-    st.title("📅 오늘 발행 일정")
+elif tab == "📝 Blog Schedule":
+    st.title("📝 Blog Schedule")
     from modules import scheduler as SCH
     from datetime import datetime as _dt
+    import threading as _th
 
     def _parse_t(s, fallback="09:00"):
         try:
             return _dt.strptime(s, "%H:%M").time()
         except Exception:
             return _dt.strptime(fallback, "%H:%M").time()
-
-    # ── 스케줄러 컨트롤 패널 (상태 + 원스톱 버튼) ──
-    from modules import cost_manager as CM
-    import threading as _th
-    import main as PIPE
-    today = date.today().isoformat()
-    _sc = SCH.load_schedule(cfg)
-    _summ = (SCH.summarize(_sc) if _sc and _sc.get("date") == today
-             else {"completed": 0, "pending": 0, "failed": 0, "next": None})
-    _enabled = bool((cfg.get("PUBLISH_SCHEDULE") or {}).get("enabled", True))
-    _paused = CM.is_paused(cfg)
-    _alive = any(t.name == "scheduler-loop" and t.is_alive() for t in _th.enumerate())
-    _running = _alive and _enabled and not _paused
-    with st.container(border=True):
-        s1, s2, s3 = st.columns(3)
-        s1.markdown("**상태**: " + ("🟢 Running" if _running else ("🔴 Paused(중지)" if _paused else "🔴 정지")))
-        s2.markdown(f"**enabled**: {'on' if _enabled else 'off'} · 스레드 {'live' if _alive else 'dead'}")
-        s3.markdown(f"**다음 실행**: {_summ.get('next') or '-'}")
-        st.caption(f"오늘 요약 — 완료 {_summ['completed']} · 대기 {_summ['pending']} · 실패 {_summ['failed']}")
-        bc = st.columns(6)
-        if bc[0].button("🆕 생성", key="ctl_gen", use_container_width=True):
-            SCH.generate_today_schedule(cfg); st.rerun()
-        if bc[1].button("♻️ 재생성", key="ctl_regen", use_container_width=True):
-            SCH.reset_today(cfg); SCH.generate_today_schedule(cfg); st.rerun()
-        if bc[2].button("🗑️ 초기화", key="ctl_reset", use_container_width=True):
-            SCH.reset_today(cfg); st.rerun()
-        if bc[3].button("⚡ 즉시발행", key="ctl_now", use_container_width=True):
-            st.session_state["_sched_confirm"] = True
-        if bc[4].button("⏸️ 중지", key="ctl_pause", disabled=_paused, use_container_width=True):
-            CM.pause(cfg); st.rerun()
-        if bc[5].button("▶️ 재개", key="ctl_resume", disabled=not _paused, use_container_width=True):
-            CM.resume(cfg); st.rerun()
 
     # ── Content Sync 수동 트리거 (WordPress ↔ Sheets 상태 동기화) ──
     # run_sync_once 100% 재사용. content_sync.lock으로 자동 03:00 실행과 상호배제.
@@ -927,251 +891,66 @@ elif tab == "📅 오늘 발행 일정":
                     for a in res.get("anomalies", [])[:10]:
                         st.write(f"- {a.get('flag')} · {a.get('name','')} (post_id={a.get('post_id','-')})")
 
-    # ── 현재 일정 표시 ──
-    sched = SCH.load_schedule(cfg)
-    today = date.today().isoformat()
-
-    # ── 스케줄 탭 전용 자동 새로고침(테스트용) ──
-    # 예약 시각이 지난 슬롯이 '예정/처리중/재시도'인 동안 1분마다 자동 새로고침하고,
-    # '발행완료/실패/HOLD/Skip'(terminal)이 되면 즉시 종료. 안전장치로 최대 10분까지만.
-    # 이 탭에서만 동작(다른 탭은 이 코드 미실행). UI 표시 전용 — 예약/스케줄러/발행/WP/Telegram 로직과
-    # 무관. 새로고침 횟수·마지막 시각·감시상태는 session_state로만 관리.
-    import time as _time
-    _ss = st.session_state
-    for _k, _v in (("sched_ar_start", 0.0), ("sched_ar_last", 0.0), ("sched_ar_count", 0),
-                   ("sched_ar_watching", False), ("sched_ar_render", 0.0)):
-        _ss.setdefault(_k, _v)
-
-    def _hm2min(t):
-        try:
-            _h, _m = str(t).split(":")[:2]
-            return int(_h) * 60 + int(_m)
-        except Exception:
-            return -1
-
-    _AR_CAP = 600                                     # 안전장치: 최대 10분
-    _ACTIVE_ST = ("pending", "running", "retry")      # 미완료(계속) / completed·failed = terminal(종료)
-    _now = _dt.now()
-    _now_min = _now.hour * 60 + _now.minute
-    _now_ts = _time.time()
-    _entries_today = (sched.get("schedule") or []) if (sched and sched.get("date") == today) else []
-    # 예약시각이 도래했는데 아직 미완료인 슬롯이 있으면 '감시(watching)' → 계속 새로고침
-    _due_pending = [e for e in _entries_today
-                    if 0 <= _hm2min(e.get("scheduled_time")) <= _now_min
-                    and str(e.get("status", "")).strip() in _ACTIVE_ST]
-    _watching = len(_due_pending) > 0
-
-    _prev_watching = _ss["sched_ar_watching"]
-    if _watching and not _prev_watching:              # 감시 시작(에지) → 캡 기준시각·카운트 초기화
-        _ss["sched_ar_start"] = _now_ts
-        _ss["sched_ar_last"] = _now_ts
-        _ss["sched_ar_count"] = 0
-    elif (_watching or _prev_watching) and _ss["sched_ar_last"] and (_now_ts - _ss["sched_ar_last"]) >= 55:
-        _ss["sched_ar_count"] += 1                    # 타이머 촉발 새로고침 1회로 집계(terminal 감지 tick 포함)
-        _ss["sched_ar_last"] = _now_ts
-    _ss["sched_ar_watching"] = _watching
-
-    _elapsed = _now_ts - (_ss["sched_ar_start"] or _now_ts)
-    _ar_active = _watching and _elapsed < _AR_CAP     # 미완료 슬롯 있고 & 10분 이내면 계속
-
-    if _ar_active:
-        _ar_interval = 60                             # 1분 간격 새로고침
-    else:
-        # 감시 아님 → 다음 예약(미도래 pending) 시각까지 대기, 없으면 정지
-        _future_pending = sorted([_hm2min(e.get("scheduled_time")) for e in _entries_today
-                                  if _hm2min(e.get("scheduled_time")) > _now_min
-                                  and str(e.get("status", "")).strip() in ("pending", "retry")])
-        _ar_interval = min(3600, max(20, (_future_pending[0] - _now_min) * 60 + 5)) if _future_pending else None
-
-    _ss["sched_ar_render"] = _now_ts
-    if _ar_interval is not None:
-        @st.fragment(run_every=_ar_interval)
-        def _sched_auto_refresh():
-            # 타이머 만료 시에만 전체 앱 재실행(초기 렌더는 render_ts 가드로 제외 → 무한루프 방지)
-            if _time.time() - _ss["sched_ar_render"] >= (_ar_interval - 3):
-                st.rerun()
-        _sched_auto_refresh()
-
-    if _ar_active:
-        st.caption(f"⏱ 자동 새로고침 중 · 미완료 슬롯 {len(_due_pending)}개 · {_ss['sched_ar_count']}회 · "
-                   f"경과 {int(_elapsed // 60)}분/최대 10분 · {_now.strftime('%H:%M:%S')} (완료 시 자동 종료)")
-
-    if sched and sched.get("date") == today:
-        st.caption(f"기준일: {sched['date']} ({sched.get('day_type')}) · 실패모드: {sched.get('failure_mode')}")
-        # 슬롯별 실행 결과 카드 — Empty 대신 상태 유지 표시(저장된 메타 keyword/title/wp만 읽어 표시).
-        _entries = sched.get("schedule", [])
-
-        def _slot_status(e):
-            s = str(e.get("status", "")).strip()
-            r = str(e.get("result", ""))
-            if s == "completed":
-                return "✅ 발행완료", "#16a34a"
-            if s == "running":
-                return "▶ 처리중", "#3b82f6"
-            if s == "retry":
-                return "🟠 재시도", "#f59e0b"
-            if s == "pending":
-                return "⏳ 예정", "#f59e0b"
-            if s == "failed":
-                if any(k in r for k in ("HOLD", "품질보류", "모든후보HOLD")):
-                    return "⚠ HOLD", "#eab308"
-                if any(k in r for k in ("후보소진", "no_calculators", "no_items", "budget")):
-                    return "⏭ Skip", "#94a3b8"
-                return "❌ 실패", "#ef4444"
-            return "⏳ 예정", "#f59e0b"
-
-        if _entries:
-            for e in _entries:
-                label, col = _slot_status(e)
-                with st.container(border=True):
-                    cA, cB = st.columns([1, 3])
-                    cA.markdown(
-                        f"<div style='font-size:18px;font-weight:700'>{e.get('scheduled_time') or e.get('slot_start','-')}</div>"
-                        f"<div style='font-size:11px;color:#64748b'>슬롯 {e.get('slot_start','')}~{e.get('slot_end','')}</div>",
-                        unsafe_allow_html=True)
-                    parts = [f"<span style='color:{col};font-weight:600'>{label}</span>"]
-                    if e.get("keyword"):
-                        parts.append(f"🔑 {e['keyword']}")
-                    if e.get("title"):
-                        parts.append(f"📝 {e['title']}")
-                    tail = []
-                    _t = e.get("completed_at") or e.get("actual_time")
-                    if _t:
-                        tail.append(f"⏱ {_t}")
-                    if e.get("wp_post_id"):
-                        tail.append(f"<a href='{e['wp_url']}' target='_blank'>WP #{e['wp_post_id']}</a>"
-                                    if e.get("wp_url") else f"WP #{e['wp_post_id']}")
-                    if str(e.get("delay_min", "")) not in ("", "-", "None"):
-                        tail.append(f"지연 {e['delay_min']}분")
-                    if tail:
-                        parts.append(f"<span style='font-size:12px;color:#64748b'>{' · '.join(str(x) for x in tail)}</span>")
-                    if not e.get("keyword") and e.get("result"):
-                        parts.append(f"<span style='font-size:12px;color:#64748b'>{e['result']}</span>")
-                    cB.markdown("<br>".join(parts), unsafe_allow_html=True)
-            done = sum(1 for e in _entries if e.get("status") == "completed")
-            st.progress(done / max(len(_entries), 1), text=f"완료 {done}/{len(_entries)}")
-        else:
-            st.info("오늘 생성된 예약 슬롯이 없습니다. (설정 시각이 이미 지나 생성에서 제외됐을 수 있습니다.)")
-            try:
-                _daytype, _cfg_slots = SCH.get_slots_for(cfg, date.today())
-            except Exception:
-                _cfg_slots = []
-            if _cfg_slots:
-                st.caption("설정된 슬롯(참고 — 오늘 미생성):")
-                for s in _cfg_slots:
-                    st.write(f"• {s.get('start')}~{s.get('end')}  ⏭ 오늘 미생성")
-
-        # 실패 건 즉시 재시도
-        failed = [e for e in sched["schedule"] if e.get("status") == "failed"]
-        if failed:
-            st.warning(f"실패 {len(failed)}건 — 즉시 재시도 가능")
-            rc1, rc2 = st.columns([2, 1])
-            pick = rc1.selectbox("재시도할 글", [f"글{e['post_no']} ({e.get('result','')})" for e in failed],
-                                 key="retry_pick")
-            if rc2.button("🔁 즉시 재시도", type="primary"):
-                import main as PIPE
-                entry = failed[[f"글{e['post_no']} ({e.get('result','')})" for e in failed].index(pick)]
-                entry["status"] = "pending"  # 재실행 대상으로 전환
-                with st.spinner("재시도 실행 중..."):
-                    SCH.execute_due_post(cfg, sched, entry, PIPE.resolve_publish_fn(cfg))
-                st.rerun()
-    else:
-        st.info("오늘 생성된 일정이 없습니다. 아래에서 '스케줄 생성'을 누르세요.")
-
-    # (생성/재생성/초기화/즉시발행 버튼은 상단 컨트롤 패널로 통합됨)
-    if st.session_state.get("_sched_confirm"):
-        with st.container(border=True):
-            st.warning("즉시 1건 발행할까요? (예약시간 무시)")
-            m = st.radio("모드", ["예정 글 당겨쓰기(기본)", "추가 발행"], key="_sched_mode")
-            x1, x2 = st.columns(2)
-            if x1.button("✅ 예, 발행", type="primary", key="_sched_yes"):
-                import main as PIPE
-                with st.spinner("즉시 발행 중..."):
-                    ok, msg = SCH.immediate_publish(cfg, PIPE.resolve_publish_fn(cfg), "pull" if "당겨" in m else "add")
-                (st.success if ok else st.error)(msg)
-                st.session_state["_sched_confirm"] = False; st.rerun()
-            if x2.button("취소", key="_sched_no"):
-                st.session_state["_sched_confirm"] = False; st.rerun()
-
+    # ── Blog Schedule 설정 (Golden 10 블로그 자동 발행) ──
     st.divider()
-    # ── 슬롯 설정 ──
-    st.subheader("⚙️ 슬롯 설정 (평일/주말 분리)")
-    ps = dict(cfg.get("PUBLISH_SCHEDULE", {}) or {})
-    default_count = len(ps.get("weekday") or []) or int(cfg.get("DAILY_POST_COUNT", 1) or 1)
-    count = int(st.number_input("하루 발행 개수 (= 슬롯 수, DAILY_POST_COUNT 자동 결정)",
-                                1, 20, default_count, key="sch_count"))
-    st.caption("슬롯 수가 곧 하루 발행 개수입니다. 시작 < 종료, 슬롯 겹침 금지.")
+    st.subheader("📝 Blog Schedule (Golden 10 블로그 자동 발행)")
 
-    enabled = st.toggle("스케줄러 사용(enabled)", value=ps.get("enabled", True), key="sch_enabled")
-    fmode = st.selectbox(
-        "실패 처리 모드", SCH.FAILURE_MODES,
-        index=SCH.FAILURE_MODES.index(ps.get("failure_mode", "retry_in_slot"))
-        if ps.get("failure_mode", "retry_in_slot") in SCH.FAILURE_MODES else 1,
-        format_func=lambda m: {"none": "모드1: 재시도 안함",
-                               "retry_in_slot": "모드2: 슬롯 내 재시도",
-                               "next_slot": "모드3: 다음 빈 슬롯으로 이동"}.get(m, m),
-        key="sch_fmode")
+    bs = dict(cfg.get("BLOG_SCHEDULE", {}) or {})
+    _blog_enabled = bool(bs.get("enabled", False))
+    _blog_alive = any(t.name == "blog-scheduler-loop" and t.is_alive() for t in _th.enumerate())
+    _blog_running = _blog_alive and _blog_enabled
 
-    def _slot_editor(day_type: str, label: str, is_today: bool = False):
-        # 헤더 표시만 조건부(오늘 적용 요일 강조). 아래 슬롯 값/반환 로직은 무변경.
-        if is_today:
-            st.success(f"✅ {label} · 오늘 적용")
-        else:
-            st.markdown(f"**{label}**")
-            st.caption("오늘 미적용 (다음 해당 요일에 적용)")
-        existing = ps.get(day_type) or SCH.default_slots(count)
-        new_slots = []
-        for i in range(count):
-            cur = existing[i] if i < len(existing) else {"start": "09:00", "end": "10:00"}
-            c1, c2 = st.columns(2)
-            s = c1.time_input(f"[{label}] 글{i+1} 시작", value=_parse_t(cur.get("start", "09:00")),
-                              key=f"{day_type}_s_{i}", step=300)
-            e = c2.time_input(f"[{label}] 글{i+1} 종료", value=_parse_t(cur.get("end", "10:00")),
-                              key=f"{day_type}_e_{i}", step=300)
-            new_slots.append({"start": s.strftime("%H:%M"), "end": e.strftime("%H:%M")})
-        return new_slots
+    with st.container(border=True):
+        b1, b2, b3 = st.columns(3)
+        b1.markdown("**Blog 상태**: " + ("🟢 Running" if _blog_running else "🔴 정지"))
+        b2.markdown(f"**enabled**: {'on' if _blog_enabled else 'off'} · 스레드 {'live' if _blog_alive else 'dead'}")
+        b3.markdown(f"**mode**: `{bs.get('mode', 'draft')}`")
 
-    _today_type = "weekend" if date.today().weekday() >= 5 else "weekday"
-    cwd, cwe = st.columns(2)
-    with cwd:
-        weekday_slots = _slot_editor("weekday", "평일(월~금)", is_today=(_today_type == "weekday"))
-    with cwe:
-        weekend_slots = _slot_editor("weekend", "주말(토~일)", is_today=(_today_type == "weekend"))
+    blog_enabled = st.toggle("Blog 스케줄러 사용(enabled)", value=_blog_enabled, key="blog_enabled")
+    blog_mode = st.selectbox(
+        "Blog 발행 모드", ["draft", "publish"],
+        index=0 if bs.get("mode", "draft") == "draft" else 1,
+        format_func=lambda m: {"draft": "Draft (WP 초안)", "publish": "Publish (WP 즉시 발행)"}.get(m, m),
+        key="blog_mode")
+    blog_weekday_only = st.checkbox("평일만 발행 (weekday_only)", value=bs.get("weekday_only", False), key="blog_wd_only")
 
-    # 검증
-    errs = SCH.validate_slots(weekday_slots, count) + SCH.validate_slots(weekend_slots, count)
-    if errs:
-        for e in errs:
-            st.warning(e)
+    # publish_slots 편집
+    existing_slots = bs.get("publish_slots") or []
+    if not existing_slots:
+        existing_slots = [{"start": "10:00", "end": "10:30"}]
+    blog_slot_count = st.number_input(
+        "Blog 하루 발행 슬롯 수", 1, 10, len(existing_slots), key="blog_slot_count")
 
-    if st.button("💾 슬롯 설정 저장 + 즉시 반영", type="primary"):
-        if errs:
-            st.error("검증 오류를 먼저 해결하세요.")
-        else:
-            cfg_path = BASE / "config" / "config.yaml"
-            with open(cfg_path, encoding="utf-8") as f:
-                raw = yaml.safe_load(f) or {}
-            raw["PUBLISH_SCHEDULE"] = {
-                "enabled": bool(enabled),
-                "failure_mode": fmode,
-                "weekday": weekday_slots,
-                "weekend": weekend_slots,
-            }
-            raw["DAILY_POST_COUNT"] = int(count)  # 슬롯 수 = 하루 발행 개수 동기화
-            with open(cfg_path, "w", encoding="utf-8") as f:
-                yaml.dump(raw, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
-            # cfg 캐시만 갱신(스케줄러 스레드 캐시는 건드리지 않음 — 스레드 중복 기동 방지)
-            load_cfg.clear()
-            cfg = load_cfg()
-            # 저장 즉시 오늘 일정 반영: reset + generate. available_slots로 과거 슬롯 자동 제외.
-            _, _day_slots = SCH.get_slots_for(cfg, date.today())
-            _total = len(_day_slots)
-            SCH.reset_today(cfg)
-            _new = SCH.generate_today_schedule(cfg)
-            _m = len(_new.get("schedule", []))
-            _n = max(0, _total - _m)
-            st.success(f"✅ 적용 완료 (오늘 일정 즉시 반영) · 과거 {_n}개 제외 / 새 {_m}개 슬롯 생성")
-            st.rerun()
+    blog_slots = []
+    for i in range(int(blog_slot_count)):
+        cur = existing_slots[i] if i < len(existing_slots) else {"start": "10:00", "end": "10:30"}
+        c1, c2 = st.columns(2)
+        bs_s = c1.time_input(
+            f"Blog 슬롯 {i+1} 시작", value=_parse_t(cur.get("start", "10:00")),
+            key=f"blog_slot_s_{i}", step=300)
+        bs_e = c2.time_input(
+            f"Blog 슬롯 {i+1} 종료", value=_parse_t(cur.get("end", "10:30")),
+            key=f"blog_slot_e_{i}", step=300)
+        blog_slots.append({"start": bs_s.strftime("%H:%M"), "end": bs_e.strftime("%H:%M")})
+
+    if st.button("💾 Blog 설정 저장", type="primary", key="blog_save"):
+        cfg_path = BASE / "config" / "config.yaml"
+        with open(cfg_path, encoding="utf-8") as f:
+            raw = yaml.safe_load(f) or {}
+        raw["BLOG_SCHEDULE"] = {
+            "enabled": bool(blog_enabled),
+            "mode": blog_mode,
+            "publish_slots": blog_slots,
+            "weekday_only": bool(blog_weekday_only),
+        }
+        with open(cfg_path, "w", encoding="utf-8") as f:
+            yaml.dump(raw, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+        load_cfg.clear()
+        cfg = load_cfg()
+        st.success(f"✅ Blog 설정 저장 완료 · enabled={blog_enabled} · slots={len(blog_slots)}개")
+        st.rerun()
+
+    st.caption("⚠️ Blog 스케줄러 ON/OFF 변경은 Dashboard 재시작 후 적용됩니다.")
 
 # ══════════════════════════════════════════════════════════════
 # 탭: 🌐 사이트 관리 (사이트/계산기 생성 마법사 + 관리)
@@ -1959,16 +1738,41 @@ elif tab == "🧮 계산기 관리":
                     if c.get("generated_at"):
                         st.caption(f"생성 시각: {c.get('generated_at')}")
 
-            files = AG.generate_calculator(c, cfg)
-            if not files["_formula_valid"]:
-                st.warning(f"수식 경고: {files['_formula_msg']}")
-            with st.expander("🔎 앱 미리보기"):
-                import streamlit.components.v1 as components
-                components.html(_inline(files), height=440, scrolling=True)
+            # ── 🧮 계산기 생성 (Phase A: 명시적 버튼 클릭 시에만 실행) ──────────
+            # AG.generate_calculator()는 더 이상 렌더링 시 자동 호출되지 않음.
+            # 결과는 session_state에 유지되어 다른 버튼/rerun에도 재생성되지 않는다.
+            _files_key = f"cm_files_{cid}"
+            _qa_key = f"cm_qa_{cid}"
+            if st.button("🧮 생성", key=f"cm_gen_{cid}"):
+                with st.spinner("계산기 생성 중..."):
+                    st.session_state[_files_key] = AG.generate_calculator(c, cfg)
+                    try:
+                        from modules.review_center import pre_build_qa
+                        st.session_state[_qa_key] = pre_build_qa(c, cfg)
+                    except Exception:
+                        st.session_state[_qa_key] = None
+                st.success("생성 완료"); st.rerun()
+
+            files = st.session_state.get(_files_key)
+            if files is None:
+                st.info("아직 생성되지 않음 — 🧮 생성 버튼을 눌러주세요.")
+            else:
+                if not files["_formula_valid"]:
+                    st.warning(f"수식 경고: {files['_formula_msg']}")
+                _qa_results = st.session_state.get(_qa_key)
+                if _qa_results:
+                    with st.expander("✅ QA 결과 (pre_build_qa)"):
+                        for r in _qa_results:
+                            _icon = "✅" if r["passed"] else ("⏭️" if r["skipped"] else "❌")
+                            st.markdown(f"{_icon} Step {r['step']}: {r['label']} — {r['detail']}")
+                with st.expander("🔎 앱 미리보기"):
+                    import streamlit.components.v1 as components
+                    components.html(_inline(files), height=440, scrolling=True)
 
             b = st.columns(4)
             deploy_label = "🚀 재배포" if url else "🚀 배포"
-            if b[0].button(deploy_label, key=f"cm_dep_{cid}", disabled=not GH.is_configured(cfg)):
+            if b[0].button(deploy_label, key=f"cm_dep_{cid}",
+                           disabled=not GH.is_configured(cfg) or files is None):
                 ok, res = GH.deploy_app(cfg, files,
                                         repo=cfg.get("GITHUB_REPO", "salarymate-calculators"),
                                         subdir=c.get("slug", cid))
@@ -1979,10 +1783,11 @@ elif tab == "🧮 계산기 관리":
             if b[1].button("⏸ 상태토글", key=f"cm_tg_{cid}"):
                 repo.update(cid, {"status": "inactive" if str(c.get("status")).lower() == "active" else "active"})
                 st.rerun()
-            if b[2].button("📥 파일 저장", key=f"cm_dl_{cid}"):
+            if b[2].button("📥 파일 저장", key=f"cm_dl_{cid}", disabled=files is None):
                 import os
                 # 계산기별 폴더 생성 후 3파일 저장(옵션 A). 상대경로(style.css/script.js) 유지 →
                 # 로컬 더블클릭·GitHub Pages 구조 동일. app_generator/템플릿/CSS는 무변경.
+                # (Phase B에서 이 경로를 data/workspace/_site/{slug}/로 연결 예정 — 이번 턴은 무변경)
                 slug = str(c.get("slug", cid)).strip().replace("/", "_").replace("\\", "_").replace("..", "_") or cid
                 outdir = BASE / "data" / "workspace" / slug
                 os.makedirs(outdir, exist_ok=True)
@@ -3261,15 +3066,14 @@ elif tab == "🔧 설정":
                     st.error(f"연결 실패: {_e}")
 
     with st.expander("⚙️ 운영 설정", expanded=False):
-        st.markdown("**발행 방식** — 예약 발행(슬롯 스케줄러) 단일화 (v12 Lite)")
+        st.markdown("**발행 방식** — Calculator는 수동 생성(App Factory/계산기 관리), Blog는 예약 발행(Blog Schedule)")
         operation_mode = "scheduled"
-        st.caption("실행: 예약 발행 → `scripts/run_scheduler.bat` · 단발 → `scripts/run_pipeline.bat`")
+        st.caption("실행: 단발 → `scripts/run_pipeline.bat` · Blog 예약 발행 → '📝 Blog Schedule' 탭")
         st.divider()
         col1, col2 = st.columns(2)
         with col1:
             adsense_mode = st.selectbox("ADSENSE_MODE", ["pre","post"], index=["pre","post"].index(cfg.get("ADSENSE_MODE","pre")), key="s_adsense")
             st.metric("하루 발행 개수 (DAILY_POST_COUNT)", cfg.get("DAILY_POST_COUNT", 3))
-            st.caption("※ '📅 오늘 발행 일정' 탭의 슬롯 수로 자동 결정")
             daily_count = cfg.get("DAILY_POST_COUNT", 3)
         with col2:
             daily_budget = st.number_input("DAILY_AI_BUDGET (USD)", 1, 100, cfg.get("DAILY_AI_BUDGET",5), key="s_db")
