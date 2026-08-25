@@ -84,7 +84,11 @@ def _notify_slot_result(cfg: dict, entry: dict, reason: str) -> None:
 # ── 경로 ──────────────────────────────────────────────────────────
 def _schedule_dir(cfg: dict) -> Path:
     root = Path(cfg.get("_root", "."))
-    d = root / "data" / "schedule"
+    line = cfg.get("scheduler_line", "")
+    if line == "calc_webapp":
+        d = root / "data" / "schedule" / "calc_webapp"
+    else:
+        d = root / "data" / "schedule"
     d.mkdir(parents=True, exist_ok=True)
     return d
 

@@ -75,6 +75,10 @@ PUBLISH_SCHEDULE:
   weekend:
   - start: 06:00
     end: 06:30
+CALC_WEBAPP_SCHEDULE:
+  enabled: false
+  mode: qa_only
+  targets: []
 CONTENT_SYNC:
   enabled: true
   run_at: 03:00

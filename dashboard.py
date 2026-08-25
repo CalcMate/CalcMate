@@ -99,6 +99,44 @@ def _start_blog_scheduler_thread():
 if cfg.get("BLOG_SCHEDULE", {}).get("enabled", False):
     _start_blog_scheduler_thread()
 
+# ── Calculator Webapp Schedule 스레드 (Phase F-1) ─────────────────────
+# 계산기 "웹앱"(AG.generate_calculator → _site/{slug}/ 스냅샷 → 자동 QA → [배포])을
+# 자동 생성하는 스레드. Blog Scheduler와 완전히 분리된 독립 스레드이며,
+# 기존 Calculator Scheduler(SEO 아티클용 run_calculator_once)와도 무관하다.
+# CALC_WEBAPP_SCHEDULE.enabled=true일 때만 기동.
+@st.cache_resource
+def _start_calc_webapp_scheduler_thread():
+    import threading
+    for _t in threading.enumerate():
+        if _t.name == "calc-webapp-scheduler-loop" and _t.is_alive():
+            return _t
+    from modules.scheduler import run_scheduler_loop
+    from modules.calc_webapp_pipeline import run_calc_webapp_once
+
+    # Calculator Webapp 라인 전용 cfg 복사본 — Blog cfg와 독립
+    calc_webapp_cfg = dict(cfg)
+    calc_webapp_cfg["scheduler_line"] = "calc_webapp"
+
+    def _loop():
+        try:
+            run_scheduler_loop(calc_webapp_cfg, run_calc_webapp_once)
+        except Exception as e:
+            import logging
+            logging.getLogger("dashboard").error("Calculator Webapp 스케줄러 스레드 종료: %s", e, exc_info=True)
+            try:
+                from modules import telegram_ops
+                telegram_ops.notify_level(calc_webapp_cfg, "ERROR",
+                    "Calculator Webapp 스케줄러 스레드 종료", e, event="error")
+            except Exception:
+                pass
+
+    t = threading.Thread(target=_loop, name="calc-webapp-scheduler-loop", daemon=True)
+    t.start()
+    return t
+
+if cfg.get("CALC_WEBAPP_SCHEDULE", {}).get("enabled", False):
+    _start_calc_webapp_scheduler_thread()
+
 # ── Content Sync(WP→Sheets 동기화) 백그라운드 자동 실행 ────────────
 # Publish Scheduler와 완전히 분리된 독립 서비스. 대시보드가 떠 있으면 매일
 # CONTENT_SYNC.run_at(기본 03:00)에 1회 동기화가 자동 실행된다(별도 스레드/락/이력).
@@ -1566,35 +1604,18 @@ elif tab == "🧮 계산기 관리":
         from modules.app_generator import render_inline_calculator
         return render_inline_calculator(files)
 
-    def _site_slug_dir(calc: dict):
-        slug = (str(calc.get("slug", calc.get("id", "")))
-                .strip().replace("/", "_").replace("\\", "_").replace("..", "_")
-                or calc.get("id", ""))
-        return BASE / "data" / "workspace" / "_site" / slug
+    # Phase F-1: _site/{slug}/ 스냅샷 읽기/쓰기는 modules/site_snapshot.py로 이관
+    # (자동 스케줄러 wrapper와 공유하기 위함 — 동작 자체는 무변경).
+    from modules.site_snapshot import (
+        write_site_snapshot as _write_site_snapshot_impl,
+        read_site_snapshot as _read_site_snapshot_impl,
+    )
 
     def _write_site_snapshot(calc: dict, files: dict) -> str:
-        # Phase B: 🧮 생성 결과를 _site/{slug}/에 확정 스냅샷으로 저장(덮어쓰기).
-        # 배포(Phase E)는 재생성 없이 이 스냅샷을 그대로 읽는다.
-        # 기존 "📥 파일 저장"(data/workspace/{slug}/) 경로는 그대로 유지 — 이 함수는 별도 경로에 추가로 저장.
-        import os
-        outdir = _site_slug_dir(calc)
-        os.makedirs(outdir, exist_ok=True)
-        for fn in ("index.html", "style.css", "script.js"):
-            content = files.get(fn)
-            if content:      # Tier2-B 등 일부 파일이 없는 산출물 대응(빈 파일 생성 방지)
-                (outdir / fn).write_text(content, encoding="utf-8")
-        return str(outdir)
+        return _write_site_snapshot_impl(cfg, calc, files)
 
     def _read_site_snapshot(calc: dict) -> dict:
-        # Phase E: 직전 확정 스냅샷 읽기 — QA의 "이전 대비 변경 감지"(Step 8) 기준값,
-        # 그리고 배포 버튼이 재생성 없이 그대로 배포할 원본으로 사용.
-        outdir = _site_slug_dir(calc)
-        out = {}
-        for fn in ("index.html", "style.css", "script.js"):
-            p = outdir / fn
-            if p.exists():
-                out[fn] = p.read_text(encoding="utf-8")
-        return out
+        return _read_site_snapshot_impl(cfg, calc)
 
     _just_saved = st.session_state.get("af_just_saved_name")
     for c in calcs:
