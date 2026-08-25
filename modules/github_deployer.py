@@ -62,7 +62,7 @@ def create_repo(cfg: dict, name: str, private: bool = False) -> tuple:
         return False, f"repo 생성 실패: {e}"
 
 
-def _put_file(cfg: dict, full_name: str, path: str, content: str, branch: str = "main") -> bool:
+def _put_file(cfg: dict, full_name: str, path: str, content: str, branch: str = "master") -> bool:
     url = f"{_API}/repos/{full_name}/contents/{path}"
     headers = _headers(cfg)
     # 기존 파일 sha 확인(업데이트용)
@@ -91,8 +91,16 @@ def _enable_pages(cfg: dict, full_name: str, branch: str = "main", path: str = "
 
 
 def deploy_app(cfg: dict, files: dict, repo: str = None, subdir: str = "") -> tuple:
-    """files={'index.html':..,'style.css':..,'script.js':..} 업로드 + Pages 활성화.
-    반환: (ok, deploy_url 또는 메시지)."""
+    """files={'index.html':..,'style.css':..,'script.js':..} 업로드.
+    반환: (ok, deploy_url 또는 메시지).
+
+    실제 운영 Pages 구성(build_type=workflow, .github/workflows/deploy.yml)은
+    master 브랜치의 data/workspace/_site/** 변경을 감지해 Actions가 빌드/배포한다.
+    이 함수는 그 경로에 맞춰 파일을 master에 직접 커밋한다(Contents API PUT도
+    push 이벤트로 집계되어 workflow가 트리거된다) — Pages 활성화(source 브랜치
+    설정) 자체는 이미 올바르게 되어 있어 건드리지 않는다(Pages-source-config는
+    별도 승인 없이 변경하지 않는다는 원칙 유지).
+    """
     if not is_configured(cfg):
         return False, "GITHUB_TOKEN 미설정 — 배포 건너뜀(로컬 미리보기만 가능)"
     repo = repo or cfg.get("GITHUB_REPO") or "salarymate-calculators"
@@ -100,12 +108,11 @@ def deploy_app(cfg: dict, files: dict, repo: str = None, subdir: str = "") -> tu
     if not ok:
         return False, full
     try:
-        prefix = (subdir.strip("/") + "/") if subdir else ""
+        prefix = "data/workspace/_site/" + ((subdir.strip("/") + "/") if subdir else "")
         for fname, content in files.items():
             if fname.startswith("_"):
                 continue
             _put_file(cfg, full, f"{prefix}{fname}", content)
-        _enable_pages(cfg, full)
         return True, get_deploy_url(cfg, full, subdir)
     except Exception as e:
         LOG.error("deploy_app 실패: %s", e)
