@@ -1566,6 +1566,22 @@ elif tab == "🧮 계산기 관리":
         from modules.app_generator import render_inline_calculator
         return render_inline_calculator(files)
 
+    def _write_site_snapshot(calc: dict, files: dict) -> str:
+        # Phase B: 🧮 생성 결과를 _site/{slug}/에 확정 스냅샷으로 저장(덮어쓰기).
+        # 이후 배포(Phase E)가 재생성 없이 이 스냅샷을 그대로 읽는 기준점이 된다.
+        # 기존 "📥 파일 저장"(data/workspace/{slug}/) 경로는 그대로 유지 — 이 함수는 별도 경로에 추가로 저장.
+        import os
+        slug = (str(calc.get("slug", calc.get("id", "")))
+                .strip().replace("/", "_").replace("\\", "_").replace("..", "_")
+                or calc.get("id", ""))
+        outdir = BASE / "data" / "workspace" / "_site" / slug
+        os.makedirs(outdir, exist_ok=True)
+        for fn in ("index.html", "style.css", "script.js"):
+            content = files.get(fn)
+            if content:      # Tier2-B 등 일부 파일이 없는 산출물 대응(빈 파일 생성 방지)
+                (outdir / fn).write_text(content, encoding="utf-8")
+        return str(outdir)
+
     _just_saved = st.session_state.get("af_just_saved_name")
     for c in calcs:
         cid = c.get("id", "")
@@ -1745,13 +1761,15 @@ elif tab == "🧮 계산기 관리":
             _qa_key = f"cm_qa_{cid}"
             if st.button("🧮 생성", key=f"cm_gen_{cid}"):
                 with st.spinner("계산기 생성 중..."):
-                    st.session_state[_files_key] = AG.generate_calculator(c, cfg)
+                    _gen_files = AG.generate_calculator(c, cfg)
+                    st.session_state[_files_key] = _gen_files
+                    _snapshot_dir = _write_site_snapshot(c, _gen_files)
                     try:
                         from modules.review_center import pre_build_qa
                         st.session_state[_qa_key] = pre_build_qa(c, cfg)
                     except Exception:
                         st.session_state[_qa_key] = None
-                st.success("생성 완료"); st.rerun()
+                st.success(f"생성 완료 — 스냅샷 저장: {_snapshot_dir}"); st.rerun()
 
             files = st.session_state.get(_files_key)
             if files is None:
