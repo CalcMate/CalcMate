@@ -1566,21 +1566,35 @@ elif tab == "🧮 계산기 관리":
         from modules.app_generator import render_inline_calculator
         return render_inline_calculator(files)
 
-    def _write_site_snapshot(calc: dict, files: dict) -> str:
-        # Phase B: 🧮 생성 결과를 _site/{slug}/에 확정 스냅샷으로 저장(덮어쓰기).
-        # 이후 배포(Phase E)가 재생성 없이 이 스냅샷을 그대로 읽는 기준점이 된다.
-        # 기존 "📥 파일 저장"(data/workspace/{slug}/) 경로는 그대로 유지 — 이 함수는 별도 경로에 추가로 저장.
-        import os
+    def _site_slug_dir(calc: dict):
         slug = (str(calc.get("slug", calc.get("id", "")))
                 .strip().replace("/", "_").replace("\\", "_").replace("..", "_")
                 or calc.get("id", ""))
-        outdir = BASE / "data" / "workspace" / "_site" / slug
+        return BASE / "data" / "workspace" / "_site" / slug
+
+    def _write_site_snapshot(calc: dict, files: dict) -> str:
+        # Phase B: 🧮 생성 결과를 _site/{slug}/에 확정 스냅샷으로 저장(덮어쓰기).
+        # 배포(Phase E)는 재생성 없이 이 스냅샷을 그대로 읽는다.
+        # 기존 "📥 파일 저장"(data/workspace/{slug}/) 경로는 그대로 유지 — 이 함수는 별도 경로에 추가로 저장.
+        import os
+        outdir = _site_slug_dir(calc)
         os.makedirs(outdir, exist_ok=True)
         for fn in ("index.html", "style.css", "script.js"):
             content = files.get(fn)
             if content:      # Tier2-B 등 일부 파일이 없는 산출물 대응(빈 파일 생성 방지)
                 (outdir / fn).write_text(content, encoding="utf-8")
         return str(outdir)
+
+    def _read_site_snapshot(calc: dict) -> dict:
+        # Phase E: 직전 확정 스냅샷 읽기 — QA의 "이전 대비 변경 감지"(Step 8) 기준값,
+        # 그리고 배포 버튼이 재생성 없이 그대로 배포할 원본으로 사용.
+        outdir = _site_slug_dir(calc)
+        out = {}
+        for fn in ("index.html", "style.css", "script.js"):
+            p = outdir / fn
+            if p.exists():
+                out[fn] = p.read_text(encoding="utf-8")
+        return out
 
     _just_saved = st.session_state.get("af_just_saved_name")
     for c in calcs:
@@ -1759,19 +1773,28 @@ elif tab == "🧮 계산기 관리":
             # 결과는 session_state에 유지되어 다른 버튼/rerun에도 재생성되지 않는다.
             _files_key = f"cm_files_{cid}"
             _qa_key = f"cm_qa_{cid}"
+            _qa_pass_key = f"cm_qa_pass_{cid}"
+            _reviewed_key = f"cm_reviewed_{cid}"
             if st.button("🧮 생성", key=f"cm_gen_{cid}"):
                 with st.spinner("계산기 생성 중..."):
+                    _prev_files = _read_site_snapshot(c)   # Phase E: 덮어쓰기 전 직전 스냅샷 확보
                     _gen_files = AG.generate_calculator(c, cfg)
                     st.session_state[_files_key] = _gen_files
                     _snapshot_dir = _write_site_snapshot(c, _gen_files)
                     try:
                         from modules.review_center import pre_build_qa
-                        st.session_state[_qa_key] = pre_build_qa(c, cfg)
-                    except Exception:
-                        st.session_state[_qa_key] = None
+                        _qa_results = pre_build_qa(c, cfg, prev_files=_prev_files)
+                    except Exception as _qe:
+                        _qa_results = [{"step": 0, "label": "QA 실행", "passed": False,
+                                        "skipped": False, "detail": f"QA 실행 오류: {_qe}"}]
+                    st.session_state[_qa_key] = _qa_results
+                    st.session_state[_qa_pass_key] = all(r["passed"] or r["skipped"] for r in _qa_results)
+                    st.session_state[_reviewed_key] = False   # Phase E: 새로 생성될 때마다 승인 상태 초기화
                 st.success(f"생성 완료 — 스냅샷 저장: {_snapshot_dir}"); st.rerun()
 
             files = st.session_state.get(_files_key)
+            qa_pass = st.session_state.get(_qa_pass_key, False)
+            reviewed = st.session_state.get(_reviewed_key, False)
             if files is None:
                 st.info("아직 생성되지 않음 — 🧮 생성 버튼을 눌러주세요.")
             else:
@@ -1779,7 +1802,7 @@ elif tab == "🧮 계산기 관리":
                     st.warning(f"수식 경고: {files['_formula_msg']}")
                 _qa_results = st.session_state.get(_qa_key)
                 if _qa_results:
-                    with st.expander("✅ QA 결과 (pre_build_qa)"):
+                    with st.expander(f"{'✅' if qa_pass else '❌'} QA 결과 (pre_build_qa) — {'PASS' if qa_pass else 'FAIL'}"):
                         for r in _qa_results:
                             _icon = "✅" if r["passed"] else ("⏭️" if r["skipped"] else "❌")
                             st.markdown(f"{_icon} Step {r['step']}: {r['label']} — {r['detail']}")
@@ -1787,17 +1810,50 @@ elif tab == "🧮 계산기 관리":
                     import streamlit.components.v1 as components
                     components.html(_inline(files), height=440, scrolling=True)
 
+                # ── 👤 사람 검수 (Phase E: QA PASS 후에만 노출) ──────────────
+                if qa_pass:
+                    with st.container(border=True):
+                        st.markdown(f"**👤 사람 검수** — {'✅ 승인됨' if reviewed else '⏳ 대기 중'}")
+                        from modules.review_center import _extract_rate_constants
+                        _rates = _extract_rate_constants((files.get("script.js") or "") + (files.get("index.html") or ""))
+                        if _rates:
+                            st.caption("감지된 요율/기준값: " + ", ".join(f"{k}={v}" for k, v in sorted(_rates.items())))
+                        _step7 = next((r for r in _qa_results if r["step"] == 7), None)
+                        if _step7 and not _step7["skipped"]:
+                            st.caption(f"계산 스모크 테스트 결과: {_step7['detail']}")
+                        if not reviewed:
+                            if st.button("✅ 검수 승인", key=f"cm_approve_{cid}", type="primary"):
+                                st.session_state[_reviewed_key] = True
+                                st.rerun()
+                        else:
+                            if st.button("↩️ 승인 취소", key=f"cm_unapprove_{cid}"):
+                                st.session_state[_reviewed_key] = False
+                                st.rerun()
+                elif files is not None:
+                    st.caption("⚠️ QA 실패 — 사람 검수 단계로 진행할 수 없습니다. 위 QA 결과를 확인하세요.")
+
             b = st.columns(4)
             deploy_label = "🚀 재배포" if url else "🚀 배포"
+            _deploy_blocked_reason = (
+                "GITHUB_TOKEN 미설정" if not GH.is_configured(cfg) else
+                "먼저 🧮 생성을 실행하세요" if files is None else
+                "QA 실패로 배포 불가" if not qa_pass else
+                "사람 검수 대기 중" if not reviewed else
+                None
+            )
             if b[0].button(deploy_label, key=f"cm_dep_{cid}",
-                           disabled=not GH.is_configured(cfg) or files is None):
-                ok, res = GH.deploy_app(cfg, files,
+                           disabled=_deploy_blocked_reason is not None):
+                # Phase E: 배포는 _site/{slug}/에 저장된 확정 스냅샷을 그대로 사용 — 재생성하지 않음.
+                _deploy_files = _read_site_snapshot(c)
+                ok, res = GH.deploy_app(cfg, _deploy_files,
                                         repo=cfg.get("GITHUB_REPO", "salarymate-calculators"),
                                         subdir=c.get("slug", cid))
                 if ok:
                     repo.publish(cid, res); st.success(f"배포 완료: {res}"); st.rerun()
                 else:
                     st.error(res)
+            if _deploy_blocked_reason:
+                b[0].caption(f"🔒 {_deploy_blocked_reason}")
             if b[1].button("⏸ 상태토글", key=f"cm_tg_{cid}"):
                 repo.update(cid, {"status": "inactive" if str(c.get("status")).lower() == "active" else "active"})
                 st.rerun()

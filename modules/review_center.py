@@ -307,18 +307,127 @@ def check_slug_conflict(slug: str, cfg: dict) -> tuple[str, bool, str]:
 # 4. Build 사전 QA 6단계 (D-4 반영)
 # ─────────────────────────────────────────────────────────────
 
-def pre_build_qa(calc: dict, cfg: dict) -> list[dict]:
+def _extract_compute_result_fn(js: str) -> str:
+    """script.js 전체 번들(공통 컴포넌트는 document/window DOM에 의존)에서
+    순수 계산 로직인 window.computeResult 함수 블록만 중괄호 매칭으로 추출.
+    app_generator.generate_js()는 [DOM 의존 컴포넌트 + computeResult + CTA/FAQ 설정] 순서로
+    이어붙이므로, 전체를 그대로 실행하면 Node.js에 document가 없어 항상 실패한다."""
+    marker = "window.computeResult"
+    i = js.find(marker)
+    if i == -1:
+        return ""
+    brace_start = js.find("{", i)
+    if brace_start == -1:
+        return ""
+    depth = 0
+    j = brace_start
+    while j < len(js):
+        if js[j] == "{":
+            depth += 1
+        elif js[j] == "}":
+            depth -= 1
+            if depth == 0:
+                end = j + 1
+                if end < len(js) and js[end] == ";":
+                    end += 1
+                return js[i:end]
+        j += 1
+    return ""
+
+
+def _js_smoke_test(js_content: str, ins: dict, date_fields: list) -> tuple:
+    """실제 생성된 script.js에서 computeResult 함수만 추출해 Node.js로 실행,
+    예외 없이 반환하는지 확인. 반환값의 정확성(기대값 비교)은 검증하지 않음 —
+    실행 가능 여부만 보는 스모크 테스트.
+    반환: (passed: bool|None, detail: str). passed=None이면 skip(환경상 실행 불가)."""
+    import subprocess
+    import tempfile
+    import os as _os
+
+    fn_src = _extract_compute_result_fn(js_content)
+    if not fn_src:
+        return False, "script.js에서 computeResult 함수를 찾지 못함(추출 실패)"
+
+    dummy = {}
+    date_pool = ["2015-01-01", "2024-01-01"]
+    _di = 0
+    for k, v in ins.items():
+        # input_schema 값은 {"type":"date"} 딕셔너리가 아니라 "date"/"number" 같은
+        # 단순 문자열인 경우가 실제로 더 흔함(app_generator._form_fields_v2와 동일 관례) — 둘 다 처리.
+        is_date = (k in (date_fields or ())) or ("date" in str(v).lower())
+        if is_date:
+            dummy[k] = date_pool[min(_di, len(date_pool) - 1)]
+            _di += 1
+        elif isinstance(v, dict):
+            raw = v.get("default", 1000)
+            try:
+                dummy[k] = float(raw) if raw not in (None, "") else 1000
+            except (TypeError, ValueError):
+                dummy[k] = 1000
+        else:
+            dummy[k] = 1000
+
+    harness = (
+        "globalThis.window = globalThis;\n" + fn_src + "\n"
+        + f"var out = window.computeResult({json.dumps(dummy, ensure_ascii=False)});\n"
+        + "process.stdout.write(JSON.stringify(out));\n"
+    )
+    fd, path = tempfile.mkstemp(suffix=".js")
+    try:
+        with _os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(harness)
+        # encoding 명시 필수: 생성된 JS에 한글 notice 문자열이 포함될 수 있어
+        # Windows 기본 로케일(cp949)로 stdout/stderr를 디코딩하면 깨짐/예외 발생.
+        r = subprocess.run(["node", path], capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=10)
+        if r.returncode != 0:
+            return False, f"JS 실행 오류(더미 입력 {dummy}): {r.stderr.strip()[:200]}"
+        try:
+            parsed = json.loads(r.stdout.strip() or "null")
+        except Exception:
+            return False, f"JS 반환값 파싱 실패: {r.stdout.strip()[:200]}"
+        return True, f"더미 입력 {dummy} → computeResult() 정상 실행, 반환: {str(parsed)[:150]}"
+    except FileNotFoundError:
+        return None, "Node.js 미설치 — 스모크 테스트 건너뜀(환경 제약)"
+    except subprocess.TimeoutExpired:
+        return False, "JS 실행 타임아웃(10초 초과) — 무한루프 가능성"
+    finally:
+        try:
+            _os.unlink(path)
+        except Exception:
+            pass
+
+
+def _extract_rate_constants(js_or_html: str) -> dict:
+    """JS/HTML 안의 대문자 상수 선언(예: NP_RATE=0.045, DAILY_MAX = 66000)을 추출.
+    요율/기준값 변경 감지(Step 8)용 — 완전한 파서가 아닌 휴리스틱."""
+    consts = {}
+    for m in re.finditer(r'\b([A-Z][A-Z0-9_]{2,})\s*=\s*([0-9]+(?:\.[0-9]+)?)', js_or_html or ""):
+        consts[m.group(1)] = m.group(2)
+    return consts
+
+
+def pre_build_qa(calc: dict, cfg: dict, prev_files: dict = None) -> list[dict]:
     """
-    Build 전 6단계 사전 검사.
+    Build 전 사전 검사(기존 6단계 + Phase E 확장 2단계).
     calc: DB 계산기 record (slug, formula, input_schema, output_schema 등)
+    prev_files: 직전 확정 스냅샷(_site/{slug}/에서 읽은 {index.html,style.css,script.js}).
+                없으면(None) Step 8은 비교 대상 없음으로 skip.
     반환: [{"step": int, "label": str, "passed": bool, "skipped": bool, "detail": str}]
     """
-    from modules.app_generator import generate_calculator
+    from modules.app_generator import generate_calculator, _validation_mode
+    from modules.registry_loader import load_registry_v3
 
     results = []
 
+    # DB record 자체의 compute_type/date_fields는 비어있는 경우가 많아(확인됨) 불안정.
+    # _validation_mode()는 app_generator.py가 실제 생성 시 쓰는 동일한 판별 기준(registry
+    # validation_mode)이라 더 신뢰 가능 — 기존 두 조건에 OR로 추가(기존 감지 경로는 유지).
     is_date_based = (str(calc.get("compute_type", "")) == "date_based" or
-                     bool(calc.get("date_fields")))
+                     bool(calc.get("date_fields")) or
+                     _validation_mode(calc) == "skip")
+    _slug = str(calc.get("slug", ""))
+    is_tier2b = (load_registry_v3().get(_slug) or {}).get("tier_subtype") == "B"
 
     ins = _pj(calc.get("input_schema"), {})
     outs = _pj(calc.get("output_schema"), {})
@@ -344,12 +453,13 @@ def pre_build_qa(calc: dict, cfg: dict) -> list[dict]:
 
     if not (passed1 and passed2):
         for s, l in [(3, "HTML 출력 요소 1:1 대응"), (4, "JS 다중 출력 처리"),
-                     (5, "복수 출력 완전성"), (6, "기본값 계산 실행")]:
+                     (5, "복수 출력 완전성"), (6, "기본값 계산 실행"),
+                     (7, "JS 실행 스모크 테스트"), (8, "요율/기준값 변경 감지")]:
             results.append({"step": s, "label": l, "passed": False, "skipped": True,
                             "detail": "Step 1/2 실패로 건너뜀"})
         return results
 
-    # generate_calculator로 파일 생성 (Step 3~5에서 사용)
+    # generate_calculator로 파일 생성 (Step 3~8에서 사용)
     try:
         files = generate_calculator(calc, cfg)
         html = files.get("index.html", "")
@@ -362,9 +472,41 @@ def pre_build_qa(calc: dict, cfg: dict) -> list[dict]:
 
     if not gen_ok:
         for s, l in [(3, "HTML 출력 요소 1:1 대응"), (4, "JS 다중 출력 처리"),
-                     (5, "복수 출력 완전성"), (6, "기본값 계산 실행")]:
+                     (5, "복수 출력 완전성"), (6, "기본값 계산 실행"),
+                     (7, "JS 실행 스모크 테스트"), (8, "요율/기준값 변경 감지")]:
             results.append({"step": s, "label": l, "passed": False, "skipped": False,
                             "detail": f"generate_calculator() 실패: {gen_err}"})
+        return results
+
+    # ── Tier2-B(예: 군인 전역일)는 표준 폼/수식 전제인 Step 3~6이 애초에 맞지 않음.
+    # 잘못된 FAIL 표시를 막기 위해 여기서 skip 처리하고 Step 7/8로 넘어간다.
+    if is_tier2b:
+        for s, l in [(3, "HTML 출력 요소 1:1 대응"), (4, "JS 다중 출력 처리"),
+                     (5, "복수 출력 완전성"), (6, "기본값 계산 실행")]:
+            results.append({"step": s, "label": l, "passed": True, "skipped": True,
+                            "detail": "Tier2-B — 표준 폼/수식 기반 검사 대상 아님(DB 템플릿 직접 사용)"})
+        _step7_tier2b = (True, "Tier2-B — 별도 script.js 없음(자체완결형 HTML), 스모크 테스트 대상 아님")
+        results.append({"step": 7, "label": "JS 실행 스모크 테스트",
+                        "passed": _step7_tier2b[0], "skipped": True, "detail": _step7_tier2b[1]})
+        prev_content = (prev_files or {}).get("index.html") or ""
+        if not prev_content:
+            results.append({"step": 8, "label": "요율/기준값 변경 감지",
+                            "passed": True, "skipped": True,
+                            "detail": "직전 스냅샷 없음(최초 생성) — 비교 대상 없음"})
+        else:
+            _old_c = _extract_rate_constants(prev_content)
+            _new_c = _extract_rate_constants(html)
+            _changed = {k: (_old_c.get(k), _new_c.get(k)) for k in set(_old_c) | set(_new_c)
+                       if _old_c.get(k) != _new_c.get(k)}
+            if _changed:
+                _d8 = "; ".join(f"{k}: {o} → {n}" for k, (o, n) in sorted(_changed.items()))
+                results.append({"step": 8, "label": "요율/기준값 변경 감지",
+                                "passed": False, "skipped": False,
+                                "detail": f"이전 스냅샷 대비 상수 변경 감지(의도한 변경인지 확인 필요) — {_d8}"})
+            else:
+                results.append({"step": 8, "label": "요율/기준값 변경 감지",
+                                "passed": True, "skipped": False,
+                                "detail": "이전 스냅샷과 요율/기준값 동일"})
         return results
 
     # ── Step 3: output_schema ↔ HTML id="out_*" 1:1 대응 ─────
@@ -421,25 +563,66 @@ def pre_build_qa(calc: dict, cfg: dict) -> list[dict]:
                         "passed": passed5, "skipped": False, "detail": detail5})
 
     # ── Step 6: 기본 입력값으로 계산 실행 ────────────────────
-    try:
-        from modules.formula_engine import execute_formula
-        dummy = {}
-        for k, v in ins.items():
-            if isinstance(v, dict):
-                raw = v.get("default", 1.0)
-                try:
-                    dummy[k] = float(raw) if raw not in (None, "") else 1.0
-                except (TypeError, ValueError):
+    # is_date_based 계산기는 Step 3~5와 동일한 이유(실제 계산이 formula 필드가 아니라
+    # _compute_js()의 하드코딩 JS로 수행됨)로 execute_formula() 재현이 애초에 맞지 않는
+    # 검사임 — Step 3~5와 일관되게 skip 처리(기존 알려진 한계, Phase E에서 수정 범위 아님).
+    if is_date_based:
+        results.append({"step": 6, "label": "기본값 계산 실행",
+                        "passed": True, "skipped": True,
+                        "detail": "날짜형 계산기 — 실제 계산은 하드코딩 JS(_compute_js)로 수행되어 "
+                                  "formula 재현 검사가 맞지 않음(기존 알려진 한계, Step 3~5와 동일 사유로 skip)"})
+    else:
+        try:
+            from modules.formula_engine import execute_formula
+            dummy = {}
+            for k, v in ins.items():
+                if isinstance(v, dict):
+                    raw = v.get("default", 1.0)
+                    try:
+                        dummy[k] = float(raw) if raw not in (None, "") else 1.0
+                    except (TypeError, ValueError):
+                        dummy[k] = 1.0
+                else:
                     dummy[k] = 1.0
-            else:
-                dummy[k] = 1.0
-        result6 = execute_formula(formula, dummy, outs if isinstance(outs, dict) else None)
-        passed6 = isinstance(result6, dict) and result6
-        detail6 = f"✅ 계산 성공: {str(result6)[:80]}" if passed6 else f"계산 결과 이상: {result6}"
-    except Exception as e:
-        passed6 = False
-        detail6 = f"계산 오류: {e}"
-    results.append({"step": 6, "label": "기본값 계산 실행",
-                    "passed": passed6, "skipped": False, "detail": detail6})
+            result6 = execute_formula(formula, dummy, outs if isinstance(outs, dict) else None)
+            passed6 = isinstance(result6, dict) and result6
+            detail6 = f"✅ 계산 성공: {str(result6)[:80]}" if passed6 else f"계산 결과 이상: {result6}"
+        except Exception as e:
+            passed6 = False
+            detail6 = f"계산 오류: {e}"
+        results.append({"step": 6, "label": "기본값 계산 실행",
+                        "passed": passed6, "skipped": False, "detail": detail6})
+
+    # ── Step 7: 실제 script.js 실행 스모크 테스트(Node.js) ───────
+    if not (js or "").strip():
+        results.append({"step": 7, "label": "JS 실행 스모크 테스트",
+                        "passed": True, "skipped": True,
+                        "detail": "script.js 없음 — 검사 대상 아님"})
+    else:
+        _p7, _d7 = _js_smoke_test(js, ins, calc.get("date_fields") or [])
+        results.append({"step": 7, "label": "JS 실행 스모크 테스트",
+                        "passed": True if _p7 is None else _p7,
+                        "skipped": _p7 is None, "detail": _d7})
+
+    # ── Step 8: 직전 스냅샷 대비 요율/기준값 변경 감지 ────────────
+    prev_js = (prev_files or {}).get("script.js") or (prev_files or {}).get("index.html") or ""
+    if not prev_js:
+        results.append({"step": 8, "label": "요율/기준값 변경 감지",
+                        "passed": True, "skipped": True,
+                        "detail": "직전 스냅샷 없음(최초 생성) — 비교 대상 없음"})
+    else:
+        _old_c = _extract_rate_constants(prev_js)
+        _new_c = _extract_rate_constants(js or html)
+        _changed = {k: (_old_c.get(k), _new_c.get(k)) for k in set(_old_c) | set(_new_c)
+                   if _old_c.get(k) != _new_c.get(k)}
+        if _changed:
+            _d8 = "; ".join(f"{k}: {o} → {n}" for k, (o, n) in sorted(_changed.items()))
+            results.append({"step": 8, "label": "요율/기준값 변경 감지",
+                            "passed": False, "skipped": False,
+                            "detail": f"이전 스냅샷 대비 상수 변경 감지(의도한 변경인지 확인 필요) — {_d8}"})
+        else:
+            results.append({"step": 8, "label": "요율/기준값 변경 감지",
+                            "passed": True, "skipped": False,
+                            "detail": "이전 스냅샷과 요율/기준값 동일"})
 
     return results
