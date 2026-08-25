@@ -30,7 +30,7 @@ jeonse-vs-monthly:
     - wolse_to_jeonse_equiv
     - monthly_savings
   display_order: 9
-  card_desc: 전세보증금과 월세 조건을 입력하면 전세 월 기회비용, 월세→전세 환산금액, 월 비…
+  card_desc: 전세와 월세 조건을 비교해 어떤 게 더 유리한지 확인해보세요
   difficulty: multi_output
   difficulty_status: provisional
   status: READY

@@ -24,7 +24,7 @@ annual-leave-remaining:
   - total_days
   - remaining_days
   display_order: 10
-  card_desc: '입력: years_of_service(근속연수, 양의 정수), used_days(…'
+  card_desc: 근속연수와 사용한 연차일수로 남은 연차를 확인해보세요
   difficulty: multi_output
   difficulty_status: provisional
   status: READY

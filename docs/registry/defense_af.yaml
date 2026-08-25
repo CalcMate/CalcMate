@@ -27,7 +27,7 @@ military-discharge-date:
   - remaining_days
   - progress_pct
   display_order: 11
-  card_desc: '입영일과 군별을 선택하면 예상 전역일을 계산합니다. (관행 계산식: 입영일+N개월…'
+  card_desc: 입영일과 군별을 선택하면 예상 전역일을 계산합니다
   difficulty: date_based
   difficulty_status: provisional
   status: READY
