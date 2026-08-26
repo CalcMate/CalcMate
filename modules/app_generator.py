@@ -41,6 +41,25 @@ _PLACEHOLDERS = {
     "insured_days": "365", "leave_month": "1", "use_6plus6": "0",
 }
 
+# STEP 16-Y/17-D: 계산기별 결과 안내(NOTICE) 문구. 공용 기본값("...근로계약...")이
+# 노무/급여 외 분야(부동산·세금 등)에 부적절하고, 같은 노무/급여 분야에서도
+# 계산기마다 실제 결과를 좌우하는 핵심 개념이 달라(퇴직금=평균임금,
+# 연차수당=통상임금 등) 계산기별 최소 문구로 교체한다. 여기 없는 slug는
+# 아래 fallback 문구를 그대로 사용해 다른 계산기에는 영향 없다.
+_NOTICE_BY_SLUG: dict = {
+    "real-estate-brokerage-fee": "본 계산 결과는 참고용이며, 실제 중개보수는 거래 유형·거래금액 및 관련 법령에서 정한 상한요율에 따라 달라질 수 있습니다.",
+    "severance-pay": "본 계산 결과는 참고용이며, 실제 퇴직금은 평균임금 산정 방식 및 관련 법령에 따라 달라질 수 있습니다.",
+    "annual-leave-allowance": "본 계산 결과는 참고용이며, 실제 연차수당은 통상임금 산정 방식 및 관련 법령에 따라 달라질 수 있습니다.",
+    "weekly-holiday-allowance": "본 계산 결과는 참고용이며, 실제 주휴수당은 소정근로시간 및 관련 법령에 따라 달라질 수 있습니다.",
+    "unemployment-benefit": "본 계산 결과는 참고용이며, 실제 수급액은 이직 사유·수급자격 판정 및 관련 법령에 따라 달라질 수 있습니다.",
+    "four-insurances": "본 계산 결과는 참고용이며, 실제 공제액은 매년 고시되는 보험료율 및 관련 법령에 따라 달라질 수 있습니다.",
+    "연말정산_환급액_계산기": "본 계산 결과는 참고용이며, 실제 환급액(또는 납부액)은 소득·공제 항목 및 관련 세법 적용에 따라 달라질 수 있습니다.",
+    "육아휴직_급여_계산기": "본 계산 결과는 참고용이며, 실제 육아휴직 급여는 통상임금 및 관련 법령에 따라 달라질 수 있습니다.",
+    "freelancer-tax-3p3": "본 계산 결과는 참고용이며, 실제 세액은 소득 규모 및 관련 세법 적용에 따라 달라질 수 있습니다.",
+    "jeonse-vs-monthly": "본 계산 결과는 참고용이며, 실제 유불리는 전월세전환율 등 시장 조건에 따라 달라질 수 있습니다.",
+    "annual-leave-remaining": "본 계산 결과는 참고용이며, 실제 연차일수는 출근율 및 관련 법령에 따라 달라질 수 있습니다.",
+}
+
 # Phase C: 계산기별 관련 글 데이터 (정적, 계산기 지원용 블로그 Set)
 _RELATED_POSTS = {
     "weekly-holiday-allowance": [
@@ -1660,10 +1679,12 @@ def generate_html(calc: dict, cfg: dict = None) -> str:
         "RESULT_LABEL": _html.escape(plabel if plabel.startswith("예상") else f"예상 {plabel}"),
         "PRIMARY_OUT": _html.escape(primary), "RESULT_UNIT": _html.escape(punit or "원"),
         "EXTRA_OUTPUT_ROWS": extra_rows_html,
-        # STEP 16-Y: real-estate-brokerage-fee는 "근로계약"이 문맥상 부적절해 계산기 단위로만 문구 교체(공용 기본값은 무변경).
-        "NOTICE": ("본 계산 결과는 참고용이며, 실제 중개보수는 거래 유형·거래금액 및 관련 법령에서 정한 상한요율에 따라 달라질 수 있습니다."
-                   if calc.get("slug") == "real-estate-brokerage-fee" else
-                   "본 계산 결과는 참고용이며, 실제 지급액은 근로계약·관련 법령에 따라 달라질 수 있습니다."),
+        # STEP 16-Y/17-D: _NOTICE_BY_SLUG에 등록된 계산기만 전용 문구 사용, 나머지는
+        # 기존 공용 기본값 그대로(다른 계산기에는 전혀 영향 없음).
+        "NOTICE": _NOTICE_BY_SLUG.get(
+            calc.get("slug"),
+            "본 계산 결과는 참고용이며, 실제 지급액은 근로계약·관련 법령에 따라 달라질 수 있습니다.",
+        ),
         # 섹션은 render_* 함수가 조립(show_*=False면 태그 포함 전체 생략)
         "ADSENSE_SLOT": render_adsense_slot(cfg),
         "ARTICLE_SECTION": render_article(calc, cfg),
