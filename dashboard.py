@@ -1996,7 +1996,9 @@ git push origin master
                 _ok, _fail = 0, []
                 for _path, _content in site_pages.items():
                     try:
-                        GH._put_file(cfg, full_name, _path, _content)
+                        # STEP 16-W: Pages는 data/workspace/_site/**만 아티팩트로 배포(.github/workflows/deploy.yml)하므로
+                        # 사이트 페이지도 저장소 루트가 아니라 이 경로 하위에 커밋해야 실제로 반영된다.
+                        GH._put_file(cfg, full_name, f"data/workspace/_site/{_path}", _content)
                         _ok += 1
                     except Exception as _e:
                         _fail.append(f"{_path}: {_e}")

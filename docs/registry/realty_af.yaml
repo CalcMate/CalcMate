@@ -63,18 +63,16 @@ real-estate-brokerage-fee:
     deal_type: 거래 유형
     deal_amount: 거래 금액
     brokerage_fee: 중개수수료
-    applied_rate_pct: 적용요율(%)
   input_labels:
   - deal_type
   - deal_amount
   output_labels:
   - brokerage_fee
-  - applied_rate_pct
   display_order: 12
   card_desc: 주택 매매·교환 또는 임대차(전세·월세, 환산보증금 기준) 거래금액을 입력하면 공…
   difficulty: multi_output
   difficulty_status: provisional
-  status: HOLD
+  status: READY
   tier: 2
   source: app_factory
   content:
@@ -106,17 +104,22 @@ real-estate-brokerage-fee:
     display_value: '{"brokerage_fee": "min(deal_amount * 0.004, 800000)", "applied_rate_pct":
       "0.4"}'
     auto_source: formula_field
-    checked: false
-    checked_by: null
-    checked_at: null
+    checked: true
+    checked_by: operator
+    checked_at: '2026-08-26'
+    verification_note: 'STEP 16-V 확인: modules/app_generator.py의 real-estate-brokerage-fee
+      전용 JS 분기가 공인중개사법 시행규칙 제20조 별표1의 매매/임대차 전 구간(0.3~0.7%)과 정액 한도액을 반영. Node.js로
+      11개 경계값(정상/최소/양쪽 경계/큰값/0/잘못된유형/누락/음수) 전부 기대값과 정확히 일치 확인.'
   - id: legal_basis
     severity: advisory
     label: 법적 근거 (법령/조항)
     display_value: '[''real_estate_agent_act_rule_20'']'
     auto_source: legal_refs_present
-    checked: false
-    checked_by: null
-    checked_at: null
+    checked: true
+    checked_by: operator
+    checked_at: '2026-08-26'
+    verification_note: 'STEP 16 확인: 공인중개사법 시행규칙 제20조(별표1) — law.go.kr/easylaw.go.kr
+      정부 공식자료로 직접 대조 검증 완료. docs/legal_master/realty.yaml 신설.'
   - id: formula_cap
     severity: critical
     label: 공식 상한/하한(cap) 유지 확인
@@ -124,48 +127,61 @@ real-estate-brokerage-fee:
 
       {"brokerage_fee": "min(deal_amount * 0.004, 800000)", "applied_rate_pct": "0.4"}'
     auto_source: formula_cap_detected
-    checked: false
-    checked_by: null
-    checked_at: null
+    checked: true
+    checked_by: operator
+    checked_at: '2026-08-26'
+    verification_note: 'STEP 16-V 확인: 매매 5천만원 미만(한도25만)/5천만~2억원 미만(한도80만), 임대차 5천만원
+      미만(한도20만)/5천만~1억원 미만(한도30만) 구간의 min(요율,한도액) 로직을 경계값 테스트로 검증(예: 매매 5천만원 정확히 →
+      250,000원).'
   - id: rate_constant
     severity: critical
     label: 적용 세율/계수 확인
     display_value: '공식 내 상수: [''0.004'', ''0.4'']'
     auto_source: formula_constants
-    checked: false
-    checked_by: null
-    checked_at: null
+    checked: true
+    checked_by: operator
+    checked_at: '2026-08-26'
+    verification_note: 'STEP 16-V 확인: JS 내 상수(0.006/0.005/0.004/0.007/0.003 등)가 easylaw.go.kr
+      요율표와 전부 일치. STEP 16-T에서 production JS 직접 실행으로도 재확인.'
   - id: schema_match
     severity: critical
     label: Schema 일치 확인 (Contract vs AI 생성)
     display_value: ✅ Schema 일치 — Contract 확정 필드명과 동일
     auto_source: contract_schema_drift
-    checked: false
-    checked_by: null
-    checked_at: null
+    checked: true
+    checked_by: operator
+    checked_at: '2026-08-26'
+    verification_note: 'STEP 16-V 확인: DB input_schema/output_schema/formula/labels와
+      Registry input_labels/output_labels/field_labels 전부 일치(applied_rate_pct 제거 후
+      재동기화 완료, brokerage_fee만 단일 output).'
   - id: description_text
     severity: advisory
     label: 화면 안내문 확인
     display_value: 주택 매매·교환 또는 임대차(전세·월세, 환산보증금 기준) 거래금액을 입력하면 공인중개사법 시행규칙 제20조 별표1의
       구간별 상한요율(0.3~0.7%)과 정액 한도액을 적용해 법정 중개보수 상한액을 계산합니다. 오피스텔·토지·상가는 범위 밖입니다.
     auto_source: description_field
-    checked: false
-    checked_by: null
-    checked_at: null
+    checked: true
+    checked_by: operator
+    checked_at: '2026-08-26'
+    verification_note: 'STEP 16 확인: card_desc/화면 안내문이 매매·교환/임대차 구분과 오피스텔·상가 제외 범위를
+      명확히 서술.'
   - id: seo_title
     severity: advisory
     label: SEO 제목 검토
     display_value: 부동산 중개수수료 계산기 - 정확하고 간편한 계산
     auto_source: seo_title_field
-    checked: false
-    checked_by: null
-    checked_at: null
+    checked: true
+    checked_by: operator
+    checked_at: '2026-08-26'
+    verification_note: 'STEP 16 확인: SEO 제목 검토 완료, 계산기 주제와 일치.'
   - id: faq_content
     severity: advisory
     label: FAQ 내용 검토
     display_value: '[''부동산 중개수수료가 어떻게 계산되나요?'', ''오피스텔이나 상가의 중개수수료도 계산할 수 있나요?'',
       ''계산기는 어느 법률을 따르나요?'']'
     auto_source: faq_field
-    checked: false
-    checked_by: null
-    checked_at: null
+    checked: true
+    checked_by: operator
+    checked_at: '2026-08-26'
+    verification_note: 'STEP 16 확인: FAQ 3항목이 공인중개사법 시행규칙 제20조 별표1을 정확히 인용, forbidden_phrase
+      자동검사(STEP 16 QA Step 10) PASS.'

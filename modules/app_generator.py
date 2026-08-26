@@ -490,10 +490,10 @@ def _compute_js(calc) -> str:
             + '  var raw_fee = deal_amount * rate;\n'
             + '  var fee = (cap !== null) ? Math.min(raw_fee, cap) : raw_fee;\n'
             + '  out["brokerage_fee"] = Math.round(fee);\n'
-            + '  out["applied_rate_pct"] = Math.round(rate * 1000) / 10;\n'
+            + '  var appliedRatePct = Math.round(rate * 1000) / 10;\n'
             + '  var typeLabel = (deal_type === 1) ? "매매·교환" : "임대차(전세·월세)";\n'
             + '  var capNote = (cap !== null) ? (", 한도액 " + cap.toLocaleString() + "원 적용") : "";\n'
-            + '  out._formula = typeLabel + " 거래금액 " + deal_amount.toLocaleString() + "원 \\u2014 상한요율 " + out["applied_rate_pct"] + "%(공인중개사법 시행규칙 제20조 별표1)" + capNote + " = " + Math.round(fee).toLocaleString() + "원";\n'
+            + '  out._formula = typeLabel + " 거래금액 " + deal_amount.toLocaleString() + "원 \\u2014 상한요율 " + appliedRatePct + "%(공인중개사법 시행규칙 제20조 별표1)" + capNote + " = " + Math.round(fee).toLocaleString() + "원";\n'
             + '  return out;\n'
             + _js_close()
         )
