@@ -96,7 +96,7 @@
   <!-- ② 계산 입력 -->
   <section class="sm-card" aria-label="계산 입력">
     <h2 class="sm-card-title">계산 입력</h2>
-    <div class="sm-field"><label class="sm-label" for="in_deal_type">거래 유형</label><div class="sm-input-wrap"><input class="sm-input" type="text" inputmode="numeric" data-comma id="in_deal_type" name="in_deal_type" placeholder="예) 0"></div></div>
+    <div class="sm-field"><label class="sm-label" for="in_deal_type">거래 유형 — 1:매매·교환, 2:전세·월세</label><div class="sm-input-wrap"><input class="sm-input" type="text" inputmode="numeric" data-comma id="in_deal_type" name="in_deal_type" placeholder="예) 0"></div></div>
 <div class="sm-field"><label class="sm-label" for="in_deal_amount">거래 금액</label><div class="sm-input-wrap"><input class="sm-input" type="text" inputmode="numeric" data-comma id="in_deal_amount" name="in_deal_amount" placeholder="예) 0"></div></div>
     <button class="sm-btn" type="button" onclick="calculate()">부동산 중개수수료 계산하기</button>
   </section>
@@ -148,7 +148,7 @@
   <!-- ⑧ 안내사항 -->
   <div class="sm-notice" role="note">
     <span class="sm-notice-icon" aria-hidden="true">⚠️</span>
-    <span>본 계산 결과는 참고용이며, 실제 지급액은 근로계약·관련 법령에 따라 달라질 수 있습니다.</span>
+    <span>본 계산 결과는 참고용이며, 실제 중개보수는 거래 유형·거래금액 및 관련 법령에서 정한 상한요율에 따라 달라질 수 있습니다.</span>
   </div>
 
 
@@ -217,7 +217,7 @@
 </div>
 
 <!-- 계산기 설정(파라미터) — app_generator가 주입 -->
-<script>window.SM_CONFIG = {"name": "부동산 중개수수료 계산기", "slug": "real-estate-brokerage-fee", "primaryOutput": "brokerage_fee", "resultUnit": "원", "inputs": [{"name": "deal_type", "label": "거래 유형", "type": "number", "unit": ""}, {"name": "deal_amount", "label": "거래 금액", "type": "number", "unit": ""}], "outputs": [{"key": "brokerage_fee", "label": "중개수수료", "unit": "원"}], "show_adsense": false, "show_cpa": false, "show_share": true, "show_pwa": false, "show_result_save": true, "show_faq": true, "show_notice": true, "show_related": true, "show_detail": true, "show_article": true, "site_mode": "pre_adsense", "result_export_type": "png", "kakao_js_key": "", "calculator_version": "2.0.0", "law_version": "2026-07", "ga4_id": "G-EP2Q8035VF"};</script>
+<script>window.SM_CONFIG = {"name": "부동산 중개수수료 계산기", "slug": "real-estate-brokerage-fee", "primaryOutput": "brokerage_fee", "resultUnit": "원", "inputs": [{"name": "deal_type", "label": "거래 유형 — 1:매매·교환, 2:전세·월세", "type": "number", "unit": ""}, {"name": "deal_amount", "label": "거래 금액", "type": "number", "unit": ""}], "outputs": [{"key": "brokerage_fee", "label": "중개수수료", "unit": "원"}], "show_adsense": false, "show_cpa": false, "show_share": true, "show_pwa": false, "show_result_save": true, "show_faq": true, "show_notice": true, "show_related": true, "show_detail": true, "show_article": true, "site_mode": "pre_adsense", "result_export_type": "png", "kakao_js_key": "", "calculator_version": "2.0.0", "law_version": "2026-07", "ga4_id": "G-EP2Q8035VF"};</script>
 <script src="script.js"></script>
 </body>
 </html>
