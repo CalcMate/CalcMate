@@ -461,6 +461,42 @@ def _compute_js(calc) -> str:
             f'  out._formula = "국민연금 " + np_label + "원 × {np_pct}% = " + Math.round(national_pension).toLocaleString() + "원 | 건강보험 " + monthly_salary.toLocaleString() + "원 × {hi_pct}% = " + Math.round(health_insurance).toLocaleString() + "원 | 장기요양 건강보험료 " + Math.round(health_insurance).toLocaleString() + "원 × {ltc_pct}% = " + Math.round(long_term_care).toLocaleString() + "원 | 고용보험 " + monthly_salary.toLocaleString() + "원 × {ei_pct}% = " + Math.round(employment_insurance).toLocaleString() + "원";\n'
             '  return out;\n};\n'
         )
+    if str(calc.get("slug", "")) == "real-estate-brokerage-fee":
+        # STEP 16(신규 계산기 생성 라인 검증, 수동): 공인중개사법 시행규칙 제20조 별표1.
+        # deal_type: 1=매매·교환, 2=임대차(전세·월세는 환산보증금을 미리 계산해 입력).
+        # 거래금액 구간별 상한요율 + 하위 2개 구간은 정액 한도액과 비교해 더 낮은 금액 적용.
+        return (
+            _js_open()
+            + _js_read("deal_type")
+            + _js_read("deal_amount")
+            + '  if (deal_amount <= 0 || (deal_type !== 1 && deal_type !== 2)) { return null; }\n'
+            + _js_init_out()
+            + '  var rate, cap;\n'
+            + '  if (deal_type === 1) {\n'
+            + '    if (deal_amount < 50000000) { rate = 0.006; cap = 250000; }\n'
+            + '    else if (deal_amount < 200000000) { rate = 0.005; cap = 800000; }\n'
+            + '    else if (deal_amount < 900000000) { rate = 0.004; cap = null; }\n'
+            + '    else if (deal_amount < 1200000000) { rate = 0.005; cap = null; }\n'
+            + '    else if (deal_amount < 1500000000) { rate = 0.006; cap = null; }\n'
+            + '    else { rate = 0.007; cap = null; }\n'
+            + '  } else {\n'
+            + '    if (deal_amount < 50000000) { rate = 0.005; cap = 200000; }\n'
+            + '    else if (deal_amount < 100000000) { rate = 0.004; cap = 300000; }\n'
+            + '    else if (deal_amount < 600000000) { rate = 0.003; cap = null; }\n'
+            + '    else if (deal_amount < 1200000000) { rate = 0.004; cap = null; }\n'
+            + '    else if (deal_amount < 1500000000) { rate = 0.005; cap = null; }\n'
+            + '    else { rate = 0.006; cap = null; }\n'
+            + '  }\n'
+            + '  var raw_fee = deal_amount * rate;\n'
+            + '  var fee = (cap !== null) ? Math.min(raw_fee, cap) : raw_fee;\n'
+            + '  out["brokerage_fee"] = Math.round(fee);\n'
+            + '  out["applied_rate_pct"] = Math.round(rate * 1000) / 10;\n'
+            + '  var typeLabel = (deal_type === 1) ? "매매·교환" : "임대차(전세·월세)";\n'
+            + '  var capNote = (cap !== null) ? (", 한도액 " + cap.toLocaleString() + "원 적용") : "";\n'
+            + '  out._formula = typeLabel + " 거래금액 " + deal_amount.toLocaleString() + "원 \\u2014 상한요율 " + out["applied_rate_pct"] + "%(공인중개사법 시행규칙 제20조 별표1)" + capNote + " = " + Math.round(fee).toLocaleString() + "원";\n'
+            + '  return out;\n'
+            + _js_close()
+        )
     if str(calc.get("slug", "")) == "annual-leave-allowance":
         # AL-1: 입력 검증 — 음수/0 → null
         # AL-5: notices — 법정 상한(25일) 초과 경고

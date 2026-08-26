@@ -1,0 +1,49 @@
+slug: real-estate-brokerage-fee
+name: 부동산 중개수수료 계산기
+category: 부동산/임대
+tier: Tier2-A
+input_fields:
+- deal_type
+- deal_amount
+output_fields:
+- brokerage_fee
+- applied_rate_pct
+formula:
+  brokerage_fee: min(deal_amount * 0.004, 800000)
+  applied_rate_pct: '0.4'
+formula_status: operator_confirmed
+scope_exclusions:
+- 무조건 상한요율이 적용됩니다
+- 협의 없이 요율표대로 지급해야 합니다
+test_cases:
+- input:
+    deal_type: 1
+    deal_amount: 30000000
+  expected:
+    brokerage_fee: 180000
+- input:
+    deal_type: 1
+    deal_amount: 50000000
+  expected:
+    brokerage_fee: 250000
+- input:
+    deal_type: 1
+    deal_amount: 300000000
+  expected:
+    brokerage_fee: 1200000
+- input:
+    deal_type: 2
+    deal_amount: 30000000
+  expected:
+    brokerage_fee: 150000
+- input:
+    deal_type: 2
+    deal_amount: 200000000
+  expected:
+    brokerage_fee: 600000
+test_cases_status: operator_confirmed
+desc: 주택 매매·교환 또는 임대차(전세·월세, 환산보증금 기준) 거래금액을 입력하면 공인중개사법 시행규칙 제20조 별표1의 구간별 상한요율(0.3~0.7%)과
+  정액 한도액을 적용해 법정 중개보수 상한액을 계산합니다. 오피스텔·토지·상가는 범위 밖입니다.
+legal_refs:
+- real_estate_agent_act_rule_20
+generated_at: '2026-08-26T15:43:27.098211+09:00'

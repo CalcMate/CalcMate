@@ -4,3 +4,8 @@ instances:
     generated_at: '2026-08-15T09:01:25.356689+09:00'
     formula_status: operator_confirmed
     test_cases_status: not_generated
+  real-estate-brokerage-fee:
+    contract_slug: real-estate-brokerage-fee
+    generated_at: '2026-08-26T15:43:27.098211+09:00'
+    formula_status: operator_confirmed
+    test_cases_status: operator_confirmed

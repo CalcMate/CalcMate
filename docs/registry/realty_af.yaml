@@ -21,14 +21,14 @@ jeonse-vs-monthly:
     wolse_to_jeonse_equiv: 월세→전세 환산금액
     monthly_savings: 월 비용 우위
   input_labels:
-    - jeonse_deposit
-    - wolse_deposit
-    - wolse_amount
-    - rate
+  - jeonse_deposit
+  - wolse_deposit
+  - wolse_amount
+  - rate
   output_labels:
-    - jeonse_opp_cost
-    - wolse_to_jeonse_equiv
-    - monthly_savings
+  - jeonse_opp_cost
+  - wolse_to_jeonse_equiv
+  - monthly_savings
   display_order: 9
   card_desc: 전세와 월세 조건을 비교해 어떤 게 더 유리한지 확인해보세요
   difficulty: multi_output
@@ -50,3 +50,122 @@ jeonse-vs-monthly:
   compute_rules:
     positive_inputs:
     - rate
+real-estate-brokerage-fee:
+  name: 부동산 중개수수료 계산기
+  slug: real-estate-brokerage-fee
+  category: 부동산/임대
+  emoji: 🧮
+  card_label: 부동산 중개수수료 계산기
+  compute_type: dict
+  date_fields: []
+  validation_mode: formula
+  field_labels:
+    deal_type: 거래 유형
+    deal_amount: 거래 금액
+    brokerage_fee: 중개수수료
+    applied_rate_pct: 적용요율(%)
+  input_labels:
+  - deal_type
+  - deal_amount
+  output_labels:
+  - brokerage_fee
+  - applied_rate_pct
+  display_order: 12
+  card_desc: 주택 매매·교환 또는 임대차(전세·월세, 환산보증금 기준) 거래금액을 입력하면 공…
+  difficulty: multi_output
+  difficulty_status: provisional
+  status: HOLD
+  tier: 2
+  source: app_factory
+  content:
+    evergreen: true
+    update_cycle: null
+    content_caveat: null
+  related_slugs: []
+  legal_refs:
+  - real_estate_agent_act_rule_20
+  writer_context:
+    emphasize: []
+    example_patterns:
+    - 주택 매매·교환 또는 임대차(전세·월세, 환산보증금 기준) 거래금액을 입력하면 공인중개사법 시행규칙 제20조
+    calculation_story: []
+  contract_source:
+    contract_slug: real-estate-brokerage-fee
+    input_fields:
+    - deal_type
+    - deal_amount
+    output_fields:
+    - brokerage_fee
+    - applied_rate_pct
+    formula_status: operator_confirmed
+    test_cases_status: operator_confirmed
+  review_checklist:
+  - id: formula_accuracy
+    severity: critical
+    label: 계산 공식 정확성
+    display_value: '{"brokerage_fee": "min(deal_amount * 0.004, 800000)", "applied_rate_pct":
+      "0.4"}'
+    auto_source: formula_field
+    checked: false
+    checked_by: null
+    checked_at: null
+  - id: legal_basis
+    severity: advisory
+    label: 법적 근거 (법령/조항)
+    display_value: '[''real_estate_agent_act_rule_20'']'
+    auto_source: legal_refs_present
+    checked: false
+    checked_by: null
+    checked_at: null
+  - id: formula_cap
+    severity: critical
+    label: 공식 상한/하한(cap) 유지 확인
+    display_value: 'cap 함수 감지 — 아래 공식에서 min()/max() 적용 범위를 직접 확인:
+
+      {"brokerage_fee": "min(deal_amount * 0.004, 800000)", "applied_rate_pct": "0.4"}'
+    auto_source: formula_cap_detected
+    checked: false
+    checked_by: null
+    checked_at: null
+  - id: rate_constant
+    severity: critical
+    label: 적용 세율/계수 확인
+    display_value: '공식 내 상수: [''0.004'', ''0.4'']'
+    auto_source: formula_constants
+    checked: false
+    checked_by: null
+    checked_at: null
+  - id: schema_match
+    severity: critical
+    label: Schema 일치 확인 (Contract vs AI 생성)
+    display_value: ✅ Schema 일치 — Contract 확정 필드명과 동일
+    auto_source: contract_schema_drift
+    checked: false
+    checked_by: null
+    checked_at: null
+  - id: description_text
+    severity: advisory
+    label: 화면 안내문 확인
+    display_value: 주택 매매·교환 또는 임대차(전세·월세, 환산보증금 기준) 거래금액을 입력하면 공인중개사법 시행규칙 제20조 별표1의
+      구간별 상한요율(0.3~0.7%)과 정액 한도액을 적용해 법정 중개보수 상한액을 계산합니다. 오피스텔·토지·상가는 범위 밖입니다.
+    auto_source: description_field
+    checked: false
+    checked_by: null
+    checked_at: null
+  - id: seo_title
+    severity: advisory
+    label: SEO 제목 검토
+    display_value: 부동산 중개수수료 계산기 - 정확하고 간편한 계산
+    auto_source: seo_title_field
+    checked: false
+    checked_by: null
+    checked_at: null
+  - id: faq_content
+    severity: advisory
+    label: FAQ 내용 검토
+    display_value: '[''부동산 중개수수료가 어떻게 계산되나요?'', ''오피스텔이나 상가의 중개수수료도 계산할 수 있나요?'',
+      ''계산기는 어느 법률을 따르나요?'']'
+    auto_source: faq_field
+    checked: false
+    checked_by: null
+    checked_at: null
