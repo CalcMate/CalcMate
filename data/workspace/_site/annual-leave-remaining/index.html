@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#2563EB">
 <meta name="naver-site-verification" content="de4ad3f1575284b5a8ea58baab7bc7a77b7cf07e">
-<meta name="description" content="근로자의 근속연수를 입력하여 올해 총 연차와 잔여 연차일을 계산하세요. 연차 규정을 토대로 정확한 정보를 제공합니다.">
-<title>연차 잔여일 계산기 - 근속연수에 따른 연차 계산</title>
+<meta name="description" content="근로자의 근속개월수를 입력하여 올해 총 연차와 잔여 연차일을 계산하세요. 연차 규정을 토대로 정확한 정보를 제공합니다.">
+<title>연차 잔여일 계산기 - 근속개월수에 따른 연차 계산</title>
 <link rel="canonical" href="https://calcmate.kr/annual-leave-remaining/">
 <link rel="stylesheet" href="style.css">
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-EP2Q8035VF"></script>
@@ -21,7 +21,7 @@
       "name": "연차 잔여일 계산기는 어떻게 작동하나요?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "연차 잔여일 계산기는 귀하의 근속연수와 이미 사용한 연차일수를 입력하면 법적 기준에 따라 올해 총 연차일수와 잔여 연차일수를 계산합니다."
+        "text": "연차 잔여일 계산기는 귀하의 근속개월수와 이미 사용한 연차일수를 입력하면 법적 기준에 따라 올해 총 연차일수와 잔여 연차일수를 계산합니다."
       }
     },
     {
@@ -29,7 +29,7 @@
       "name": "총 연차일수는 어떻게 계산되나요?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "총 연차일수는 기본 15일에 근속연수 1년 초과 시 2년마다 1일씩 추가로 가산하여 25일까지 가능합니다."
+        "text": "근속 1년 미만은 매월 개근 시 1일씩(최대 11일), 1년 이상은 15일을 기준으로 근속 3년째부터 2년마다 1일씩 가산되어 최대 25일까지 가능합니다."
       }
     },
     {
@@ -37,7 +37,7 @@
       "name": "근로기준법에 따르면 연차는 어떻게 부여되나요?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "근로기준법 제60조 제1항에 따라 연차 15일이 부여되며, 4항에 따라 이후 2년마다 1일씩 추가로 최대 25일까지 받을 수 있습니다."
+        "text": "근로기준법 제60조 제1항에 따라 1년간 80% 이상 출근 시 15일이 부여되며, 1년 미만이거나 80% 미만 출근한 경우 제2항에 따라 매월 개근 시 1일씩(최대 11일) 부여됩니다. 제4항에 따라 3년 이상 근속 시 2년마다 1일씩 추가되어 최대 25일까지 받을 수 있습니다."
       }
     },
     {
@@ -45,7 +45,7 @@
       "name": "근속 1년 미만의 직원은 연차를 받을 수 없나요?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "근속 1년 미만의 경우 법정 연차가 부여되지 않으나, 회사 내부정책에 따라 달라질 수 있습니다."
+        "text": "아닙니다. 근속 1년 미만 근로자도 매월 개근하면 1일씩, 최대 11일의 법정 연차가 발생합니다(근로기준법 제60조 제2항). 근속 1년을 채우면 그때부터 15일 기준으로 전환되며, 이 계산기는 매월 개근을 전제로 계산합니다."
       }
     }
   ]
@@ -98,13 +98,13 @@
     </nav>
     <div class="sm-hero-badge">🏢 노동/고용법</div>
     <h1>연차 잔여일 계산기</h1>
-    <p class="sm-hero-sub">근로자의 근속연수를 입력하여 올해 총 연차와 잔여 연차일을 계산하세요. 연차 규정을 토대로 정확한 정보를 제공합니다.</p>
+    <p class="sm-hero-sub">근로자의 근속개월수를 입력하여 올해 총 연차와 잔여 연차일을 계산하세요. 연차 규정을 토대로 정확한 정보를 제공합니다.</p>
   </header>
 
   <!-- ② 계산 입력 -->
   <section class="sm-card" aria-label="계산 입력">
     <h2 class="sm-card-title">계산 입력</h2>
-    <div class="sm-field"><label class="sm-label" for="in_years_of_service">근속연수</label><div class="sm-input-wrap"><input class="sm-input" type="text" inputmode="numeric" data-comma id="in_years_of_service" name="in_years_of_service" placeholder="예) 0"></div></div>
+    <div class="sm-field"><label class="sm-label" for="in_months_of_service">근속개월수</label><div class="sm-input-wrap"><input class="sm-input" type="text" inputmode="numeric" data-comma id="in_months_of_service" name="in_months_of_service" placeholder="예) 0"></div></div>
 <div class="sm-field"><label class="sm-label" for="in_used_days">이미 사용한 연차일수</label><div class="sm-input-wrap"><input class="sm-input" type="text" inputmode="numeric" data-comma id="in_used_days" name="in_used_days" placeholder="예) 0"></div></div>
     <button class="sm-btn" type="button" onclick="calculate()">연차 잔여일 계산하기</button>
   </section>
@@ -165,7 +165,7 @@
 
   <!-- ⑧ 본문 -->
   <section class="sm-card sm-article">
-    <h2>연차 잔여일 계산기</h2><p>근로자의 근속연수를 입력하여 올해 총 연차와 잔여 연차일을 계산하세요. 연차 규정을 토대로 정확한 정보를 제공합니다.</p>
+    <h2>연차 잔여일 계산기</h2><p>근로자의 근속개월수를 입력하여 올해 총 연차와 잔여 연차일을 계산하세요. 연차 규정을 토대로 정확한 정보를 제공합니다.</p>
   </section>
 
   <!-- Phase C: 본문 중간 CTA -->
@@ -181,10 +181,10 @@
   <section class="sm-card" id="faq-card">
     <h2 class="sm-card-title">자주 묻는 질문</h2>
     <div id="sm-dynamic-faq"></div>
-    <div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">연차 잔여일 계산기는 어떻게 작동하나요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">연차 잔여일 계산기는 귀하의 근속연수와 이미 사용한 연차일수를 입력하면 법적 기준에 따라 올해 총 연차일수와 잔여 연차일수를 계산합니다.</div></div>
-<div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">총 연차일수는 어떻게 계산되나요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">총 연차일수는 기본 15일에 근속연수 1년 초과 시 2년마다 1일씩 추가로 가산하여 25일까지 가능합니다.</div></div>
-<div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">근로기준법에 따르면 연차는 어떻게 부여되나요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">근로기준법 제60조 제1항에 따라 연차 15일이 부여되며, 4항에 따라 이후 2년마다 1일씩 추가로 최대 25일까지 받을 수 있습니다.</div></div>
-<div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">근속 1년 미만의 직원은 연차를 받을 수 없나요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">근속 1년 미만의 경우 법정 연차가 부여되지 않으나, 회사 내부정책에 따라 달라질 수 있습니다.</div></div>
+    <div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">연차 잔여일 계산기는 어떻게 작동하나요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">연차 잔여일 계산기는 귀하의 근속개월수와 이미 사용한 연차일수를 입력하면 법적 기준에 따라 올해 총 연차일수와 잔여 연차일수를 계산합니다.</div></div>
+<div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">총 연차일수는 어떻게 계산되나요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">근속 1년 미만은 매월 개근 시 1일씩(최대 11일), 1년 이상은 15일을 기준으로 근속 3년째부터 2년마다 1일씩 가산되어 최대 25일까지 가능합니다.</div></div>
+<div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">근로기준법에 따르면 연차는 어떻게 부여되나요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">근로기준법 제60조 제1항에 따라 1년간 80% 이상 출근 시 15일이 부여되며, 1년 미만이거나 80% 미만 출근한 경우 제2항에 따라 매월 개근 시 1일씩(최대 11일) 부여됩니다. 제4항에 따라 3년 이상 근속 시 2년마다 1일씩 추가되어 최대 25일까지 받을 수 있습니다.</div></div>
+<div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">근속 1년 미만의 직원은 연차를 받을 수 없나요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">아닙니다. 근속 1년 미만 근로자도 매월 개근하면 1일씩, 최대 11일의 법정 연차가 발생합니다(근로기준법 제60조 제2항). 근속 1년을 채우면 그때부터 15일 기준으로 전환되며, 이 계산기는 매월 개근을 전제로 계산합니다.</div></div>
   </section>
 
   <!-- ⑩ 관련 계산기 -->
@@ -231,7 +231,7 @@
 </div>
 
 <!-- 계산기 설정(파라미터) — app_generator가 주입 -->
-<script>window.SM_CONFIG = {"name": "연차 잔여일 계산기", "slug": "annual-leave-remaining", "primaryOutput": "total_days", "resultUnit": "일", "inputs": [{"name": "years_of_service", "label": "근속연수", "type": "number", "unit": ""}, {"name": "used_days", "label": "이미 사용한 연차일수", "type": "number", "unit": ""}], "outputs": [{"key": "total_days", "label": "올해 총 연차일수", "unit": "일"}, {"key": "remaining_days", "label": "잔여 연차일수", "unit": "일"}], "show_adsense": false, "show_cpa": false, "show_share": true, "show_pwa": false, "show_result_save": true, "show_faq": true, "show_notice": true, "show_related": true, "show_detail": true, "show_article": true, "site_mode": "pre_adsense", "result_export_type": "png", "kakao_js_key": "", "calculator_version": "2.0.0", "law_version": "2026-07", "ga4_id": "G-EP2Q8035VF"};</script>
+<script>window.SM_CONFIG = {"name": "연차 잔여일 계산기", "slug": "annual-leave-remaining", "primaryOutput": "total_days", "resultUnit": "일", "inputs": [{"name": "months_of_service", "label": "근속개월수", "type": "number", "unit": ""}, {"name": "used_days", "label": "이미 사용한 연차일수", "type": "number", "unit": ""}], "outputs": [{"key": "total_days", "label": "올해 총 연차일수", "unit": "일"}, {"key": "remaining_days", "label": "잔여 연차일수", "unit": "일"}], "show_adsense": false, "show_cpa": false, "show_share": true, "show_pwa": false, "show_result_save": true, "show_faq": true, "show_notice": true, "show_related": true, "show_detail": true, "show_article": true, "site_mode": "pre_adsense", "result_export_type": "png", "kakao_js_key": "", "calculator_version": "2.0.0", "law_version": "2026-07", "ga4_id": "G-EP2Q8035VF"};</script>
 <script src="script.js"></script>
 </body>
 </html>
