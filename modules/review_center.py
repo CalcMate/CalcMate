@@ -703,3 +703,186 @@ def _faq_forbidden_phrase_check(calc: dict, html: str) -> tuple:
     if hit:
         return (False, False), f"금칙 문구 발견: {hit}"
     return (True, False), f"✅ 등록된 금칙 문구 {len(forbidden)}개 전부 미발견"
+
+
+# ══════════════════════════════════════════════════════════════════
+# STEP 17-C — 콘텐츠/문맥/UX 품질 QA (기존 pre_build_qa() 1~10단계와
+# 완전히 분리된 별도 계층). 기존 함수는 한 줄도 수정하지 않는다.
+#
+# 배경: STEP 16-Y에서 발견된 두 문제(① 노무용 공용 안내문구가 부동산
+# 계산기에 그대로 노출, ② 숫자 코드(1/2) 입력의 의미가 화면에 없음)는
+# 기존 QA 1~10단계(전부 "이름/개수가 시스템 간에 일치하는가"만 검사하는
+# 구조 검증)로는 원천적으로 탐지 불가능했다(STEP 17-B 진단). 이 섹션은
+# "사람이 읽었을 때 말이 되는가"를 검사하는 4개의 독립 함수 + 이를 묶는
+# content_quality_qa() 진입점을 추가한다.
+# ══════════════════════════════════════════════════════════════════
+
+# 카테고리별 전형어(소규모 큐레이션). 오탐 방지를 위해 해당 분야에서만
+# 쓰이는 명확한 용어만 포함한다(범용 단어 제외).
+_DOMAIN_TERMS: dict = {
+    "노무/급여": ["근로계약", "퇴직금", "임금체불", "통상임금", "평균임금"],
+    "고용/보험": ["구직급여", "실업급여"],
+    "노무/급여/보험": ["산재보험", "육아휴직급여"],
+    "세금/정부혜택": ["원천징수", "종합소득세", "과세표준"],
+    "부동산/임대": ["중개보수", "전월세전환율"],
+    "병역/공무": ["전역일", "군복무"],
+}
+
+
+def _category_word_leakage_check(calc: dict, html: str) -> tuple:
+    """calc의 category와 무관한 다른 분야의 전형어가 본문에 등장하는지 검사.
+    카테고리 문자열에 공통 토큰이 하나도 없는 완전 무관 분야 용어는 강한
+    오염 신호(FAIL), 토큰이 일부 겹치는 인접 분야 용어는 WARNING(오탐
+    방지 — 예: '고용/보험' 계산기에 '노무/급여/보험' 전형어가 섞이는
+    경우는 실제 흔히 있는 정상적 인접 언급일 수 있음).
+    반환: (passed: bool, hits: list[str], detail: str)."""
+    category = str(calc.get("category", ""))
+    cat_tokens = set(category.split("/")) if category else set()
+    html = html or ""
+    # 사이트 공통 CTA(related-card/result-cta/inline-cta/footer-cta 등, 위치가
+    # 여러 곳에 흩어져 있고 계속 늘어날 수 있음 — STEP 17-C에서 severance-pay의
+    # "실업급여도 계산해 보기" 문구로 실제 확인)를 하나씩 제거 목록에 추가하는
+    # 방식은 취약하다고 판단해, 반대로 "이 계산기의 고유 콘텐츠 영역"만
+    # 화이트리스트로 추출하는 방식으로 전환한다: 제목/설명(hero), 안내문구
+    # (notice), 본문(article), FAQ만 대상으로 삼는다. 마커를 하나도 찾지 못하면
+    # (템플릿 구조가 다른 경우) 안전하게 원본 html 그대로 검사한다(폴백).
+    parts = []
+    for pattern in (
+        r"<header class=\"sm-hero\">.*?</header>",
+        r"<div class=\"sm-notice\" role=\"note\">.*?</div>",
+        r"<section class=\"sm-card sm-article\">.*?</section>",
+        r"<section class=\"sm-card\" id=\"faq-card\">.*?</section>",
+    ):
+        m = re.search(pattern, html, flags=re.S)
+        if m:
+            parts.append(m.group(0))
+    # 화이트리스트 마커를 하나도 못 찾은 경우(예: Tier2-B 날짜형 계산기처럼
+    # 표준 템플릿과 구조가 다른 경우) 원본 html로 폴백하되, 최소한 사이트
+    # 공통 <script>(JSON-LD 슬로건 등)는 제거해 명백한 오탐을 피한다.
+    html = "\n".join(parts) if parts else re.sub(r"<script[^>]*>.*?</script>", "", html, flags=re.S)
+    hits = []
+    for cat, terms in _DOMAIN_TERMS.items():
+        if cat == category:
+            continue
+        for term in terms:
+            if term in html:
+                hits.append((cat, term))
+    if not hits:
+        return True, [], "✅ 타 분야 전형어 미발견"
+    strong = [h for h in hits if not (cat_tokens & set(h[0].split("/")))]
+    hit_labels = [f"{c}:{t}" for c, t in hits]
+    if strong:
+        detail = "; ".join(f"'{t}'({c} 분야 전형어)" for c, t in strong)
+        return False, hit_labels, f"❌ 문맥 오염 의심(계산기 분야={category or '미지정'}): {detail}"
+    detail = "; ".join(f"'{t}'({c} 분야, 인접 분야이므로 확인만 권장)" for c, t in hits)
+    return True, hit_labels, f"⚠️ {detail}"
+
+
+def _input_semantic_select_check(calc: dict, contract: dict = None) -> tuple:
+    """Contract의 test_cases에서 입력 필드가 실제로는 소수의 정수값만 갖는
+    선택형(enum) 성격인지 휴리스틱으로 탐지한다. select: 접두사가 이미
+    적용된 필드나 Contract 자체가 없는 경우(자동 생성 계산기 등)는 대상에서
+    제외한다 — 오탐/자동 FAIL 방지를 위해 이 검사는 항상 WARNING만 반환하고
+    passed=True를 유지한다(하드 게이트 아님).
+    반환: (passed: True 고정, warn_fields: list[str], detail: str)."""
+    if not contract or not contract.get("test_cases"):
+        return True, [], "skipped: Contract test_cases 없음(자동 생성 계산기이거나 Contract 미보유)"
+    ins = _pj(calc.get("input_schema"), {})
+    values_by_field: dict = {}
+    for tc in contract.get("test_cases", []):
+        for k, v in (tc.get("input") or {}).items():
+            values_by_field.setdefault(k, set()).add(v)
+    candidates = []
+    for k, values in values_by_field.items():
+        spec = str(ins.get(k, ""))
+        if spec.lower().startswith("select:") or "date" in spec.lower():
+            continue
+        is_small_int_set = (
+            1 <= len(values) <= 4
+            and all(isinstance(v, (int, float)) and float(v) == int(v) for v in values)
+            and max(int(v) for v in values) <= 10
+        )
+        if is_small_int_set:
+            candidates.append(k)
+    if candidates:
+        return True, candidates, f"⚠️ 선택형(enum) 가능성 있는 필드: {candidates} — select: 타입 사용 검토 권장"
+    return True, [], "✅ enum 후보 없음(또는 이미 select 처리됨)"
+
+
+def _internal_name_leakage_check(calc: dict, html: str) -> tuple:
+    """input_schema/output_schema의 내부 필드 키가 id=/name= 속성이 아닌
+    사용자에게 보이는 텍스트(라벨/FAQ/본문)에 그대로 노출되는지 검사.
+    반환: (passed: bool, hits: list[str], detail: str)."""
+    ins = _pj(calc.get("input_schema"), {})
+    outs = _pj(calc.get("output_schema"), {})
+    keys = set(ins.keys()) | set(outs.keys())
+    if not keys:
+        return True, [], "skipped: input/output schema 없음"
+    visible = re.sub(r'\bid="[^"]*"', "", html or "")
+    visible = re.sub(r'\bname="[^"]*"', "", visible)
+    visible = re.sub(r"<script[^>]*>.*?</script>", "", visible, flags=re.S)
+    hits = [k for k in keys if re.search(rf'(?<![\w"]){re.escape(k)}(?![\w"])', visible)]
+    if hits:
+        return False, hits, f"❌ 내부 필드명이 사용자 텍스트에 노출: {sorted(hits)}"
+    return True, [], "✅ 내부 필드명 노출 없음"
+
+
+def _legal_citation_cross_check(calc: dict, html: str) -> tuple:
+    """HTML에 표시되는 'OO법 제OO조' 패턴을 추출해 legal_refs → legal_master의
+    law+article과 실제로 일치하는지 검사. legal_refs가 없거나 정규식으로
+    인용 여부를 확정하기 어려운 경우는 추측해서 FAIL시키지 않고 skip 처리한다.
+    반환: (passed: bool, cited: list[str], detail: str)."""
+    from modules.registry_loader import load_registry_v3, load_legal_master
+
+    slug = str(calc.get("slug", ""))
+    v3_entry = load_registry_v3().get(slug) or {}
+    legal_refs = v3_entry.get("legal_refs") or []
+    cited = sorted(set(re.findall(r"[가-힣]+법(?:\s*시행규칙)?\s*제\d+조", html or "")))
+
+    if not legal_refs:
+        if cited:
+            return True, cited, f"⚠️ legal_refs 미등록 상태에서 법률 문구 발견(확인 권장): {cited}"
+        return True, [], "skipped: legal_refs 없음, 법률 인용 문구도 없음"
+
+    if not cited:
+        return True, [], "skipped: 법률 인용 문구가 HTML에서 정규식으로 확정되지 않음"
+
+    lm = load_legal_master()
+    expected = set()
+    for ref in legal_refs:
+        entity = lm.get(ref) or {}
+        law, article = entity.get("law", ""), entity.get("article", "")
+        if law and article:
+            expected.add(f"{law} {article}".replace(" ", ""))
+
+    matched = any(any(exp in c.replace(" ", "") for exp in expected) for c in cited)
+    if matched:
+        return True, cited, f"✅ 인용 법률 일치: {cited}"
+    return False, cited, f"❌ 인용 법률 불일치 — HTML 인용: {cited} / legal_refs 기대: {sorted(expected)}"
+
+
+def content_quality_qa(calc: dict, html: str, js: str = "", contract: dict = None) -> list[dict]:
+    """STEP 17-C: 콘텐츠/문맥/UX 품질 QA 진입점. pre_build_qa()의 반환 형식
+    ([{"step","label","passed","skipped","detail"}])과 동일한 리스트를
+    반환하되, 이 함수는 pre_build_qa() 내부에서 호출되지 않는 완전히
+    독립적인 검사 계층이다(기존 10단계 미변경, 별도 호출 필요).
+    """
+    results = []
+
+    p1, hits1, d1 = _category_word_leakage_check(calc, html)
+    results.append({"step": "CQ1", "label": "카테고리-문맥 오염 검사(category word leakage)",
+                    "passed": p1, "skipped": False, "detail": d1})
+
+    p2, hits2, d2 = _input_semantic_select_check(calc, contract)
+    results.append({"step": "CQ2", "label": "입력 필드 선택형(enum) 의미 검사",
+                    "passed": p2, "skipped": d2.startswith("skipped"), "detail": d2})
+
+    p3, hits3, d3 = _internal_name_leakage_check(calc, html)
+    results.append({"step": "CQ3", "label": "내부 필드명 노출 검사",
+                    "passed": p3, "skipped": d3.startswith("skipped"), "detail": d3})
+
+    p4, hits4, d4 = _legal_citation_cross_check(calc, html)
+    results.append({"step": "CQ4", "label": "법률 인용 교차검증",
+                    "passed": p4, "skipped": d4.startswith("skipped"), "detail": d4})
+
+    return results
