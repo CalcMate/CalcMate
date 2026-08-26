@@ -179,7 +179,26 @@ def _form_fields_v2(ins, labels=None) -> str:
     rows = []
     for k, spec in ins.items():
         label, unit = _split_label(k, labels)
-        if "date" in str(spec).lower():
+        spec_str = str(spec)
+        if spec_str.lower().startswith("select:"):
+            # STEP 17-A: 선택형(enum) 입력. input_schema 값 형식: "select:값1=텍스트1,값2=텍스트2"
+            # 다른 계산기의 기존 타입 문자열("integer"/"number"/"date" 등)은 이 접두사를 쓰지 않으므로 영향 없음.
+            options_html = []
+            for pair in spec_str.split(":", 1)[1].split(","):
+                if "=" not in pair:
+                    continue
+                val, text = pair.split("=", 1)
+                options_html.append(
+                    f'<option value="{_html.escape(val.strip())}">{_html.escape(text.strip())}</option>')
+            rows.append(
+                f'<div class="sm-field">'
+                f'<label class="sm-label" for="in_{k}">{_html.escape(label)}</label>'
+                f'<div class="sm-input-wrap">'
+                f'<select class="sm-input" id="in_{k}" name="in_{k}">'
+                f'{"".join(options_html)}'
+                f'</select>'
+                f'</div></div>')
+        elif "date" in spec_str.lower():
             rows.append(
                 f'<div class="sm-field">'
                 f'<label class="sm-label" for="in_{k}">{_html.escape(label)}</label>'

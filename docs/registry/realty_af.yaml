@@ -60,7 +60,7 @@ real-estate-brokerage-fee:
   date_fields: []
   validation_mode: formula
   field_labels:
-    deal_type: 거래 유형 — 1:매매·교환, 2:전세·월세
+    deal_type: 거래 유형
     deal_amount: 거래 금액
     brokerage_fee: 중개수수료
   input_labels:
