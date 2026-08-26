@@ -598,9 +598,9 @@ window.computeResult = function(inputs){
   var raw_fee = deal_amount * rate;
   var fee = (cap !== null) ? Math.min(raw_fee, cap) : raw_fee;
   out["brokerage_fee"] = Math.round(fee);
-  out["applied_rate_pct"] = Math.round(rate * 1000) / 10;
+  var appliedRatePct = Math.round(rate * 1000) / 10;
   var typeLabel = (deal_type === 1) ? "매매·교환" : "임대차(전세·월세)";
   var capNote = (cap !== null) ? (", 한도액 " + cap.toLocaleString() + "원 적용") : "";
-  out._formula = typeLabel + " 거래금액 " + deal_amount.toLocaleString() + "원 \u2014 상한요율 " + out["applied_rate_pct"] + "%(공인중개사법 시행규칙 제20조 별표1)" + capNote + " = " + Math.round(fee).toLocaleString() + "원";
+  out._formula = typeLabel + " 거래금액 " + deal_amount.toLocaleString() + "원 \u2014 상한요율 " + appliedRatePct + "%(공인중개사법 시행규칙 제20조 별표1)" + capNote + " = " + Math.round(fee).toLocaleString() + "원";
   return out;
 };
