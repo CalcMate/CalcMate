@@ -22,6 +22,12 @@ CRITICAL_CATEGORIES = frozenset({
 # D-4: Tier2-B 감지 키워드 (rule-based, AI 이전 단계)
 TIER2B_KEYWORDS = ["날짜", "기간", "전역일", "만료일", "종료일", "d-day", "디데이", "복무", "개월수"]
 
+# STEP 25-2: Mode 추천 후처리용 법령/규정성 신호 키워드 (rule-based, B→A 오판 보정)
+LEGAL_SIGNAL_KEYWORDS = [
+    "법령", "법률", "법정", "규정", "근로기준법", "병역법", "소득세법",
+    "요율", "세율", "보험료율", "상한", "하한", "연도별", "예외", "특례",
+]
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -270,6 +276,70 @@ def suggest_tier(cfg: dict, name: str, desc: str = "") -> dict:
         }
     except Exception as e:
         return {"tier": "Tier2-A", "reason": f"추천 실패: {e}", "confidence": "low"}
+
+
+def detect_legal_signal_keywords(name: str, desc: str = "") -> bool:
+    """이름/설명에서 법령/규정성 신호 키워드 감지 (rule-based, Mode 추천 후처리용)."""
+    text = ((name or "") + " " + (desc or "")).lower()
+    return any(kw.lower() in text for kw in LEGAL_SIGNAL_KEYWORDS)
+
+
+# ─────────────────────────────────────────────────────────────
+# 2b. Mode(A/B) AI 추천 (STEP 25-2)
+# ─────────────────────────────────────────────────────────────
+
+def suggest_mode(cfg: dict, name: str, category: str = "", desc: str = "") -> dict:
+    """
+    AI(GPT-4o)가 계산기 이름/카테고리/설명 기반으로 Mode(A/B)를 추천한다.
+
+    Mode A(자유 생성)는 legal_refs 입력 경로와 check_hold_rules() 사전 게이트가 없고,
+    Mode B(Contract 기반 생성)만 이를 제공한다(STEP 25-1 진단). 따라서 B→A 오판이
+    A→B 오판보다 구조적으로 더 위험하며, 이 함수는 그 비대칭을 반영해 법령/규정
+    의존 가능성이 조금이라도 있으면 Mode B 쪽으로 보수적으로 판단한다.
+
+    이 함수는 추천값만 반환한다. generate_app()/generate_app_with_contract()/
+    save_app() 호출, legal_refs 자동 선택/확정, test_cases 자동 생성에는
+    일체 관여하지 않는다 — 그 판단과 실행은 항상 사용자가 직접 수행한다.
+
+    반환: {"mode": "A"|"B", "reason": str, "confidence": "high"|"medium"|"low"}
+    """
+    from modules.app_factory import _chat
+    from modules.json_utils import parse_json_lenient
+
+    sys_prompt = (
+        "너는 한국 웹 계산기의 생성 방식(Mode) 분류 전문가다.\n\n"
+        "Mode A(자유 생성): 단순 산술, 입력→출력 직접 계산, 법령/행정 규정 의존 없음, "
+        "요율/상한/하한 등 외부 값 의존 없음, 복잡한 예외/특례 없음.\n"
+        "         예: BMI, 단순 비율 계산기\n"
+        "Mode B(Contract 확정 생성): 법령/행정 규정 의존 가능성, 법정 요율, "
+        "연도별 변경 가능 값, 상한/하한, 복잡한 조건/예외, 날짜 기반 복잡 계산, "
+        "외부 기준표/규정 의존.\n"
+        "         예: 퇴직금, 실업급여, 전역일 계산기\n\n"
+        "법령 또는 규정 의존 가능성이 조금이라도 있으면 Mode A보다 Mode B를 "
+        "보수적으로 추천한다.\n\n"
+        'JSON만 반환: {"mode": "A", "reason": "이유 1~2문장", "confidence": "high|medium|low"}'
+    )
+    user_prompt = f"계산기명: {name}\n카테고리: {category or '(없음)'}\n설명: {desc or '(없음)'}"
+
+    try:
+        text, _, _ = _chat(cfg, "orchestrator", sys_prompt, user_prompt, 300)
+        result = parse_json_lenient(text)
+        # STEP 25-2: 비대칭 위험 보정 — 판단 불가/미제공 시 안전한 쪽(B)으로 기본값
+        mode = result.get("mode", "B")
+        if mode not in ("A", "B"):
+            mode = "B"
+        confidence = result.get("confidence", "medium")
+        reason = result.get("reason", "")
+    except Exception as e:
+        return {"mode": "B", "reason": f"추천 실패(안전 기본값 B로 보수적 대체): {e}", "confidence": "low"}
+
+    # STEP 25-2: 법령/규정성 키워드가 감지되는데 AI가 A/HIGH를 반환하면 MEDIUM으로 강등
+    if mode == "A" and confidence == "high" and detect_legal_signal_keywords(name, desc):
+        confidence = "medium"
+        reason = (reason + " " if reason else "") + \
+            "(법령/규정성 키워드 감지로 신뢰도를 MEDIUM으로 보수적 조정함)"
+
+    return {"mode": mode, "reason": reason, "confidence": confidence}
 
 
 # ─────────────────────────────────────────────────────────────

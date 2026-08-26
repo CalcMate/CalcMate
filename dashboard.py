@@ -2059,6 +2059,42 @@ elif tab == "🏭 App Factory":
     af_cat = c2.text_input("카테고리", placeholder="노무/급여", key="af_cat")
     af_desc = st.text_area("설명", placeholder="예: 근속연수와 평균임금으로 퇴직금 계산", key="af_desc")
 
+    # ── Mode(A/B) AI 추천 (STEP 25-2) ───────────────────────────
+    # 추천 표시 전용 UX 기능. generate_app()/generate_app_with_contract()/save_app()를
+    # 직접 호출하지 않으며, legal_refs·test_cases 자동 선택/생성에도 관여하지 않는다.
+    # Mode 선택 자체는 기존과 동일하게 아래 [🏭 자동 생성](A) / [📋 Contract 기반 생성](B)
+    # 버튼 중 사용자가 직접 클릭하는 방식으로 최종 결정된다(이 STEP에서 변경하지 않음).
+    _mode_col1, _mode_col2 = st.columns([4, 1])
+    with _mode_col1:
+        _mode_suggest = st.session_state.get("af_mode_suggest", {})
+        if _mode_suggest:
+            _m_conf = _mode_suggest.get("confidence", "medium")
+            _m_val = _mode_suggest.get("mode", "A")
+            _m_label = "Mode B — 📋 Contract 기반 생성" if _m_val == "B" else "Mode A — 🏭 자동 생성"
+            _m_reason = _mode_suggest.get("reason", "")
+            if _m_conf == "high":
+                st.success(f"✅ AI 추천: **{_m_label}** (확신도: HIGH)  \n이유: {_m_reason}")
+            else:
+                _m_conf_icon = {"medium": "⚠️ 확신도 보통 —", "low": "🚨 판단 불확실 —"}.get(_m_conf, "")
+                st.info(f"💡 AI 추천: **{_m_label}** {_m_conf_icon}  \n이유: {_m_reason}")
+            st.caption(
+                "참고용 추천입니다. 아래 버튼 중 직접 선택해 진행하세요 — "
+                "legal_refs·test_cases는 이 추천과 무관하게 항상 사람이 직접 확정합니다."
+            )
+    with _mode_col2:
+        if st.button("💡 Mode AI 추천", key="af_mode_suggest_btn",
+                      help="이름·카테고리·설명 기반으로 AI가 Mode(A/B)를 추천합니다(표시만, 자동 생성 없음)"):
+            if not af_name.strip():
+                st.warning("계산기명을 먼저 입력하세요.")
+            else:
+                with st.spinner("Mode 분석 중..."):
+                    try:
+                        _m_result = RC.suggest_mode(cfg, af_name, af_cat or "", af_desc or "")
+                        st.session_state["af_mode_suggest"] = _m_result
+                        st.rerun()
+                    except Exception as _me:
+                        st.warning(f"Mode 추천 실패(직접 선택): {_me}")
+
     # ── Tier2-B 키워드 사전 감지 (rule-based) ──────────────────
     if af_name and RC.detect_tier2b_keywords(af_name, af_desc or ""):
         st.warning("⚠️ 이름/설명에 날짜·기간 관련 키워드가 감지됩니다. Tier2-B(날짜형) 가능성을 직접 확인하세요.")
