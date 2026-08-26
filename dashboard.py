@@ -2072,9 +2072,18 @@ elif tab == "🏭 App Factory":
         _tier_suggest = st.session_state.get("af_tier_suggest", {})
         if _tier_suggest:
             _conf = _tier_suggest.get("confidence", "medium")
-            _conf_icon = {"high": "", "medium": "⚠️ 확신도 보통 —", "low": "🚨 분류 불확실 —"}.get(_conf, "")
-            st.info(f"💡 AI 추천: **{_tier_suggest.get('tier', 'Tier2-A')}** {_conf_icon}  \n"
-                    f"이유: {_tier_suggest.get('reason', '')}")
+            _tier_val = _tier_suggest.get('tier', 'Tier2-A')
+            _reason = _tier_suggest.get('reason', '')
+            # STEP 23-3: confidence=high는 "자동 선택됨"을 명확히 표시(자동 생성 아님 —
+            # 라디오/체크박스는 여전히 사용자가 언제든 변경 가능, 생성 버튼은 항상 수동 클릭)
+            if _conf == "high":
+                st.success(f"✅ AI 추천: **{_tier_val}** (신뢰도: HIGH) — "
+                           f"높은 확신도로 자동 선택되었습니다. 필요하면 직접 변경할 수 있습니다.  \n"
+                           f"이유: {_reason}")
+            else:
+                _conf_icon = {"medium": "⚠️ 확신도 보통 —", "low": "🚨 분류 불확실 —"}.get(_conf, "")
+                st.info(f"💡 AI 추천: **{_tier_val}** {_conf_icon}  \n"
+                        f"이유: {_reason}")
     with _tier_col2:
         if st.button("💡 Tier AI 추천", key="af_tier_suggest_btn", help="이름·설명 기반으로 AI가 Tier를 추천합니다"):
             if not af_name.strip():
@@ -2087,6 +2096,12 @@ elif tab == "🏭 App Factory":
                         # D-1: 추천값으로 라디오 기본값 세팅
                         _t_int = _tier_map_str_to_int.get(_result["tier"], 2)
                         st.session_state["af_tier"] = _t_int
+                        # STEP 23-2: Tier2-B 추천 신호를 Mode B 체크박스까지 배선
+                        # (confidence와 무관하게 "Tier2-B라는 추천 결과 자체"만 보존 —
+                        #  자동확정 여부는 이 STEP의 범위 밖. Mode A는 subtype 개념이 없어 영향 없음)
+                        _tier2b_suggested = (_result.get("tier") == "Tier2-B")
+                        st.session_state["af_tier2b_suggested"] = _tier2b_suggested
+                        st.session_state["af_contract_is_tier2b"] = _tier2b_suggested
                         st.rerun()
                     except Exception as _te:
                         st.warning(f"Tier 추천 실패(직접 선택): {_te}")
