@@ -1641,7 +1641,10 @@ def generate_html(calc: dict, cfg: dict = None) -> str:
         "RESULT_LABEL": _html.escape(plabel if plabel.startswith("예상") else f"예상 {plabel}"),
         "PRIMARY_OUT": _html.escape(primary), "RESULT_UNIT": _html.escape(punit or "원"),
         "EXTRA_OUTPUT_ROWS": extra_rows_html,
-        "NOTICE": "본 계산 결과는 참고용이며, 실제 지급액은 근로계약·관련 법령에 따라 달라질 수 있습니다.",
+        # STEP 16-Y: real-estate-brokerage-fee는 "근로계약"이 문맥상 부적절해 계산기 단위로만 문구 교체(공용 기본값은 무변경).
+        "NOTICE": ("본 계산 결과는 참고용이며, 실제 중개보수는 거래 유형·거래금액 및 관련 법령에서 정한 상한요율에 따라 달라질 수 있습니다."
+                   if calc.get("slug") == "real-estate-brokerage-fee" else
+                   "본 계산 결과는 참고용이며, 실제 지급액은 근로계약·관련 법령에 따라 달라질 수 있습니다."),
         # 섹션은 render_* 함수가 조립(show_*=False면 태그 포함 전체 생략)
         "ADSENSE_SLOT": render_adsense_slot(cfg),
         "ARTICLE_SECTION": render_article(calc, cfg),
