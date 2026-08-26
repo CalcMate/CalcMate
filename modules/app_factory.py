@@ -964,35 +964,18 @@ def _build_contract_enforcement_prompt(contract: dict) -> str:
     return "\n".join(lines)
 
 
-def generate_app(cfg: dict, name: str, category: str = "", desc: str = "", tier: int = 2,
-                 _contract: dict = None) -> dict:
-    """계산기 1종을 AI로 생성하여 dict 반환(저장은 save_app).
+def _suggest_spec(cfg: dict, name: str, category: str, desc: str, tier: int,
+                   existing: list, _contract: dict = None) -> tuple:
+    """AI(GPT)로 계산기 스펙(input/output schema, formula, labels)을 설계한다.
 
-    _contract: Contract 기반 생성 시 내부적으로 전달되는 확정 스펙 dict.
-               Mode A(자동 생성) 호출 시 전달하지 않음 — 기존 동작 그대로 유지.
-               Mode B(generate_app_with_contract) 호출 시만 사용.
+    generate_app()의 스펙 설계 단계(구 1)/2))를 순수 추출한 헬퍼 — 프롬프트·검증·
+    재시도 로직을 한 글자도 바꾸지 않고 그대로 옮긴 것이며 동작은 완전히 동일하다.
+    STEP 24-1: 향후 "필드 자동 제안" 미리보기 등에서 이 헬퍼만 재사용하기 위한
+    순수 추출이며, 이번 STEP에서는 generate_app() 외의 신규 호출부를 추가하지 않는다.
+
+    반환: (spec: dict, steps: list[(단계, 모델, 토큰)])
     """
-    name = (name or "").strip()
-    if not name:
-        raise ValueError("계산기명을 입력하세요.")
-    steps = []  # (단계, 모델, 토큰)
-
-    # [0] 기존 계산기 목록 로드 — 사전 중복 확인 + GPT 컨텍스트
-    try:
-        existing = CalculatorRepository(get_db_adapter(cfg)).get_all()
-    except Exception:
-        existing = []
-
-    # [0-A] 사전 중복 차단 — AI 호출 전, 이름 일치 시 즉시 중단 (AI 토큰 낭비 방지)
-    _name_norm = re.sub(r"\s+", "", name).lower()
-    for _c in existing:
-        if re.sub(r"\s+", "", _c.get("name", "")).lower() == _name_norm:
-            raise ValueError(
-                f"이미 등록된 계산기와 이름이 동일합니다: '{_c.get('name')}'. "
-                "AI 호출 없이 차단됩니다. 다른 이름을 사용하거나 기존 계산기를 검토하세요."
-            )
-
-    # [1] 기존 계산기 목록 요약(중복 회피 컨텍스트) — sys1에 주입
+    # 기존 계산기 목록 요약(중복 회피 컨텍스트) — sys1에 주입
     existing_summary = "\n".join(
         f"- {c.get('name','')} ({c.get('category','')}): 입력항목 {list(_pj(c.get('input_schema'), {}).keys())}"
         for c in existing
@@ -1029,6 +1012,7 @@ def generate_app(cfg: dict, name: str, category: str = "", desc: str = "", tier:
         "어떠한 경우에도 위 JSON 형식으로만 응답하라."
     )
     u1 = f"계산기명: {name}\n카테고리: {category}\n설명: {desc}"
+    steps = []  # (단계, 모델, 토큰)
     t1, m1, k1 = _chat(cfg, "orchestrator", sys1, u1, 800)
     spec = parse_json_lenient(t1)
     steps.append(("총괄(스펙)", m1, k1))
@@ -1052,6 +1036,40 @@ def generate_app(cfg: dict, name: str, category: str = "", desc: str = "", tier:
             msg = f"{msg} / 재시도 오류: {e}"
     spec["_formula_valid"] = ok
     spec["_formula_msg"] = msg
+    return spec, steps
+
+
+def generate_app(cfg: dict, name: str, category: str = "", desc: str = "", tier: int = 2,
+                 _contract: dict = None) -> dict:
+    """계산기 1종을 AI로 생성하여 dict 반환(저장은 save_app).
+
+    _contract: Contract 기반 생성 시 내부적으로 전달되는 확정 스펙 dict.
+               Mode A(자동 생성) 호출 시 전달하지 않음 — 기존 동작 그대로 유지.
+               Mode B(generate_app_with_contract) 호출 시만 사용.
+    """
+    name = (name or "").strip()
+    if not name:
+        raise ValueError("계산기명을 입력하세요.")
+    steps = []  # (단계, 모델, 토큰)
+
+    # [0] 기존 계산기 목록 로드 — 사전 중복 확인 + GPT 컨텍스트
+    try:
+        existing = CalculatorRepository(get_db_adapter(cfg)).get_all()
+    except Exception:
+        existing = []
+
+    # [0-A] 사전 중복 차단 — AI 호출 전, 이름 일치 시 즉시 중단 (AI 토큰 낭비 방지)
+    _name_norm = re.sub(r"\s+", "", name).lower()
+    for _c in existing:
+        if re.sub(r"\s+", "", _c.get("name", "")).lower() == _name_norm:
+            raise ValueError(
+                f"이미 등록된 계산기와 이름이 동일합니다: '{_c.get('name')}'. "
+                "AI 호출 없이 차단됩니다. 다른 이름을 사용하거나 기존 계산기를 검토하세요."
+            )
+
+    # [1] 스펙 설계(입력/출력 스키마 + 산식) — STEP 24-1: _suggest_spec()으로 순수 추출
+    spec, _spec_steps = _suggest_spec(cfg, name, category, desc, tier, existing, _contract)
+    steps.extend(_spec_steps)
 
     # 2) 코드(Claude): 단일 자가완결 HTML (인라인 CSS/JS) — JSON 미사용(견고)
     sys2 = ("너는 프론트엔드 개발자다. 아래 스펙으로 동작하는 계산기를 "

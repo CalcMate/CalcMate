@@ -2242,6 +2242,65 @@ elif tab == "🏭 App Factory":
                 f"/ formula_status: {_rest.get('formula_status')}. "
                 "확인 후 [📋 Contract 기반 생성]으로 재검증하세요.")
 
+        # ── STEP 24-2: AI 필드 자동 제안 — STEP 24-1의 _suggest_spec() 재사용 ──
+        # (신규 프롬프트/생성 로직 없음. generate_app()의 [0]/[1] 단계와 동일한
+        #  existing 로드 + _suggest_spec() 호출만 수행 — Mode A 로직 무변경.)
+        def _af_suggest_fields_with_ai() -> None:
+            _name = (st.session_state.get("af_name") or "").strip()
+            if not _name:
+                st.session_state["af_prefill_msg"] = (
+                    "warning", "⚠️ 필드 자동 제안을 사용하려면 먼저 [계산기명]을 입력하세요.")
+                return
+            _cat = st.session_state.get("af_cat") or ""
+            _desc = st.session_state.get("af_desc") or ""
+            _tier = st.session_state.get("af_tier", 2)
+            try:
+                from repositories.calculator_repository import CalculatorRepository as _CR
+                from adapters.db.factory import get_db_adapter as _gda
+                _existing = _CR(_gda(cfg)).get_all()
+            except Exception:
+                _existing = []
+            try:
+                _spec, _ = AF._suggest_spec(cfg, _name, _cat, _desc, _tier, _existing, _contract=None)
+            except Exception as _e:
+                st.session_state["af_prefill_msg"] = (
+                    "warning", f"⚠️ 필드 자동 제안에 실패했습니다. 기존 입력값은 유지됩니다. ({_e})")
+                return
+            _in_keys = list((_spec.get("input_schema") or {}).keys())
+            _out_keys = list((_spec.get("output_schema") or {}).keys())
+            if not _in_keys and not _out_keys:
+                st.session_state["af_prefill_msg"] = (
+                    "warning", "⚠️ AI가 유효한 필드를 제안하지 못했습니다. 기존 입력값은 유지됩니다.")
+                return
+            if _in_keys:
+                st.session_state["af_contract_input_fields"] = ", ".join(_in_keys)
+            if _out_keys:
+                st.session_state["af_contract_output_fields"] = ", ".join(_out_keys)
+            _formula = _spec.get("formula")
+            _has_formula = _formula not in (None, "", {})
+            if _has_formula:
+                _f_str = (json.dumps(_formula, ensure_ascii=False)
+                          if isinstance(_formula, dict) else str(_formula))
+                st.session_state["af_contract_formula"] = _f_str
+            _labels = _spec.get("labels") or {}
+            _label_note = (" (" + ", ".join(f"{k}={v}" for k, v in list(_labels.items())[:5]) + ")"
+                           if _labels else "")
+            st.session_state["af_prefill_msg"] = (
+                "success",
+                f"✅ AI 필드 제안이 적용되었습니다 — input {len(_in_keys)}개 / output {len(_out_keys)}개"
+                f"{' / formula 포함' if _has_formula else ''}. 필요하면 직접 수정하세요.{_label_note}")
+
+        st.button(
+            "💡 필드 자동 제안",
+            key="af_suggest_fields_btn",
+            on_click=_af_suggest_fields_with_ai,
+            help=(
+                "계산기명/카테고리/설명을 바탕으로 AI가 input/output 필드명과 formula 후보를 "
+                "제안해 아래 입력란에 채웁니다(STEP 24-1의 _suggest_spec() 재사용, 신규 AI 로직 없음). "
+                "AI 제안으로 현재 필드 입력값을 채웁니다. 필요하면 이후 직접 수정할 수 있습니다."
+            ),
+        )
+
         _btn_col1, _btn_col2 = st.columns(2)
         _btn_col1.button(
             "📥 Registry에서 불러오기 (input/output 필드)",
