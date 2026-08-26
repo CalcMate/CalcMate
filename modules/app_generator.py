@@ -481,6 +481,33 @@ def _compute_js(calc) -> str:
             + '  return out;\n'
             + _js_close()
         )
+    if str(calc.get("slug", "")) == "annual-leave-remaining":
+        # ALR-1(STEP 15-E): 근로기준법 제60조 제1항(1년 미만, 매월 개근 시 1일, 최대 11일)
+        # + 제4항(3년 이상 계속근로 시 2년마다 1일 가산, 25일 상한) 통합 계산.
+        # 입력: months_of_service(총 근속개월수), used_days(이미 사용한 연차일수).
+        # ⚠️ STEP 15-E-R 시점 기준 DB calculators.input_schema는 아직 years_of_service라
+        # 실제 폼 필드가 연결되지 않음 — 이 분기만으로는 완결되지 않고 별도 DB 갱신 필요.
+        return (
+            _js_open()
+            + _js_read("months_of_service")
+            + _js_read("used_days")
+            + '  if (months_of_service < 0 || used_days < 0) { return null; }\n'
+            + _js_init_out()
+            + '  var total_days;\n'
+            + '  if (months_of_service < 12) {\n'
+            + '    total_days = Math.min(months_of_service, 11);\n'
+            + '  } else {\n'
+            + '    var years = Math.floor(months_of_service / 12);\n'
+            + '    total_days = 15 + Math.min(Math.max(0, Math.floor((years - 1) / 2)), 10);\n'
+            + '  }\n'
+            + '  out["total_days"] = total_days;\n'
+            + '  out["remaining_days"] = total_days - used_days;\n'
+            + '  out._formula = (months_of_service < 12)\n'
+            + '    ? (months_of_service + "개월 근속 — 매월 1일씩 최대 11일(근로기준법 제60조 제2항) = " + total_days + "일")\n'
+            + '    : (months_of_service + "개월(" + Math.floor(months_of_service / 12) + "년) 근속 — 15일 + 2년마다 1일 가산, 25일 상한(근로기준법 제60조 제1항·제4항) = " + total_days + "일");\n'
+            + '  return out;\n'
+            + _js_close()
+        )
     if str(calc.get("slug", "")) == "육아휴직_급여_계산기":
         # PL-1..15 Phase 2: 판정-계산 분리 구조 (determine_leave_mode / calculate_general / calculate_6plus6)
         pl_reg  = (_registry().get("육아휴직_급여_계산기") or {})

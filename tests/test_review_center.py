@@ -401,6 +401,116 @@ def test_hold1_silent_for_operator_confirmed(monkeypatch):
     assert "HOLD-1" not in result["rules"]
 
 
+# ─────────────────────────────────────────────────────────────
+# 6. STEP 15-H — HTML 입력 필드 ↔ JS 입력 키 일치 검사
+# ─────────────────────────────────────────────────────────────
+from modules.review_center import _html_js_input_consistency, _faq_forbidden_phrase_check
+
+
+def _html_input(field: str) -> str:
+    return f'<input class="sm-input" id="in_{field}" name="in_{field}">'
+
+
+def _js_read_line(field: str) -> str:
+    return f'  var {field} = inputs["{field}"] || 0;\n'
+
+
+def test_html_js_consistency_pass_when_keys_match():
+    html = _html_input("months_of_service") + _html_input("used_days")
+    js = _js_read_line("months_of_service") + _js_read_line("used_days")
+    passed, detail = _html_js_input_consistency(html, js)
+    assert passed is True
+    assert "months_of_service" in detail
+
+
+def test_html_js_consistency_fail_on_field_name_mismatch():
+    """STEP 15-E 사고 재현: HTML=years_of_service, JS=months_of_service."""
+    html = _html_input("years_of_service") + _html_input("used_days")
+    js = _js_read_line("months_of_service") + _js_read_line("used_days")
+    passed, detail = _html_js_input_consistency(html, js)
+    assert passed is False
+    assert "years_of_service" in detail
+    assert "months_of_service" in detail
+
+
+def test_html_js_consistency_fail_when_js_reads_extra_field():
+    html = _html_input("months_of_service") + _html_input("used_days")
+    js = (_js_read_line("months_of_service") + _js_read_line("used_days")
+          + _js_read_line("nonexistent_field"))
+    passed, detail = _html_js_input_consistency(html, js)
+    assert passed is False
+    assert "nonexistent_field" in detail
+
+
+def test_html_js_consistency_ignores_output_fields():
+    """id="out_*"(출력 표시용)는 in_* 정규식에 안 걸려 false positive 없음."""
+    html = (_html_input("months_of_service") + _html_input("used_days")
+            + '<span id="out_total_days"></span><span id="out_remaining_days"></span>')
+    js = _js_read_line("months_of_service") + _js_read_line("used_days")
+    passed, detail = _html_js_input_consistency(html, js)
+    assert passed is True
+
+
+# ─────────────────────────────────────────────────────────────
+# 7. STEP 15-H — FAQ/본문 금칙 문구 검사
+# ─────────────────────────────────────────────────────────────
+
+def test_faq_forbidden_phrase_none_registered_skips(monkeypatch):
+    monkeypatch.setattr("modules.registry_loader.load_registry", lambda: {})
+    monkeypatch.setattr("modules.registry_loader.load_registry_v3", lambda: {})
+    monkeypatch.setattr("modules.registry_loader.load_legal_master", lambda: {})
+    (passed, skipped), detail = _faq_forbidden_phrase_check({"slug": "no-such-calc"}, "<p>안녕</p>")
+    assert passed is True and skipped is True
+
+
+def test_faq_forbidden_phrase_detected_via_old_registry(monkeypatch):
+    monkeypatch.setattr(
+        "modules.registry_loader.load_registry",
+        lambda: {"unemployment-benefit": {"forbidden_phrases": ["받을 수 있습니다"]}},
+    )
+    monkeypatch.setattr("modules.registry_loader.load_registry_v3", lambda: {})
+    monkeypatch.setattr("modules.registry_loader.load_legal_master", lambda: {})
+    (passed, skipped), detail = _faq_forbidden_phrase_check(
+        {"slug": "unemployment-benefit"}, "<p>실업급여를 받을 수 있습니다.</p>"
+    )
+    assert passed is False and skipped is False
+    assert "받을 수 있습니다" in detail
+
+
+def test_faq_forbidden_phrase_passes_when_absent(monkeypatch):
+    monkeypatch.setattr(
+        "modules.registry_loader.load_registry",
+        lambda: {"unemployment-benefit": {"forbidden_phrases": ["받을 수 있습니다"]}},
+    )
+    monkeypatch.setattr("modules.registry_loader.load_registry_v3", lambda: {})
+    monkeypatch.setattr("modules.registry_loader.load_legal_master", lambda: {})
+    (passed, skipped), detail = _faq_forbidden_phrase_check(
+        {"slug": "unemployment-benefit"}, "<p>수급 요건 충족 시 지급됩니다.</p>"
+    )
+    assert passed is True and skipped is False
+
+
+def test_faq_forbidden_phrase_via_v3_legal_refs(monkeypatch):
+    """v3 registry(legal_refs) → legal_master 엔티티 경유 금칙 문구 탐지."""
+    monkeypatch.setattr("modules.registry_loader.load_registry", lambda: {})
+    monkeypatch.setattr(
+        "modules.registry_loader.load_registry_v3",
+        lambda: {"annual-leave-remaining": {"legal_refs": ["labor_standards_act_60"]}},
+    )
+    monkeypatch.setattr(
+        "modules.registry_loader.load_legal_master",
+        lambda: {"labor_standards_act_60": {
+            "forbidden_phrases": ["법정 연차가 부여되지 않으나"]
+        }},
+    )
+    (passed, skipped), detail = _faq_forbidden_phrase_check(
+        {"slug": "annual-leave-remaining"},
+        "<p>근속 1년 미만의 경우 법정 연차가 부여되지 않으나 회사 정책에 따릅니다.</p>",
+    )
+    assert passed is False and skipped is False
+    assert "법정 연차가 부여되지 않으나" in detail
+
+
 if __name__ == "__main__":
     import pytest
     sys.exit(pytest.main([__file__, "-v"]))

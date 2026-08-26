@@ -114,7 +114,7 @@ def test_real_calculators_scope_exclusions():
         "freelancer-tax-3p3": ["원천징수로 납세 완료", "종합소득세 신고 불필요"],
         "육아휴직_급여_계산기": ["고용보험법 제40조", "근로기준법 제74조"],
         "weekly-holiday-allowance": [],
-        "annual-leave-allowance": [],
+        "annual-leave-allowance": ["1년 미만의 경우 법정 연차가 부여되지 않으나", "근속 1년 미만은 연차가 없습니다"],
         "four-insurances": [],
     }
     for slug, want in expected.items():

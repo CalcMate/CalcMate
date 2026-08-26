@@ -454,7 +454,8 @@ def pre_build_qa(calc: dict, cfg: dict, prev_files: dict = None) -> list[dict]:
     if not (passed1 and passed2):
         for s, l in [(3, "HTML 출력 요소 1:1 대응"), (4, "JS 다중 출력 처리"),
                      (5, "복수 출력 완전성"), (6, "기본값 계산 실행"),
-                     (7, "JS 실행 스모크 테스트"), (8, "요율/기준값 변경 감지")]:
+                     (7, "JS 실행 스모크 테스트"), (8, "요율/기준값 변경 감지"),
+                     (9, "HTML 입력 필드 ↔ JS 입력 키 일치"), (10, "FAQ/본문 금칙 문구 검사")]:
             results.append({"step": s, "label": l, "passed": False, "skipped": True,
                             "detail": "Step 1/2 실패로 건너뜀"})
         return results
@@ -473,7 +474,8 @@ def pre_build_qa(calc: dict, cfg: dict, prev_files: dict = None) -> list[dict]:
     if not gen_ok:
         for s, l in [(3, "HTML 출력 요소 1:1 대응"), (4, "JS 다중 출력 처리"),
                      (5, "복수 출력 완전성"), (6, "기본값 계산 실행"),
-                     (7, "JS 실행 스모크 테스트"), (8, "요율/기준값 변경 감지")]:
+                     (7, "JS 실행 스모크 테스트"), (8, "요율/기준값 변경 감지"),
+                     (9, "HTML 입력 필드 ↔ JS 입력 키 일치"), (10, "FAQ/본문 금칙 문구 검사")]:
             results.append({"step": s, "label": l, "passed": False, "skipped": False,
                             "detail": f"generate_calculator() 실패: {gen_err}"})
         return results
@@ -507,6 +509,14 @@ def pre_build_qa(calc: dict, cfg: dict, prev_files: dict = None) -> list[dict]:
                 results.append({"step": 8, "label": "요율/기준값 변경 감지",
                                 "passed": True, "skipped": False,
                                 "detail": "이전 스냅샷과 요율/기준값 동일"})
+        # Tier2-B는 별도 script.js가 없는 자체완결형 HTML — Step 9(HTML↔JS)는 대상 아님.
+        results.append({"step": 9, "label": "HTML 입력 필드 ↔ JS 입력 키 일치",
+                        "passed": True, "skipped": True,
+                        "detail": "Tier2-B — 별도 script.js 없음(자체완결형 HTML), 검사 대상 아님"})
+        # Step 10(FAQ 금칙 문구)은 HTML 텍스트 검사라 Tier2-B에도 그대로 적용 가능.
+        _passed10, _detail10 = _faq_forbidden_phrase_check(calc, html)
+        results.append({"step": 10, "label": "FAQ/본문 금칙 문구 검사",
+                        "passed": _passed10[0], "skipped": _passed10[1], "detail": _detail10})
         return results
 
     # ── Step 3: output_schema ↔ HTML id="out_*" 1:1 대응 ─────
@@ -625,4 +635,71 @@ def pre_build_qa(calc: dict, cfg: dict, prev_files: dict = None) -> list[dict]:
                             "passed": True, "skipped": False,
                             "detail": "이전 스냅샷과 요율/기준값 동일"})
 
+    # ── Step 9(STEP 15-H): 생성된 HTML 입력 필드 ↔ JS가 읽는 입력 키 일치 확인 ──
+    # validate_formula()(formula ↔ input_schema)와는 별개 검사 — 이건 실제
+    # 렌더링된 <input id="in_*"> 필드와 script.js의 inputs["..."] 참조를 직접 비교한다.
+    # STEP 15-E에서 발견된 사고(HTML=years_of_service, JS=months_of_service)를
+    # 발생 시점(생성 직후)에 자동으로 잡기 위한 검사.
+    passed9, detail9 = _html_js_input_consistency(html, js)
+    results.append({"step": 9, "label": "HTML 입력 필드 ↔ JS 입력 키 일치",
+                    "passed": passed9, "skipped": False, "detail": detail9})
+
+    # ── Step 10(STEP 15-H): FAQ/본문에 SSOT forbidden_phrases 재등장 여부 ──
+    passed10, detail10 = _faq_forbidden_phrase_check(calc, html)
+    results.append({"step": 10, "label": "FAQ/본문 금칙 문구 검사",
+                    "passed": passed10[0], "skipped": passed10[1], "detail": detail10})
+
     return results
+
+
+def _html_js_input_consistency(html: str, js: str) -> tuple:
+    """생성된 HTML의 입력 필드(id="in_*")와 실제 script.js가 읽는 inputs["..."] 키를
+    비교한다. 출력 필드(id="out_*")는 별도 접두사라 여기 섞이지 않는다.
+    반환: (passed: bool, detail: str)."""
+    html_keys = set(re.findall(r'id="in_([^"]+)"', html or ""))
+    js_keys = set(re.findall(r'inputs\["([^"]+)"\]', js or ""))
+    html_only = html_keys - js_keys
+    js_only = js_keys - html_keys
+    passed = not html_only and not js_only
+    if passed:
+        detail = f"✅ 입력 필드 일치({len(html_keys)}개): {sorted(html_keys)}"
+    else:
+        parts = []
+        if html_only:
+            parts.append(f"HTML에만 있는 필드(JS가 읽지 않음): {sorted(html_only)}")
+        if js_only:
+            parts.append(f"JS만 참조하는 필드(HTML에 없음): {sorted(js_only)}")
+        parts.append(f"HTML={sorted(html_keys)} / JS={sorted(js_keys)}")
+        detail = " | ".join(parts)
+    return passed, detail
+
+
+def _faq_forbidden_phrase_check(calc: dict, html: str) -> tuple:
+    """SSOT(legal_basis.master.yaml의 계산기별 forbidden_phrases +
+    legal_master/*.yaml의 legal_refs 연결 엔티티별 forbidden_phrases)에 등록된
+    금칙 문구가 생성된 HTML(FAQ/본문 포함)에 등장하는지 검사.
+    반환: ((passed, skipped), detail)."""
+    from modules.registry_loader import load_registry, load_registry_v3, load_legal_master
+
+    slug = str(calc.get("slug", ""))
+    forbidden = set()
+
+    # (a) 구 registry(legal_basis.master.yaml) — 계산기 slug에 직접 forbidden_phrases
+    old_entry = load_registry().get(slug) or {}
+    forbidden.update(old_entry.get("forbidden_phrases") or [])
+
+    # (b) v3 registry의 legal_refs → legal_master 엔티티별 forbidden_phrases
+    v3_entry = load_registry_v3().get(slug) or {}
+    legal_refs = v3_entry.get("legal_refs") or []
+    if legal_refs:
+        lm = load_legal_master()
+        for ref in legal_refs:
+            forbidden.update((lm.get(ref) or {}).get("forbidden_phrases") or [])
+
+    if not forbidden:
+        return (True, True), "이 계산기에 등록된 forbidden_phrases 없음(SSOT 미연결 또는 금칙 문구 미등록) — 검사 대상 아님"
+
+    hit = [p for p in forbidden if p and p in (html or "")]
+    if hit:
+        return (False, False), f"금칙 문구 발견: {hit}"
+    return (True, False), f"✅ 등록된 금칙 문구 {len(forbidden)}개 전부 미발견"

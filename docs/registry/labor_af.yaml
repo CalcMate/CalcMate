@@ -13,18 +13,18 @@ annual-leave-remaining:
   date_fields: []
   validation_mode: formula
   field_labels:
-    years_of_service: 근속연수
+    months_of_service: 근속개월수
     used_days: 이미 사용한 연차일수
     total_days: 올해 총 연차일수(일)
     remaining_days: 잔여 연차일수(일)
   input_labels:
-  - years_of_service
+  - months_of_service
   - used_days
   output_labels:
   - total_days
   - remaining_days
   display_order: 10
-  card_desc: 근속연수와 사용한 연차일수로 남은 연차를 확인해보세요
+  card_desc: 근속개월수와 사용한 연차일수로 남은 연차를 확인해보세요
   difficulty: multi_output
   difficulty_status: provisional
   status: READY
@@ -39,82 +39,103 @@ annual-leave-remaining:
   - weekly-holiday-allowance
   - severance-pay
   - unemployment-benefit
-  legal_refs: []
+  legal_refs:
+  - labor_standards_act_60
   writer_context:
-    emphasize: []
+    emphasize:
+    - 1년 미만도 매월 개근 시 1일씩, 최대 11일 발생(근로기준법 제60조 제2항)
     example_patterns:
-    - '입력: years_of_service(근속연수, 양의 정수), used_days(이미 사용한 연차일수, 0 '
+    - '입력: months_of_service(근속개월수, 0 이상 정수), used_days(이미 사용한 연차일수, 0 '
     calculation_story: []
   review_checklist:
   - id: formula_accuracy
     severity: critical
     label: 계산 공식 정확성
-    display_value: '{"total_days": "15 + min(max(0, (years_of_service - 1) // 2),
-      10)", "remaining_days": "15 + min(max(0, (years_of_service - 1) // 2), 10) -
-      used_days"}'
+    display_value: 'JS 전용 분기(modules/app_generator.py, slug=="annual-leave-remaining"):
+      months_of_service<12 → min(months_of_service,11); months_of_service>=12 → 15+min(max(0,(floor(months_of_service/12)-1)//2),10).
+      DB formula(steady-state, 1년 이상 구간): {"total_days": "15 + min(max(0, (months_of_service
+      // 12 - 1) // 2), 10)"}'
     auto_source: formula_field
-    checked: false
-    checked_by: null
-    checked_at: null
+    checked: true
+    checked_by: operator
+    checked_at: '2026-08-26'
+    verification_note: 'STEP 15-E~I 정식 수정 완료: tests/test_annual_leave_remaining_compute.py
+      17개(0/1/6/11/12/13/23/24/36/60/252/300개월 등) 전부 PASS. DB input_schema/labels/formula/faq/seo가
+      months_of_service 기준으로 갱신되고 실제 generate_calculator() 결과(HTML/JS)까지 확인 완료(STEP
+      15-I STEP 13 참조). 이전(STEP 14/15-B) 사후검증은 years_of_service 기반 구버전 공식을 대상으로 한
+      것이었고 1년 미만 구간(제2항)이 반영되지 않은 상태였음 — 이번 갱신으로 해당 결함 해소.'
   - id: legal_basis
     severity: critical
     label: 법적 근거 (법령/조항)
-    display_value: '[''근로기준법 제60조 제1항'', ''근로기준법 제60조 제4항'']'
+    display_value: '[''근로기준법 제60조 제1항'', ''근로기준법 제60조 제2항'', ''근로기준법 제60조 제4항'']'
     auto_source: legal_refs_present
-    checked: false
-    checked_by: null
-    checked_at: null
+    checked: true
+    checked_by: operator
+    checked_at: '2026-08-26'
+    verification_note: 'STEP 15-I 정식 수정 완료: 제1항(1년+80%출근시 15일)/제2항(1년 미만 또는 80%미만
+      출근시 매월개근 1일, 최대 11일)/제4항(3년 이상 2년마다 1일 가산, 25일 상한) 전부 JS 계산 로직에 반영됨. legal_refs를
+      빈 배열에서 labor_standards_act_60으로 연결(docs/legal_master/labor.yaml 해당 엔티티도 제2항
+      내용 포함하도록 함께 갱신).'
   - id: formula_cap
     severity: critical
     label: 공식 상한/하한(cap) 유지 확인
-    display_value: 'cap 함수 감지 — 아래 공식에서 min()/max() 적용 범위를 직접 확인:
-
-      {"total_days": "15 + min(max(0, (years_of_service - 1) // 2), 10)", "remaining_days":
-      "15 + min(max(0, (years_of_service - 1) // 2), 10) - used_days"}'
+    display_value: 'cap 확인: 1년 미만 구간 min(months_of_service,11)로 11일 상한, 1년 이상 구간 min(...,10)로
+      25일(15+10) 상한. 음수 입력은 JS에서 null 반환(방어).'
     auto_source: formula_cap_detected
-    checked: false
-    checked_by: null
-    checked_at: null
+    checked: true
+    checked_by: operator
+    checked_at: '2026-08-26'
+    verification_note: 'STEP 15-E/I 정식 수정 완료: 0/1/11/12/24/36/60/252/300개월 + 음수 입력까지
+      tests/test_annual_leave_remaining_compute.py로 전부 검증(17개 PASS). 25일 상한은 300개월(25년)
+      입력으로도 재확인.'
   - id: base_year
     severity: critical
     label: 기준 연도/시행일 확인
-    display_value: 직접 확인 필요 — 법령 시행일 또는 세율 적용 연도
+    display_value: 이 계산기는 매년 변경되는 요율/한도액(세율표, 보험료율 등)을 사용하지 않음 — 근로기준법 제60조의 연차 산정
+      규칙(15일 기준, 매월 1일/2년마다 1일 가산, 25일 상한)은 연도 종속 수치가 아니므로 기준 연도 확인 대상 아님.
     auto_source: critical_category
-    checked: false
-    checked_by: null
-    checked_at: null
+    checked: true
+    checked_by: operator
+    checked_at: '2026-08-26'
   - id: schema_match
     severity: critical
     label: Schema 일치 확인 (Contract vs AI 생성)
-    display_value: ✅ Schema 일치 — Contract 확정 필드명과 동일
+    display_value: ✅ Schema 일치 — DB input_schema/labels(months_of_service, used_days)와
+      registry input_labels/field_labels 일치(STEP 15-I STEP 17에서 실제 DB 재조회로 재확인)
     auto_source: contract_schema_drift
-    checked: false
-    checked_by: null
-    checked_at: null
+    checked: true
+    checked_by: operator
+    checked_at: '2026-08-26'
+    verification_note: 'STEP 15-I 정식 수정 완료: DB input_schema를 months_of_service 기준으로
+      갱신하고 registry input_labels/field_labels도 동일하게 맞춤 — 이전(STEP 14) 검증은 DB가 아직 years_of_service였을
+      때 registry끼리만 비교한 것이라 실제로는 DB와 불일치 상태였음(STEP 15-E~F에서 발견). 이번 갱신으로 DB↔Registry
+      실제 일치.'
   - id: description_text
     severity: advisory
     label: 화면 안내문 확인
-    display_value: '입력: years_of_service(근속연수, 양의 정수), used_days(이미 사용한 연차일수, 0 이상
-      정수). 출력: total_days(올해 총 연차일수), remaining_days(잔여 연차일수). 공식(dict): total_days
-      = 15 + min(max(0, (years_of_service - 1) // 2), 10), remain'
+    display_value: '입력: months_of_service(근속개월수, 0 이상 정수), used_days(이미 사용한 연차일수,
+      0 이상 정수). 출력: total_days(올해 총 연차일수), remaining_days(잔여 연차일수). 1년 미만/1년 이상 구간을
+      각각 근로기준법 제60조 제2항/제1항·제4항에 따라 계산.'
     auto_source: description_field
-    checked: false
-    checked_by: null
-    checked_at: null
+    checked: true
+    checked_by: operator
+    checked_at: '2026-08-26'
   - id: seo_title
     severity: advisory
     label: SEO 제목 검토
-    display_value: 연차 잔여일 계산기 - 근속연수에 따른 연차 계산
+    display_value: 연차 잔여일 계산기 - 근속개월수에 따른 연차 계산
     auto_source: seo_title_field
-    checked: false
-    checked_by: null
-    checked_at: null
+    checked: true
+    checked_by: operator
+    checked_at: '2026-08-26'
   - id: faq_content
     severity: advisory
     label: FAQ 내용 검토
     display_value: '[''연차 잔여일 계산기는 어떻게 작동하나요?'', ''총 연차일수는 어떻게 계산되나요?'', ''근로기준법에
-      따르면 연차는 어떻게 부여되나요?'']'
+      따르면 연차는 어떻게 부여되나요?'', ''근속 1년 미만의 직원은 연차를 받을 수 없나요?'']'
     auto_source: faq_field
-    checked: false
-    checked_by: null
-    checked_at: null
+    checked: true
+    checked_by: operator
+    checked_at: '2026-08-26'
+    verification_note: 'STEP 15-I 정식 수정 완료: "법정 연차가 부여되지 않으나" 오류 문구 제거, 근로기준법 제60조
+      제2항 기준으로 4개 FAQ 항목 전부 재작성. FAQ forbidden phrase 자동검사(STEP 15-H) 통과 확인.'
