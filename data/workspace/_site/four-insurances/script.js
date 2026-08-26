@@ -580,9 +580,9 @@ window.computeResult = function(inputs){
   var NP_MIN = 390000;
   var NP_MAX = 6170000;
   var np_base = Math.min(Math.max(monthly_salary, NP_MIN), NP_MAX);
-  var national_pension = np_base * 0.045;
-  var health_insurance = monthly_salary * 0.03545;
-  var long_term_care = health_insurance * 0.1296;
+  var national_pension = np_base * 0.0475;
+  var health_insurance = monthly_salary * 0.03595;
+  var long_term_care = health_insurance * 0.1314;
   var employment_insurance = monthly_salary * 0.009;
   var total = national_pension + health_insurance + long_term_care + employment_insurance;
   out["national_pension"] = national_pension;
@@ -600,7 +600,7 @@ window.computeResult = function(inputs){
   _si_notices.push("산재보험은 사업주가 전액 부담합니다 — 근로자 급여에서 공제되지 않습니다 (산업재해보상보험법 제13조).");
   out.notices = [].concat(_np_notices, _si_notices);
   var np_label = (monthly_salary < NP_MIN ? NP_MIN.toLocaleString() : (monthly_salary > NP_MAX ? NP_MAX.toLocaleString() : monthly_salary.toLocaleString()));
-  out._formula = "국민연금 " + np_label + "원 × 4.5% = " + Math.round(national_pension).toLocaleString() + "원 | 건강보험 " + monthly_salary.toLocaleString() + "원 × 3.545% = " + Math.round(health_insurance).toLocaleString() + "원 | 장기요양 건강보험료 " + Math.round(health_insurance).toLocaleString() + "원 × 12.96% = " + Math.round(long_term_care).toLocaleString() + "원 | 고용보험 " + monthly_salary.toLocaleString() + "원 × 0.9% = " + Math.round(employment_insurance).toLocaleString() + "원";
+  out._formula = "국민연금 " + np_label + "원 × 4.75% = " + Math.round(national_pension).toLocaleString() + "원 | 건강보험 " + monthly_salary.toLocaleString() + "원 × 3.595% = " + Math.round(health_insurance).toLocaleString() + "원 | 장기요양 건강보험료 " + Math.round(health_insurance).toLocaleString() + "원 × 13.14% = " + Math.round(long_term_care).toLocaleString() + "원 | 고용보험 " + monthly_salary.toLocaleString() + "원 × 0.9% = " + Math.round(employment_insurance).toLocaleString() + "원";
   return out;
 };
 
