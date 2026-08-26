@@ -1,0 +1,151 @@
+/* CalcMate Site CSS — design_system.css 토큰 공유 */
+:root{
+  --c-primary:#2563EB;--c-primary-dark:#1D4ED8;--c-primary-bg:#EFF6FF;
+  --c-success:#16A34A;--c-warning:#D97706;--c-danger:#DC2626;
+  --c-bg:#F6F8FB;--c-card:#FFFFFF;--c-border:#EAECEF;
+  --c-text:#111827;--c-text-sub:#6B7280;--c-text-light:#9CA3AF;
+  --c-deep:#2C5AA0;--c-deep-dk:#1E3F74;--c-deep-bg:#EBF1F9;
+  --r-card:24px;--r-input:16px;--r-btn:18px;--r-badge:100px;
+  --sp-1:8px;--sp-2:16px;--sp-3:24px;--sp-4:32px;--sp-5:48px;
+  --shadow-card:0 2px 16px rgba(0,0,0,.07);
+  --shadow-btn:0 4px 12px rgba(37,99,235,.25);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:-apple-system,'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif;
+  background:var(--c-bg);color:var(--c-text);font-size:16px;line-height:1.6;
+  -webkit-font-smoothing:antialiased}
+a{color:var(--c-primary);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* ── 레이아웃 ── */
+.cm-wrap{max-width:960px;margin:0 auto;padding:0 var(--sp-2) var(--sp-5)}
+.cm-wrap--narrow{max-width:720px;margin:0 auto;padding:0 var(--sp-2) var(--sp-5)}
+
+/* ── 네비게이션 ── */
+.cm-nav{background:var(--c-card);border-bottom:1px solid var(--c-border);
+  position:sticky;top:0;z-index:200}
+.cm-nav-inner{max-width:960px;margin:0 auto;padding:0 var(--sp-2);
+  display:flex;align-items:center;justify-content:space-between;height:56px}
+.cm-nav-logo{font-size:18px;font-weight:800;color:var(--c-primary);
+  letter-spacing:-.5px;text-decoration:none}
+.cm-nav-logo:hover{text-decoration:none}
+.cm-nav-links{display:flex;gap:var(--sp-2);align-items:center}
+.cm-nav-links a{font-size:14px;font-weight:500;color:var(--c-text-sub);text-decoration:none}
+.cm-nav-links a:hover{color:var(--c-primary)}
+
+/* ── 히어로 ── */
+.cm-hero{padding:var(--sp-5) 0 var(--sp-4);text-align:center}
+.cm-hero-logo{font-size:40px;font-weight:900;color:var(--c-primary);
+  letter-spacing:-1px;margin-bottom:var(--sp-2)}
+.cm-hero-tagline{font-size:18px;font-weight:700;color:var(--c-text);
+  margin-bottom:var(--sp-1);letter-spacing:-.3px}
+.cm-hero-sub{font-size:15px;color:var(--c-text-sub);margin-bottom:var(--sp-4);line-height:1.7}
+.cm-hero-btn{display:inline-flex;align-items:center;gap:8px;
+  padding:16px 36px;background:var(--c-primary);color:#fff;
+  border-radius:var(--r-btn);font-size:17px;font-weight:700;
+  text-decoration:none;box-shadow:var(--shadow-btn);
+  transition:background .15s,transform .1s}
+.cm-hero-btn:hover{background:var(--c-primary-dark);text-decoration:none;transform:translateY(-1px)}
+
+/* ── 섹션 헤더 ── */
+.cm-section{padding:var(--sp-4) 0 0}
+.cm-section-title{font-size:20px;font-weight:800;letter-spacing:-.4px;
+  margin-bottom:var(--sp-3);text-align:center}
+
+/* ── 계산기 그리드 ── */
+.cm-calc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--sp-2);margin-bottom:var(--sp-4)}
+.cm-calc-card{background:var(--c-card);border:1.5px solid var(--c-border);
+  border-radius:var(--r-card);padding:var(--sp-3);text-decoration:none;
+  display:block;transition:border-color .15s,box-shadow .15s,transform .1s;
+  box-shadow:var(--shadow-card)}
+.cm-calc-card:hover{border-color:var(--c-primary);
+  box-shadow:0 4px 24px rgba(37,99,235,.14);transform:translateY(-2px);text-decoration:none}
+.cm-calc-emoji{font-size:32px;margin-bottom:var(--sp-1);display:block}
+.cm-calc-name{font-size:15px;font-weight:700;color:var(--c-text);
+  margin-bottom:6px;letter-spacing:-.2px}
+.cm-calc-desc{font-size:13px;color:var(--c-text-sub);line-height:1.6}
+
+/* ── About 섹션 (홈) ── */
+.cm-about{background:var(--c-card);border-radius:var(--r-card);
+  padding:var(--sp-4);box-shadow:var(--shadow-card);
+  border:1px solid var(--c-border);margin-bottom:var(--sp-3)}
+.cm-about-title{font-size:18px;font-weight:800;margin-bottom:var(--sp-2);letter-spacing:-.3px}
+.cm-about-body{font-size:15px;color:var(--c-text-sub);line-height:1.8}
+.cm-about-body p+p{margin-top:var(--sp-2)}
+
+/* ── 이용안내 (홈) ── */
+.cm-notice-box{background:#FFFBEB;border:1px solid #FDE68A;
+  border-radius:var(--r-card);padding:var(--sp-3);margin-bottom:var(--sp-3)}
+.cm-notice-title{font-size:14px;font-weight:700;color:#92400E;margin-bottom:var(--sp-1)}
+.cm-notice-list{list-style:none;padding:0}
+.cm-notice-list li{font-size:13px;color:#92400E;padding:5px 0;
+  display:flex;gap:8px;line-height:1.6}
+.cm-notice-list li::before{content:"✓";font-weight:700;flex-shrink:0;margin-top:1px}
+
+/* ── 페이지 콘텐츠 (sub-pages) ── */
+.cm-page-hero{padding:var(--sp-4) 0 var(--sp-3)}
+.cm-page-title{font-size:26px;font-weight:800;letter-spacing:-.5px;margin-bottom:6px}
+.cm-page-sub{font-size:14px;color:var(--c-text-sub)}
+.cm-content{background:var(--c-card);border-radius:var(--r-card);
+  padding:var(--sp-4);box-shadow:var(--shadow-card);border:1px solid var(--c-border);
+  margin-bottom:var(--sp-3)}
+.cm-content h2{font-size:16px;font-weight:700;margin:var(--sp-3) 0 var(--sp-1);
+  color:var(--c-text);letter-spacing:-.2px}
+.cm-content h2:first-child{margin-top:0}
+.cm-content p{font-size:14px;color:var(--c-text-sub);line-height:1.8;margin-bottom:var(--sp-1)}
+.cm-content p:last-child{margin-bottom:0}
+.cm-content ul{padding-left:var(--sp-3);margin-bottom:var(--sp-1)}
+.cm-content ul li{font-size:14px;color:var(--c-text-sub);line-height:1.8;padding:2px 0}
+.cm-content ol{padding-left:var(--sp-3);margin-bottom:var(--sp-1);counter-reset:cm-ol}
+.cm-content ol li{font-size:14px;color:var(--c-text-sub);line-height:1.8;padding:4px 0}
+.cm-content .cm-date{font-size:13px;color:var(--c-text-light);margin-top:var(--sp-3)}
+.cm-content .cm-contact-email{
+  display:inline-block;margin:var(--sp-2) 0;
+  padding:12px 24px;background:var(--c-primary-bg);
+  border:1.5px solid var(--c-primary);border-radius:var(--r-input);
+  color:var(--c-primary);font-size:15px;font-weight:700;
+}
+.cm-content .cm-note{font-size:13px;color:var(--c-text-light);
+  border-left:3px solid var(--c-border);padding-left:var(--sp-2);
+  margin-top:var(--sp-1)}
+
+/* ── 푸터 ── */
+.cm-footer{text-align:center;padding:var(--sp-4) 0;
+  border-top:1px solid var(--c-border);margin-top:var(--sp-4)}
+.cm-footer-logo{font-size:16px;font-weight:800;color:var(--c-primary);
+  margin-bottom:var(--sp-1)}
+.cm-footer-links{display:flex;gap:var(--sp-2);justify-content:center;
+  flex-wrap:wrap;margin-bottom:var(--sp-2)}
+.cm-footer-links a{font-size:13px;color:var(--c-text-sub);text-decoration:none}
+.cm-footer-links a:hover{color:var(--c-primary)}
+.cm-footer-copy{font-size:12px;color:var(--c-text-light)}
+
+/* ── 404 페이지 ── */
+.cm-404{text-align:center;padding:var(--sp-5) 0 var(--sp-4)}
+.cm-404-code{font-size:80px;font-weight:900;color:var(--c-primary);
+  letter-spacing:-3px;line-height:1;margin-bottom:var(--sp-2);opacity:.15}
+.cm-404-title{font-size:22px;font-weight:800;letter-spacing:-.4px;
+  margin-bottom:var(--sp-2);line-height:1.4}
+.cm-404-sub{font-size:14px;color:var(--c-text-sub);margin-bottom:var(--sp-4)}
+.cm-404-actions{display:flex;gap:var(--sp-2);justify-content:center;flex-wrap:wrap}
+.cm-404-btn{display:inline-flex;align-items:center;padding:13px 28px;
+  border-radius:var(--r-btn);font-size:15px;font-weight:700;
+  text-decoration:none;transition:background .15s,transform .1s}
+.cm-404-btn--primary{background:var(--c-primary);color:#fff;box-shadow:var(--shadow-btn)}
+.cm-404-btn--primary:hover{background:var(--c-primary-dark);transform:translateY(-1px);text-decoration:none}
+.cm-404-btn:not(.cm-404-btn--primary){background:var(--c-card);color:var(--c-primary);
+  border:1.5px solid var(--c-primary)}
+.cm-404-btn:not(.cm-404-btn--primary):hover{background:var(--c-primary-bg);text-decoration:none}
+
+/* ── 반응형 ── */
+@media(max-width:700px){
+  .cm-calc-grid{grid-template-columns:repeat(2,1fr)}
+  .cm-hero-logo{font-size:32px}
+  .cm-hero-tagline{font-size:16px}
+  .cm-hero-btn{font-size:15px;padding:14px 28px}
+}
+@media(max-width:480px){
+  .cm-calc-grid{grid-template-columns:1fr}
+  .cm-nav-links a:not(:last-child){display:none}
+}
