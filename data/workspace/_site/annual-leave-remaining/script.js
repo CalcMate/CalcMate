@@ -574,10 +574,22 @@
 
 
 window.computeResult = function(inputs){
-  var years_of_service = inputs["years_of_service"] || 0;
+  var months_of_service = inputs["months_of_service"] || 0;
   var used_days = inputs["used_days"] || 0;
+  if (months_of_service < 0 || used_days < 0) { return null; }
   var out = {};
-  out["total_days"] = (15 + Math.min(Math.max(0, Math.floor((years_of_service - 1) / 2)), 10));
-  out["remaining_days"] = (15 + Math.min(Math.max(0, Math.floor((years_of_service - 1) / 2)), 10) - used_days);
+  out.notices = [];
+  var total_days;
+  if (months_of_service < 12) {
+    total_days = Math.min(months_of_service, 11);
+  } else {
+    var years = Math.floor(months_of_service / 12);
+    total_days = 15 + Math.min(Math.max(0, Math.floor((years - 1) / 2)), 10);
+  }
+  out["total_days"] = total_days;
+  out["remaining_days"] = total_days - used_days;
+  out._formula = (months_of_service < 12)
+    ? (months_of_service + "개월 근속 — 매월 1일씩 최대 11일(근로기준법 제60조 제2항) = " + total_days + "일")
+    : (months_of_service + "개월(" + Math.floor(months_of_service / 12) + "년) 근속 — 15일 + 2년마다 1일 가산, 25일 상한(근로기준법 제60조 제1항·제4항) = " + total_days + "일");
   return out;
 };
