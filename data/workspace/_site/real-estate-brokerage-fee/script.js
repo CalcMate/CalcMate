@@ -264,6 +264,8 @@
   var CFG = w.SM_CONFIG || {};
 
   function num(v) { return (typeof v === "number") ? v : (parseFloat(String(v).replace(/,/g, "")) || 0); }
+  // STEP 28-6: Math.round(-0.4) 등에서 나오는 -0이 그대로 "-0"으로 표시되는 것을 방지
+  // (-0 + 0 === 0, toLocaleString()은 부호까지 그대로 반영하므로 +0으로 정규화 필요).
   function comma(n) { return (Math.round(n) + 0).toLocaleString(); }
 
   function esc(s) {
@@ -272,18 +274,26 @@
     });
   }
 
-  // 입력 수집: number → 숫자(콤마제거), date → 문자열
+  // 입력 수집: number → 숫자(콤마제거), date → 문자열, boolean(checkbox) → 1/0
   function collectInputs() {
     var inputs = {};
     (CFG.inputs || []).forEach(function (f) {
       var el = d.getElementById("in_" + f.name);
       if (!el) { inputs[f.name] = (f.type === "date") ? "" : 0; return; }
+      // STEP 28-11: checkbox는 value가 아니라 checked로 상태를 판정해야 하며,
+      // 값은 기존 computeResult()가 기대하는 1(적용)/0(미적용)으로 넘긴다.
+      if (f.type === "boolean") { inputs[f.name] = el.checked ? 1 : 0; return; }
       inputs[f.name] = (f.type === "date") ? el.value : num(el.value);
     });
     return inputs;
   }
 
   // 카운트업 애니메이션 (디자인 유지)
+  // STEP 28-6: requestAnimationFrame은 배경 탭에서 스로틀/정지될 수 있어(Chrome 표준 동작),
+  // 애니메이션 시작 전에 최종값을 먼저 동기적으로 표시한다 — rAF가 전혀 돌지 않아도
+  // "0"/"-0"에 고착되지 않고 항상 정답이 남아있도록 하는 안전장치. rAF가 정상 동작하면
+  // 이 즉시값은 같은 틱에서 애니메이션 시작 프레임(0)으로 바로 덮어써지므로 화면상
+  // 기존 카운트업 효과는 그대로 유지된다.
   function countUp(el, target) {
     if (!el) return;
     el.textContent = comma(target);

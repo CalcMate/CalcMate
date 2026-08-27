@@ -12,6 +12,7 @@ four-insurances:
     monthly_salary: "월급(원)"
     national_pension: "국민연금"
     health_insurance: "건강보험"
+    long_term_care: "장기요양보험료"
     employment_insurance: "고용보험"
     total: "합계"
   input_labels:
@@ -19,6 +20,7 @@ four-insurances:
   output_labels:
     - national_pension
     - health_insurance
+    - long_term_care
     - employment_insurance
     - total
   display_order: 5

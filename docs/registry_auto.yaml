@@ -39,7 +39,8 @@ jeonse-vs-monthly:
   content:
     evergreen: null
     update_cycle: null
-  related_slugs: []
+  related_slugs:
+  - real-estate-brokerage-fee
   compute_rules:
     positive_inputs:
     - rate
