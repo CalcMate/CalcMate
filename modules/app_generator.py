@@ -1246,7 +1246,7 @@ def _dynamic_faq_js(calc: dict) -> str:
                   "복수의 직장에서 근무한 기간을 합산할 수 있습니다."},
             {"priority": 2, "condition": "(outputs.notices||[]).some(function(n){return n.indexOf('상한')>=0 || n.indexOf('하한')>=0;})",
              "q": "구직급여 상한액/하한액이 적용됐는데 왜 그런가요?",
-             "a": "구직급여는 1일 상한액(66,000원)과 하한액(최저임금의 80%)이 법으로 정해져 있습니다(고용보험법 제46조). "
+             "a": "구직급여는 1일 상한액(68,100원)과 하한액(최저임금의 80%)이 법으로 정해져 있습니다(고용보험법 제46조). "
                   "실제 임금과 무관하게 이 범위 내에서 지급됩니다."},
             {"priority": 3, "condition": "outputs.total_benefit > 0",
              "q": "실업급여는 언제부터 받을 수 있나요?",
@@ -1256,7 +1256,7 @@ def _dynamic_faq_js(calc: dict) -> str:
         "four-insurances": [
             {"priority": 2, "condition": "(outputs.notices||[]).some(function(n){return n.indexOf('상한')>=0 || n.indexOf('하한')>=0;})",
              "q": "국민연금 기준소득월액 상한/하한이 적용됐는데 왜 그런가요?",
-             "a": "국민연금은 기준소득월액에 상한(6,170,000원)과 하한(390,000원)이 있습니다(국민연금법 제88조). "
+             "a": "국민연금은 기준소득월액에 상한(6,590,000원)과 하한(410,000원)이 있습니다(국민연금법 제88조). "
                   "실제 월급과 무관하게 이 범위 내에서 보험료가 산정됩니다."},
             {"priority": 3, "condition": "outputs.total > 0",
              "q": "사업주가 부담하는 4대보험료는 얼마인가요?",
@@ -1266,7 +1266,7 @@ def _dynamic_faq_js(calc: dict) -> str:
         "연말정산_환급액_계산기": [
             {"priority": 2, "condition": "(outputs.notices||[]).some(function(n){return n.indexOf('상한')>=0 || n.indexOf('하한')>=0;})",
              "q": "4대보험료가 상한/하한으로 조정된 이유는?",
-             "a": "국민연금은 기준소득월액 상한(6,170,000원)/하한(390,000원) 범위에서 계산됩니다. "
+             "a": "국민연금은 기준소득월액 상한(6,590,000원)/하한(410,000원) 범위에서 계산됩니다. "
                   "건강보험·고용보험은 실제 월급 기준이며 상한이 없습니다."},
             {"priority": 3, "condition": "outputs.estimated_refund > 0",
              "q": "환급금은 언제 받을 수 있나요?",
