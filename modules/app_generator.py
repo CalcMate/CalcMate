@@ -30,7 +30,7 @@ _TPL = Path(__file__).resolve().parent.parent / "templates" / "calculators" / "c
 _JS_FUNCS = {"min": "Math.min", "max": "Math.max", "round": "Math.round",
              "abs": "Math.abs", "int": "Math.trunc", "float": "Number"}
 
-# Phase C: 입력폼 예시값 (placeholder)
+# Phase C: 입력폼 예시값 (placeholder). 법정수치가 아닌 일반 예시값은 그대로 둔다.
 _PLACEHOLDERS = {
     "hourly_wage": "10320", "weekly_hours": "40",
     "daily_wage": "67000",  "unused_days": "5",
@@ -40,6 +40,29 @@ _PLACEHOLDERS = {
     "total_salary": "40000000", "family_count": "1", "paid_tax": "1000000",
     "insured_days": "365", "leave_month": "1", "use_6plus6": "0",
 }
+
+# STEP 28-20: placeholder 값 자체가 법정수치인 (slug, field) 쌍만 SSOT를 우선 조회한다.
+# 여기 없는 필드는 위 _PLACEHOLDERS의 일반 예시값을 그대로 사용(변경 없음).
+_PLACEHOLDER_SSOT_PATH = {
+    ("weekly-holiday-allowance", "hourly_wage"): ("weekly-holiday-allowance", "compute_rules", "min_wage"),
+}
+
+
+def _ssot_placeholder(slug: str, field: str):
+    """(slug, field)가 _PLACEHOLDER_SSOT_PATH에 등록된 경우 SSOT 값을 문자열로 반환.
+    미등록이거나 SSOT에 값이 없으면 None(호출측이 기존 _PLACEHOLDERS로 폴백)."""
+    path = _PLACEHOLDER_SSOT_PATH.get((slug, field))
+    if not path:
+        return None
+    reg_slug, *keys = path
+    node = _registry().get(reg_slug) or {}
+    for k in keys:
+        if not isinstance(node, dict):
+            return None
+        node = node.get(k)
+    if isinstance(node, (int, float)) and not isinstance(node, bool):
+        return str(int(node))
+    return None
 
 # STEP 16-Y/17-D: 계산기별 결과 안내(NOTICE) 문구. 공용 기본값("...근로계약...")이
 # 노무/급여 외 분야(부동산·세금 등)에 부적절하고, 같은 노무/급여 분야에서도
@@ -194,7 +217,7 @@ def _split_label(k, labels=None):
     return (m.group(1).strip(), m.group(2).strip()) if m else (lab, "")
 
 
-def _form_fields_v2(ins, labels=None) -> str:
+def _form_fields_v2(ins, labels=None, slug="") -> str:
     rows = []
     for k, spec in ins.items():
         label, unit = _split_label(k, labels)
@@ -239,7 +262,7 @@ def _form_fields_v2(ins, labels=None) -> str:
                 f'</label></div>')
         else:
             u = f'<span class="sm-unit">{_html.escape(unit)}</span>' if unit else ""
-            ph = _PLACEHOLDERS.get(k, "0")
+            ph = _ssot_placeholder(slug, k) or _PLACEHOLDERS.get(k, "0")
             rows.append(
                 f'<div class="sm-field">'
                 f'<label class="sm-label" for="in_{k}">{_html.escape(label)}</label>'
@@ -1201,6 +1224,10 @@ def _cta_rules_js(calc: dict) -> str:
     return f"window.SM_CTA_RULES = {json.dumps(rules_data, ensure_ascii=False)};\n"
 
 
+def _comma(n) -> str:
+    return f"{int(n):,}"
+
+
 def _dynamic_faq_js(calc: dict) -> str:
     """window.SM_DYNAMIC_FAQ — 계산기별 조건부 FAQ 항목 JS 객체 생성 (D-4).
 
@@ -1209,8 +1236,18 @@ def _dynamic_faq_js(calc: dict) -> str:
       2 = 상한/하한 적용
       3 = 결과 관련 (환급/추가납부/발생/미발생)
       4 = 일반 (정적 FAQ — JS 불필요, HTML에 이미 있음)
+
+    STEP 28-20: 문구 안의 법정수치(구직급여 상한/국민연금 상·하한)는 SSOT
+    (legal_basis.master.yaml, _registry() 경유)에서 읽어온다 — 하드코딩 폴백은
+    SSOT 조회 실패 시에만 사용된다.
     """
     slug = str(calc.get("slug", ""))
+    reg = _registry()
+    ub_amounts = (reg.get("unemployment-benefit") or {}).get("benefit_amounts") or {}
+    ub_daily_max = _comma(ub_amounts.get("daily_max", 68100))
+    fi_rates = (reg.get("four-insurances") or {}).get("insurance_rates") or {}
+    np_max = _comma(fi_rates.get("np_max", 6590000))
+    np_min = _comma(fi_rates.get("np_min", 410000))
     faq_map = {
         "weekly-holiday-allowance": [
             {"priority": 1, "condition": "outputs.weekly_holiday_pay === 0 && (outputs.notices||[]).length > 0",
@@ -1246,7 +1283,7 @@ def _dynamic_faq_js(calc: dict) -> str:
                   "복수의 직장에서 근무한 기간을 합산할 수 있습니다."},
             {"priority": 2, "condition": "(outputs.notices||[]).some(function(n){return n.indexOf('상한')>=0 || n.indexOf('하한')>=0;})",
              "q": "구직급여 상한액/하한액이 적용됐는데 왜 그런가요?",
-             "a": "구직급여는 1일 상한액(68,100원)과 하한액(최저임금의 80%)이 법으로 정해져 있습니다(고용보험법 제46조). "
+             "a": f"구직급여는 1일 상한액({ub_daily_max}원)과 하한액(최저임금의 80%)이 법으로 정해져 있습니다(고용보험법 제46조). "
                   "실제 임금과 무관하게 이 범위 내에서 지급됩니다."},
             {"priority": 3, "condition": "outputs.total_benefit > 0",
              "q": "실업급여는 언제부터 받을 수 있나요?",
@@ -1256,7 +1293,7 @@ def _dynamic_faq_js(calc: dict) -> str:
         "four-insurances": [
             {"priority": 2, "condition": "(outputs.notices||[]).some(function(n){return n.indexOf('상한')>=0 || n.indexOf('하한')>=0;})",
              "q": "국민연금 기준소득월액 상한/하한이 적용됐는데 왜 그런가요?",
-             "a": "국민연금은 기준소득월액에 상한(6,590,000원)과 하한(410,000원)이 있습니다(국민연금법 제88조). "
+             "a": f"국민연금은 기준소득월액에 상한({np_max}원)과 하한({np_min}원)이 있습니다(국민연금법 제88조). "
                   "실제 월급과 무관하게 이 범위 내에서 보험료가 산정됩니다."},
             {"priority": 3, "condition": "outputs.total > 0",
              "q": "사업주가 부담하는 4대보험료는 얼마인가요?",
@@ -1266,7 +1303,7 @@ def _dynamic_faq_js(calc: dict) -> str:
         "연말정산_환급액_계산기": [
             {"priority": 2, "condition": "(outputs.notices||[]).some(function(n){return n.indexOf('상한')>=0 || n.indexOf('하한')>=0;})",
              "q": "4대보험료가 상한/하한으로 조정된 이유는?",
-             "a": "국민연금은 기준소득월액 상한(6,590,000원)/하한(410,000원) 범위에서 계산됩니다. "
+             "a": f"국민연금은 기준소득월액 상한({np_max}원)/하한({np_min}원) 범위에서 계산됩니다. "
                   "건강보험·고용보험은 실제 월급 기준이며 상한이 없습니다."},
             {"priority": 3, "condition": "outputs.estimated_refund > 0",
              "q": "환급금은 언제 받을 수 있나요?",
@@ -1722,7 +1759,7 @@ def generate_html(calc: dict, cfg: dict = None) -> str:
         "TITLE": _html.escape(title), "DESCRIPTION": _html.escape(desc),
         "CATEGORY": f"{emoji} {_html.escape(category)}", "NAME": _html.escape(name),
         "TOP_NAV": render_top_nav(cfg),
-        "HERO_SUB": _html.escape(desc), "FORM_FIELDS": _form_fields_v2(ins, labels),
+        "HERO_SUB": _html.escape(desc), "FORM_FIELDS": _form_fields_v2(ins, labels, calc.get("slug", "")),
         "CALC_BTN": _html.escape(f"{short} 계산하기"),
         "RESULT_LABEL": _html.escape(plabel if plabel.startswith("예상") else f"예상 {plabel}"),
         "PRIMARY_OUT": _html.escape(primary), "RESULT_UNIT": _html.escape(punit or "원"),
@@ -1807,12 +1844,24 @@ def generate_calculator(calc: dict, cfg: dict = None) -> dict:
         ok, msg = True, "날짜기반 계산(코드 내장) — 수식 검증 제외"
     else:
         ok, msg = validate_formula(formula, ins) if formula else (True, "수식 없음")
+    # STEP 28-20: G-LEGAL-CURRENT(SSOT 기반 법정수치 최신성 검사)를 공통 진입점에 연결.
+    # run_integrity_gates() 전체(G-CALC/G-NUMCON/G-LEGAL/G-CONSISTENCY 등)는 기존에
+    # 검증된 적 없는 콘텐츠에서 무관한 항목까지 false positive를 내는 것을 확인해
+    # 이번 STEP 범위(법정수치 stale 여부)와 직접 관련된 이 게이트만 연결한다 — 논블로킹
+    # (calculator 생성 자체를 막지 않고, 결과만 반환해 호출측이 판단하도록 함).
+    try:
+        from .content_integrity import check_g_legal_current
+        _legal_fails = check_g_legal_current(calc.get("article_content") or "", _slug)
+    except Exception as _e:
+        _legal_fails = [{"gate": "G-LEGAL-CURRENT", "grade": "error", "detail": f"게이트 실행 오류: {_e}"}]
     return {
         "index.html": generate_html(calc, cfg),
         "style.css": generate_css(calc),
         "script.js": generate_js(calc, cfg),
         "_formula_valid": ok,
         "_formula_msg": msg,
+        "_legal_current_passed": not _legal_fails,
+        "_legal_current_failures": _legal_fails,
     }
 
 
