@@ -587,6 +587,6 @@ window.computeResult = function(inputs){
   out["jeonse_opp_cost"] = ((jeonse_deposit - wolse_deposit) * rate / 100 / 12);
   out["wolse_to_jeonse_equiv"] = (wolse_deposit + wolse_amount * 1200 / rate);
   out["monthly_savings"] = (wolse_amount - (jeonse_deposit - wolse_deposit) * rate / 100 / 12);
-  out._formula = "";
+  out._formula = ('전세보증금: ' + jeonse_deposit.toLocaleString() + ', ' + '월세보증금: ' + wolse_deposit.toLocaleString() + ', ' + '월세금액: ' + wolse_amount.toLocaleString() + ', ' + '전월세전환율: ' + rate.toLocaleString()) + ' → ' + ('전세 월 기회비용: ' + Math.round((jeonse_deposit - wolse_deposit) * rate / 100 / 12).toLocaleString() + ', ' + '월세→전세 환산금액: ' + Math.round(wolse_deposit + wolse_amount * 1200 / rate).toLocaleString() + ', ' + '월 비용 우위: ' + Math.round(wolse_amount - (jeonse_deposit - wolse_deposit) * rate / 100 / 12).toLocaleString());
   return out;
 };

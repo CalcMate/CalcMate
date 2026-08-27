@@ -922,10 +922,27 @@ def _compute_js(calc) -> str:
         out_key = next(iter(fmap))
         out_expr = _to_js(next(iter(fmap.values())))
         in_keys = list(ins.keys())
-        formula_str = (f"{in_keys[0]}.toLocaleString() + '원 × (' "
-                       f"+ {in_keys[1]} + '÷40×8) = ' "
-                       f"+ Math.round({out_expr}).toLocaleString() + '원'"
-                       if len(in_keys) == 2 else '""')
+        if len(in_keys) == 2:
+            # 기존 2-input 계산기(예: 주휴수당) 문구 그대로 유지 — 회귀 방지.
+            formula_str = (f"{in_keys[0]}.toLocaleString() + '원 × (' "
+                           f"+ {in_keys[1]} + '÷40×8) = ' "
+                           f"+ Math.round({out_expr}).toLocaleString() + '원'")
+        else:
+            # STEP 28-7: 위 2-input 전용 문구("A × (B÷40×8)")는 특정 계산기의 실제
+            # 수식 형태를 그대로 박아둔 것이라 입력 개수가 다르면 재사용할 수 없다.
+            # 입력 개수/출력 개수에 관계없이 항상 안전하게 동작하도록, 실제 계산식과
+            # 다른 가짜 수식을 만드는 대신 입력값·산출값을 라벨과 함께 그대로 나열한다
+            # (다중 출력도 첫 번째만이 아니라 전부 포함).
+            labels = _effective_labels(calc)
+            in_join = (
+                " + ', ' + ".join(f"'{_label(k, labels)}: ' + {k}.toLocaleString()" for k in in_keys)
+                if in_keys else "''"
+            )
+            out_join = " + ', ' + ".join(
+                f"'{_label(k, labels)}: ' + Math.round({_to_js(expr)}).toLocaleString()"
+                for k, expr in fmap.items()
+            )
+            formula_str = f"({in_join}) + ' → ' + ({out_join})"
         # fmap의 모든 출력 key를 처리 (단일/다중 출력 공통)
         out_lines = "".join(
             f'  out["{k}"] = ({_to_js(expr)});\n' for k, expr in fmap.items()
