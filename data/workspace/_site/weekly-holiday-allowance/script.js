@@ -588,8 +588,8 @@ window.computeResult = function(inputs){
     out._formula = "주 " + weekly_hours + "시간 미만(15시간 기준) — 주휴수당 미발생";
     return out;
   }
-  if (hourly_wage < 10030) {
-    out.notices.push("입력한 시급(" + hourly_wage.toLocaleString() + "원)이 2026년 최저임금(10,030원)보다 낮습니다.");
+  if (hourly_wage < 10320) {
+    out.notices.push("입력한 시급(" + hourly_wage.toLocaleString() + "원)이 2026년 최저임금(10,320원)보다 낮습니다.");
   }
   out["weekly_holiday_pay"] = (hourly_wage * (weekly_hours / 40) * 8);
   out._formula = weekly_hours.toLocaleString() + '원 × (' + hourly_wage + '÷40×8) = ' + Math.round(hourly_wage * (weekly_hours / 40) * 8).toLocaleString() + '원';
