@@ -588,8 +588,8 @@ window.computeResult = function(inputs){
     out._formula = employment_months + "개월 — 6개월 미만으로 수급 불가";
     return out;
   }
-  var DAILY_MAX = 66000;
-  var DAILY_MIN = 64192;
+  var DAILY_MAX = 68100;
+  var DAILY_MIN = 66048;
   var raw_daily = avg_daily_wage * 0.6;
   var daily_benefit = Math.min(Math.max(raw_daily, DAILY_MIN), DAILY_MAX);
   var under50 = [{lo:0,hi:12,d:120},{lo:12,hi:36,d:150},{lo:36,hi:60,d:180},{lo:60,hi:120,d:210},{lo:120,hi:Infinity,d:240}];
