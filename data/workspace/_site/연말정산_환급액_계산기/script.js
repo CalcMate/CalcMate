@@ -584,8 +584,8 @@ window.computeResult = function(inputs){
   family_count = Math.max(1, Math.round(family_count));
   var out = {};
   out.notices = [];
-  var NP_RATE=0.045; var NP_MIN=390000; var NP_MAX=6170000;
-  var HI_RATE=0.03545; var LTC_RATE=0.1296; var EI_RATE=0.009;
+  var NP_RATE=0.0475; var NP_MIN=410000; var NP_MAX=6590000;
+  var HI_RATE=0.03595; var LTC_RATE=0.1314; var EI_RATE=0.009;
   var LD_MAX=20000000; var PER_PERSON=1500000;
   var CREDIT_THRESHOLD=1300000;
   var CREDIT_RATE_LOW=0.55; var CREDIT_RATE_HIGH=0.3;
@@ -668,4 +668,4 @@ window.computeResult = function(inputs){
 };
 
 window.SM_CTA_RULES = {"default": {"text": "절세 방법이 궁금하다면", "links": [{"label": "연말정산 공제 가이드", "href": "/blog/yearend-tax-refund-maximize/"}, {"label": "전체 계산기", "href": "/"}], "analytics": "cta_yt_default"}, "rules": [{"condition": "outputs.estimated_refund > 0", "text": "환급금이 예상됩니다! 공제 항목을 더 챙겨 보세요", "links": [{"label": "환급 극대화 전략", "href": "/blog/yearend-tax-refund-maximize/"}, {"label": "간소화서비스 이용법", "href": "/blog/yearend-tax-simplified-service/"}], "analytics": "cta_yt_refund"}, {"condition": "outputs.estimated_refund < 0", "text": "추가납부가 예상됩니다. 공제 항목을 확인하세요", "links": [{"label": "공제 항목 총정리", "href": "/blog/yearend-tax-refund-maximize/"}, {"label": "전체 계산기", "href": "/"}], "analytics": "cta_yt_additional"}]};
-window.SM_DYNAMIC_FAQ = [{"priority": 2, "condition": "(outputs.notices||[]).some(function(n){return n.indexOf('상한')>=0 || n.indexOf('하한')>=0;})", "q": "4대보험료가 상한/하한으로 조정된 이유는?", "a": "국민연금은 기준소득월액 상한(6,170,000원)/하한(390,000원) 범위에서 계산됩니다. 건강보험·고용보험은 실제 월급 기준이며 상한이 없습니다."}, {"priority": 3, "condition": "outputs.estimated_refund > 0", "q": "환급금은 언제 받을 수 있나요?", "a": "2월 말 연말정산 완료 후 3월 급여일에 환급금이 지급되는 것이 일반적입니다. 회사마다 지급 시기가 다를 수 있으며, 직접 신고한 경우 5월 종합소득세 신고 후 환급됩니다."}, {"priority": 3, "condition": "outputs.estimated_refund < 0", "q": "추가납부액을 줄이려면 어떻게 해야 하나요?", "a": "연금저축·IRP·의료비·교육비·기부금 등 세액공제 항목을 최대한 활용하면 결정세액을 낮출 수 있습니다. 연간 계획적인 공제 항목 관리가 중요합니다."}];
+window.SM_DYNAMIC_FAQ = [{"priority": 2, "condition": "(outputs.notices||[]).some(function(n){return n.indexOf('상한')>=0 || n.indexOf('하한')>=0;})", "q": "4대보험료가 상한/하한으로 조정된 이유는?", "a": "국민연금은 기준소득월액 상한(6,590,000원)/하한(410,000원) 범위에서 계산됩니다. 건강보험·고용보험은 실제 월급 기준이며 상한이 없습니다."}, {"priority": 3, "condition": "outputs.estimated_refund > 0", "q": "환급금은 언제 받을 수 있나요?", "a": "2월 말 연말정산 완료 후 3월 급여일에 환급금이 지급되는 것이 일반적입니다. 회사마다 지급 시기가 다를 수 있으며, 직접 신고한 경우 5월 종합소득세 신고 후 환급됩니다."}, {"priority": 3, "condition": "outputs.estimated_refund < 0", "q": "추가납부액을 줄이려면 어떻게 해야 하나요?", "a": "연금저축·IRP·의료비·교육비·기부금 등 세액공제 항목을 최대한 활용하면 결정세액을 낮출 수 있습니다. 연간 계획적인 공제 항목 관리가 중요합니다."}];
