@@ -32,7 +32,7 @@ _JS_FUNCS = {"min": "Math.min", "max": "Math.max", "round": "Math.round",
 
 # Phase C: 입력폼 예시값 (placeholder)
 _PLACEHOLDERS = {
-    "hourly_wage": "10030", "weekly_hours": "40",
+    "hourly_wage": "10320", "weekly_hours": "40",
     "daily_wage": "67000",  "unused_days": "5",
     "avg_monthly_wage": "3000000", "avg_daily_wage": "100000",
     "monthly_salary": "3000000", "monthly_wage": "3000000",
