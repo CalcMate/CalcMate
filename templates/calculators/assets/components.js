@@ -16,12 +16,15 @@
     });
   }
 
-  // 입력 수집: number → 숫자(콤마제거), date → 문자열
+  // 입력 수집: number → 숫자(콤마제거), date → 문자열, boolean(checkbox) → 1/0
   function collectInputs() {
     var inputs = {};
     (CFG.inputs || []).forEach(function (f) {
       var el = d.getElementById("in_" + f.name);
       if (!el) { inputs[f.name] = (f.type === "date") ? "" : 0; return; }
+      // STEP 28-11: checkbox는 value가 아니라 checked로 상태를 판정해야 하며,
+      // 값은 기존 computeResult()가 기대하는 1(적용)/0(미적용)으로 넘긴다.
+      if (f.type === "boolean") { inputs[f.name] = el.checked ? 1 : 0; return; }
       inputs[f.name] = (f.type === "date") ? el.value : num(el.value);
     });
     return inputs;

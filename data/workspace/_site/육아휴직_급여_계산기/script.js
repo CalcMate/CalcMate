@@ -278,6 +278,7 @@
     (CFG.inputs || []).forEach(function (f) {
       var el = d.getElementById("in_" + f.name);
       if (!el) { inputs[f.name] = (f.type === "date") ? "" : 0; return; }
+      if (f.type === "boolean") { inputs[f.name] = el.checked ? 1 : 0; return; }
       inputs[f.name] = (f.type === "date") ? el.value : num(el.value);
     });
     return inputs;

@@ -59,7 +59,7 @@ unemployment-benefit:
   field_labels:
     monthly_wage: "월 통상임금(원)"
     insured_days: "피보험단위기간(일)"
-    use_6plus6: "6+6 특례(1=적용, 0=일반)"
+    use_6plus6: "6+6 특례 적용"
     leave_month: "육아휴직 개월 차"
     monthly_allowance: "예상 월 지급액(원)"
   input_labels:

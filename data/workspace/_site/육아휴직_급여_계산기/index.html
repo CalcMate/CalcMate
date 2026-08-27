@@ -106,7 +106,7 @@
     <h2 class="sm-card-title">계산 입력</h2>
     <div class="sm-field"><label class="sm-label" for="in_monthly_wage">월 통상임금</label><div class="sm-input-wrap"><input class="sm-input" type="text" inputmode="numeric" data-comma id="in_monthly_wage" name="in_monthly_wage" placeholder="예) 3000000"><span class="sm-unit">원</span></div></div>
 <div class="sm-field"><label class="sm-label" for="in_insured_days">피보험단위기간</label><div class="sm-input-wrap"><input class="sm-input" type="text" inputmode="numeric" data-comma id="in_insured_days" name="in_insured_days" placeholder="예) 365"><span class="sm-unit">일</span></div></div>
-<div class="sm-field"><label class="sm-label" for="in_use_6plus6">6+6 특례</label><div class="sm-input-wrap"><input class="sm-input" type="text" inputmode="numeric" data-comma id="in_use_6plus6" name="in_use_6plus6" placeholder="예) 0"><span class="sm-unit">1=적용, 0=일반</span></div></div>
+<div class="sm-field"><label class="sm-label" for="in_use_6plus6" style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="in_use_6plus6" name="in_use_6plus6" style="width:18px;height:18px;flex-shrink:0;cursor:pointer"><span>6+6 특례 적용</span></label></div>
 <div class="sm-field"><label class="sm-label" for="in_leave_month">육아휴직 개월 차</label><div class="sm-input-wrap"><input class="sm-input" type="text" inputmode="numeric" data-comma id="in_leave_month" name="in_leave_month" placeholder="예) 1"></div></div>
     <button class="sm-btn" type="button" onclick="calculate()">육아휴직 급여 계산하기</button>
   </section>
@@ -268,7 +268,7 @@
 </div>
 
 <!-- 계산기 설정(파라미터) — app_generator가 주입 -->
-<script>window.SM_CONFIG = {"name": "육아휴직 급여 계산기", "slug": "육아휴직_급여_계산기", "primaryOutput": "monthly_allowance", "resultUnit": "원", "inputs": [{"name": "monthly_wage", "label": "월 통상임금", "type": "number", "unit": "원"}, {"name": "insured_days", "label": "피보험단위기간", "type": "number", "unit": "일"}, {"name": "use_6plus6", "label": "6+6 특례", "type": "number", "unit": "1=적용, 0=일반"}, {"name": "leave_month", "label": "육아휴직 개월 차", "type": "number", "unit": ""}], "outputs": [{"key": "monthly_allowance", "label": "예상 월 지급액", "unit": "원"}], "show_adsense": false, "show_cpa": false, "show_share": true, "show_pwa": false, "show_result_save": true, "show_faq": true, "show_notice": true, "show_related": true, "show_detail": true, "show_article": true, "site_mode": "pre_adsense", "result_export_type": "png", "kakao_js_key": "", "calculator_version": "2.0.0", "law_version": "2026-07", "ga4_id": "G-EP2Q8035VF"};</script>
+<script>window.SM_CONFIG = {"name": "육아휴직 급여 계산기", "slug": "육아휴직_급여_계산기", "primaryOutput": "monthly_allowance", "resultUnit": "원", "inputs": [{"name": "monthly_wage", "label": "월 통상임금", "type": "number", "unit": "원"}, {"name": "insured_days", "label": "피보험단위기간", "type": "number", "unit": "일"}, {"name": "use_6plus6", "label": "6+6 특례 적용", "type": "boolean", "unit": ""}, {"name": "leave_month", "label": "육아휴직 개월 차", "type": "number", "unit": ""}], "outputs": [{"key": "monthly_allowance", "label": "예상 월 지급액", "unit": "원"}], "show_adsense": false, "show_cpa": false, "show_share": true, "show_pwa": false, "show_result_save": true, "show_faq": true, "show_notice": true, "show_related": true, "show_detail": true, "show_article": true, "site_mode": "pre_adsense", "result_export_type": "png", "kakao_js_key": "", "calculator_version": "2.0.0", "law_version": "2026-07", "ga4_id": "G-EP2Q8035VF"};</script>
 <script src="script.js"></script>
 </body>
 </html>

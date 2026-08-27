@@ -224,6 +224,19 @@ def _form_fields_v2(ins, labels=None) -> str:
                 f'<div class="sm-input-wrap">'
                 f'<input class="sm-input" type="date" id="in_{k}" name="in_{k}">'
                 f'</div></div>')
+        elif "boolean" in spec_str.lower():
+            # STEP 28-11: boolean 타입은 숫자 입력이 아닌 checkbox로 렌더링.
+            # collectInputs()(components.js)가 checkbox는 checked 여부를 1/0으로
+            # 변환해 전달하므로, "1=적용/0=미적용"을 기대하는 기존 computeResult()
+            # 판정 로직은 값 그대로 유지된다(계산 로직 변경 없음).
+            rows.append(
+                f'<div class="sm-field">'
+                f'<label class="sm-label" for="in_{k}" '
+                f'style="display:flex;align-items:center;gap:8px;cursor:pointer">'
+                f'<input type="checkbox" id="in_{k}" name="in_{k}" '
+                f'style="width:18px;height:18px;flex-shrink:0;cursor:pointer">'
+                f'<span>{_html.escape(label)}</span>'
+                f'</label></div>')
         else:
             u = f'<span class="sm-unit">{_html.escape(unit)}</span>' if unit else ""
             ph = _PLACEHOLDERS.get(k, "0")
@@ -311,8 +324,12 @@ def _sm_config(calc, cfg) -> dict:
     inputs = []
     for k, spec in ins.items():
         label, unit = _split_label(k, labels)
+        _spec_l = str(spec).lower()
+        # STEP 28-11: boolean 타입 추가 — collectInputs()가 checkbox(checked)를 읽도록 구분.
         inputs.append({"name": k, "label": label,
-                       "type": ("date" if "date" in str(spec).lower() else "number"), "unit": unit})
+                       "type": ("date" if "date" in _spec_l
+                                 else "boolean" if "boolean" in _spec_l
+                                 else "number"), "unit": unit})
     outputs = [{"key": k, "label": _split_label(k, labels)[0], "unit": _split_label(k, labels)[1] or "원"} for k in outs]
     primary = list(outs.keys())[0] if outs else "result"
     c = cfg if isinstance(cfg, dict) else {}
