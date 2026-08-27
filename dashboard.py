@@ -2186,11 +2186,35 @@ elif tab == "🏭 App Factory":
             key="af_contract_is_tier2b",
             help="입영일·전역일 등 날짜 연산 계산기. 체크 시 AI 호출 없이 날짜 계산 HTML을 직접 생성합니다.",
         )
+        # ── STEP 26-1: 확정 slug 자동 제안 — 기존 generate_slug() 재사용 ──
+        # (Mode A의 af_slug 자동 프리필과 동일 함수. 신규 slug 규칙 없음.)
+        # 위젯(key=af_contract_slug_pre)이 아직 instantiate되기 전이므로 여기서
+        # session_state를 직접 세팅해도 안전하다(StreamlitAPIException 없음).
+        # 슬러그 입력란이 비어있을 때만 채우고, 한 번이라도 값이 들어가면
+        # (자동 제안이든 사용자 직접 입력이든) 이후 rerun에서 다시 덮어쓰지 않는다.
+        if af_name.strip() and not (st.session_state.get("af_contract_slug_pre") or "").strip():
+            _cs_auto = generate_slug(af_name.strip())
+            if _cs_auto:
+                st.session_state["af_contract_slug_pre"] = _cs_auto
+
         _bc1, _bc2 = st.columns(2)
         _af_slug_pre = _bc1.text_input(
             "확정 slug *", placeholder="annual-leave-remaining",
             key="af_contract_slug_pre",
-            help="생성 전 확정 URL 식별자. 영문 소문자·숫자·하이픈만.")
+            help="생성 전 확정 URL 식별자. 영문 소문자·숫자·하이픈만. "
+                 "계산기명을 입력하면 자동 제안되며, 직접 수정할 수 있습니다.")
+        # ── STEP 26-1: 확정 slug 중복 확인 — 기존 check_slug_conflict() 재사용 ──
+        _cs_check = (_af_slug_pre or "").strip().lower()
+        if _cs_check:
+            import re as _re_cs_chk
+            if _re_cs_chk.match(r"^[a-z0-9][a-z0-9-]*$", _cs_check):
+                _, _cs_conflict, _cs_msg = RC.check_slug_conflict(_cs_check, cfg)
+                if _cs_conflict:
+                    _bc1.error(f"⛔ 슬러그 중복: {_cs_msg}")
+                else:
+                    _bc1.caption(f"✅ 슬러그 사용 가능: '{_cs_check}'")
+            else:
+                _bc1.warning("영문 소문자·숫자·하이픈만 사용 가능합니다.")
         _af_input_fields = _bc2.text_input(
             "입력 필드 (쉼표 구분) *", placeholder="years_of_service, used_days",
             key="af_contract_input_fields",
