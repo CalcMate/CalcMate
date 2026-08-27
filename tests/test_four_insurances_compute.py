@@ -15,8 +15,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 # ─── 요율 상수 (legal_basis.master.yaml insurance_rates와 동기화) ─────────────
 NP_RATE  = 0.0475   # 2026년 국민연금 근로자 부담 4.75%
-NP_MIN   = 390_000
-NP_MAX   = 6_170_000
+NP_MIN   = 410_000   # 기준소득월액 하한 (2026년 7월~2027년 6월, 국민연금공단)
+NP_MAX   = 6_590_000 # 기준소득월액 상한 (2026년 7월~2027년 6월, 국민연금공단)
 HI_RATE  = 0.03595  # 2026년 건강보험 근로자 부담 3.595%
 LTC_RATE = 0.1296
 EI_RATE  = 0.009

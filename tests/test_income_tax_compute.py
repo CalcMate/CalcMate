@@ -162,14 +162,14 @@ class TestInsuranceDeduction:
         assert abs(r["ltc_monthly"] - r["hi_monthly"] * 0.1296) < 1
 
     def test_np_min_clamp(self):
-        # 매우 낮은 급여 → 국민연금 하한(390,000/월) 기준 (2026: 4.75%)
+        # 매우 낮은 급여 → 국민연금 하한(410,000/월) 기준 (2026.7~2027.6, 4.75%)
         r = compute_insurance_deduction(1_000_000)   # 월 83,333 → 하한 적용
-        assert abs(r["np_monthly"] - 390_000 * 0.0475) < 1
+        assert abs(r["np_monthly"] - 410_000 * 0.0475) < 1
 
     def test_np_max_clamp(self):
-        # 높은 급여 → 국민연금 상한(6,170,000/월) 기준 (2026: 4.75%)
+        # 높은 급여 → 국민연금 상한(6,590,000/월) 기준 (2026.7~2027.6, 4.75%)
         r = compute_insurance_deduction(200_000_000)  # 월 16.7M → 상한 적용
-        assert abs(r["np_monthly"] - 6_170_000 * 0.0475) < 1
+        assert abs(r["np_monthly"] - 6_590_000 * 0.0475) < 1
 
 
 # ─── 6. 전체 계산 흐름 ──────────────────────────────────────────────────────
