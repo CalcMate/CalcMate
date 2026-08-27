@@ -6,7 +6,9 @@
   var CFG = w.SM_CONFIG || {};
 
   function num(v) { return (typeof v === "number") ? v : (parseFloat(String(v).replace(/,/g, "")) || 0); }
-  function comma(n) { return (Math.round(n)).toLocaleString(); }
+  // STEP 28-6: Math.round(-0.4) 등에서 나오는 -0이 그대로 "-0"으로 표시되는 것을 방지
+  // (-0 + 0 === 0, toLocaleString()은 부호까지 그대로 반영하므로 +0으로 정규화 필요).
+  function comma(n) { return (Math.round(n) + 0).toLocaleString(); }
 
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
@@ -26,15 +28,23 @@
   }
 
   // 카운트업 애니메이션 (디자인 유지)
+  // STEP 28-6: requestAnimationFrame은 배경 탭에서 스로틀/정지될 수 있어(Chrome 표준 동작),
+  // 애니메이션 시작 전에 최종값을 먼저 동기적으로 표시한다 — rAF가 전혀 돌지 않아도
+  // "0"/"-0"에 고착되지 않고 항상 정답이 남아있도록 하는 안전장치. rAF가 정상 동작하면
+  // 이 즉시값은 같은 틱에서 애니메이션 시작 프레임(0)으로 바로 덮어써지므로 화면상
+  // 기존 카운트업 효과는 그대로 유지된다.
   function countUp(el, target) {
     if (!el) return;
-    var dur = 600, start = performance.now();
-    (function step(now) {
+    el.textContent = comma(target);
+    var dur = 600, start;
+    function step(now) {
+      if (start === undefined) start = now;
       var p = Math.min((now - start) / dur, 1);
       var ease = 1 - Math.pow(1 - p, 3);
       el.textContent = comma(ease * target);
       if (p < 1) requestAnimationFrame(step);
-    })(performance.now());
+    }
+    requestAnimationFrame(step);
   }
 
   // Phase C: notices 렌더 (계산 결과의 안내 메시지 목록)

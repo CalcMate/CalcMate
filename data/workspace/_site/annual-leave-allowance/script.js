@@ -264,7 +264,7 @@
   var CFG = w.SM_CONFIG || {};
 
   function num(v) { return (typeof v === "number") ? v : (parseFloat(String(v).replace(/,/g, "")) || 0); }
-  function comma(n) { return (Math.round(n)).toLocaleString(); }
+  function comma(n) { return (Math.round(n) + 0).toLocaleString(); }
 
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
@@ -286,13 +286,16 @@
   // 카운트업 애니메이션 (디자인 유지)
   function countUp(el, target) {
     if (!el) return;
-    var dur = 600, start = performance.now();
-    (function step(now) {
+    el.textContent = comma(target);
+    var dur = 600, start;
+    function step(now) {
+      if (start === undefined) start = now;
       var p = Math.min((now - start) / dur, 1);
       var ease = 1 - Math.pow(1 - p, 3);
       el.textContent = comma(ease * target);
       if (p < 1) requestAnimationFrame(step);
-    })(performance.now());
+    }
+    requestAnimationFrame(step);
   }
 
   // Phase C: notices 렌더 (계산 결과의 안내 메시지 목록)
