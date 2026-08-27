@@ -1585,15 +1585,27 @@ def render_top_nav(cfg: dict = None) -> str:
     )
 
 
+# STEP 28-10: Footer 문구 범용화 — _NOTICE_BY_SLUG(line 49)와 동일 원칙.
+# 여기 없는 slug는 아래 fallback(기존 노무 문구) 그대로 사용해 다른 계산기에는
+# 전혀 영향 없다. 실제 문구 콘텐츠 확정은 별도 콘텐츠 STEP에서 진행 — 이번엔
+# override 가능한 구조만 추가하고 각 dict는 비워 둔다(기존 표시 문구 그대로 유지).
+_FOOTER_CTA_TITLE_BY_SLUG: dict = {}
+_FOOTER_CTA_SUB_BY_SLUG: dict = {}
+_FOOTER_DISCLAIMER_BY_SLUG: dict = {}
+
+
 def render_footer_cta(calc: dict, cfg: dict = None) -> str:
     """페이지 하단 CTA (전체 계산기 목록 및 주요 링크)."""
     site_url = str((cfg or {}).get("SITE_URL", "")).rstrip("/")
     home_url = site_url or "/"
+    slug = str((calc or {}).get("slug", ""))
+    title = _FOOTER_CTA_TITLE_BY_SLUG.get(slug, "CalcMate — 급여·노무 계산기 모음")
+    sub = _FOOTER_CTA_SUB_BY_SLUG.get(slug, "퇴직금·주휴수당·실업급여·4대보험·연말정산·육아휴직까지")
     return (
         '  <!-- Phase C: 페이지 하단 CTA -->\n'
         '  <div class="sm-footer-cta">\n'
-        f'    <p class="sm-footer-cta-title">CalcMate — 급여·노무 계산기 모음</p>\n'
-        '    <p class="sm-footer-cta-sub">퇴직금·주휴수당·실업급여·4대보험·연말정산·육아휴직까지</p>\n'
+        f'    <p class="sm-footer-cta-title">{_html.escape(title)}</p>\n'
+        f'    <p class="sm-footer-cta-sub">{_html.escape(sub)}</p>\n'
         '    <div class="sm-footer-cta-links">\n'
         f'      <a class="sm-footer-cta-link" href="{home_url}">전체 계산기</a>\n'
         f'      <a class="sm-footer-cta-link" href="{home_url}">다른 계산기 보기</a>\n'
@@ -1602,9 +1614,11 @@ def render_footer_cta(calc: dict, cfg: dict = None) -> str:
     )
 
 
-def render_site_footer(cfg: dict = None) -> str:
+def render_site_footer(calc: dict = None, cfg: dict = None) -> str:
     """사이트 공용 footer — 사이트 5페이지와 동일 구조."""
     u = str((cfg or {}).get("SITE_URL", "")).rstrip("/")
+    slug = str((calc or {}).get("slug", ""))
+    disclaimer = _FOOTER_DISCLAIMER_BY_SLUG.get(slug, "본 계산기는 참고용이며 실제 지급액과 다를 수 있습니다.")
     _ls = "font-size:13px;color:var(--c-text-sub);text-decoration:none"
     links = "".join(
         f'<a href="{u}{path}" style="{_ls}">{label}</a>'
@@ -1620,7 +1634,7 @@ def render_site_footer(cfg: dict = None) -> str:
         '  <footer style="text-align:center;padding-top:var(--sp-3);'
         'border-top:1px solid var(--c-border);margin-top:var(--sp-3)">\n'
         '    <p style="font-size:13px;color:var(--c-text-light);margin-bottom:var(--sp-1)">'
-        '본 계산기는 참고용이며 실제 지급액과 다를 수 있습니다.</p>\n'
+        f'{_html.escape(disclaimer)}</p>\n'
         f'    <div style="font-size:16px;font-weight:800;color:var(--c-primary);'
         f'margin-bottom:var(--sp-1)">CalcMate</div>\n'
         f'    <nav style="display:flex;gap:var(--sp-2);justify-content:center;'
@@ -1713,7 +1727,7 @@ def generate_html(calc: dict, cfg: dict = None) -> str:
         "INLINE_CTA": render_inline_cta(calc, cfg),
         "RELATED_POSTS_SECTION": render_related_posts(calc, cfg),
         "FOOTER_CTA": render_footer_cta(calc, cfg),
-        "SITE_FOOTER": render_site_footer(cfg),
+        "SITE_FOOTER": render_site_footer(calc, cfg),
         # Phase E 추가
         "GA4_SCRIPT": _render_ga4_script(cfg),
         "CANONICAL": render_canonical(calc, cfg),
