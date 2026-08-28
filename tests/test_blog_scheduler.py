@@ -52,16 +52,53 @@ def golden10_intents():
     }
 
 
-@pytest.fixture
-def db_path():
-    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                        "data", "blog_auto.db")
+_GOLDEN10_SNAPSHOT = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "snapshots", "golden10_blog_snapshot.json")
 
 
 @pytest.fixture
-def cfg():
-    """Mock config (no OPENAI_API_KEY = mock path)."""
-    return {"MAX_RETRY_COUNT": 1, "QUALITY_GATE": {}, "QUALITY_SCORE": {}}
+def temp_blog_root(tmp_path):
+    """STEP 28-63: Golden10 스냅샷(tests/snapshots/golden10_blog_snapshot.json)으로
+    임시 calculators DB를 만들어, 로컬 전용이던 data/blog_auto.db(gitignored) 없이도
+    fresh checkout(CI 포함)에서 test_blog_scheduler.py가 재현되도록 한다.
+
+    스냅샷은 실제 로컬 DB의 Golden10 10건 article_content/faq를 그대로 추출한 것이며
+    (임의 작성 아님), blog_scheduler_adapter.py의 기존 cfg["_root"] override 지점을
+    그대로 사용하므로 production 코드는 한 줄도 변경하지 않는다.
+    """
+    with open(_GOLDEN10_SNAPSHOT, encoding="utf-8") as f:
+        rows = json.load(f)
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    db_file = data_dir / "blog_auto.db"
+
+    conn = sqlite3.connect(str(db_file))
+    conn.execute(
+        "CREATE TABLE calculators ("
+        " slug TEXT PRIMARY KEY, name TEXT, article_content TEXT,"
+        " faq TEXT, seo_title TEXT, seo_description TEXT)"
+    )
+    conn.executemany(
+        "INSERT INTO calculators (slug, name, article_content, faq, seo_title, seo_description) "
+        "VALUES (:slug, :name, :article_content, :faq, :seo_title, :seo_description)",
+        rows,
+    )
+    conn.commit()
+    conn.close()
+    return tmp_path
+
+
+@pytest.fixture
+def db_path(temp_blog_root):
+    return str(temp_blog_root / "data" / "blog_auto.db")
+
+
+@pytest.fixture
+def cfg(temp_blog_root):
+    """Mock config (no OPENAI_API_KEY = mock path).
+    _root를 임시 Golden10 DB로 지정해 blog_scheduler_adapter가 그 DB를 사용하게 한다."""
+    return {"MAX_RETRY_COUNT": 1, "QUALITY_GATE": {}, "QUALITY_SCORE": {}, "_root": str(temp_blog_root)}
 
 
 @pytest.fixture
@@ -180,14 +217,12 @@ class TestGolden10SchedulerDryRun:
 class TestDBInvariance:
     """Scheduler Dry-Run 후 DB 변경 없음."""
 
-    def test_article_content_hash_unchanged(self, cfg, golden10_hashes):
+    def test_article_content_hash_unchanged(self, cfg, db_path, golden10_hashes):
         """Golden 10 article_content hash가 동일."""
         from modules.blog_scheduler_adapter import run_blog_once
         run_blog_once(cfg, max_count=10)
 
-        conn = sqlite3.connect(os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "data", "blog_auto.db"))
+        conn = sqlite3.connect(db_path)
         c = conn.cursor()
         for slug, expected_hash in golden10_hashes.items():
             c.execute("SELECT article_content FROM calculators WHERE slug=?", (slug,))
@@ -289,16 +324,12 @@ class TestSingleDryRun:
 class TestCalculatorLineSeparation:
     """Blog adapter가 calculator write path를 호출하지 않음."""
 
-    def test_no_db_write_in_blog_line(self, cfg):
+    def test_no_db_write_in_blog_line(self, cfg, db_path):
         """Blog line이 calculators 테이블을 수정하지 않음."""
         from modules.blog_scheduler_adapter import run_blog_once
         import hashlib
-        import sqlite3
 
         # 실행 전 DB hash
-        db_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "data", "blog_auto.db")
         before = hashlib.md5(open(db_path, "rb").read()).hexdigest()
 
         result = run_blog_once(cfg, max_count=10)
@@ -316,13 +347,11 @@ class TestCalculatorLineSeparation:
 class TestGolden10HashAfterRun:
     """Scheduler Dry-Run 후 Golden 10 hash 불변."""
 
-    def test_hash_unchanged_after_full_run(self, cfg, golden10_hashes):
+    def test_hash_unchanged_after_full_run(self, cfg, db_path, golden10_hashes):
         from modules.blog_scheduler_adapter import run_blog_once
         run_blog_once(cfg, max_count=10)
 
-        conn = sqlite3.connect(os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            "data", "blog_auto.db"))
+        conn = sqlite3.connect(db_path)
         c = conn.cursor()
         for slug, expected in golden10_hashes.items():
             c.execute("SELECT article_content FROM calculators WHERE slug=?", (slug,))
