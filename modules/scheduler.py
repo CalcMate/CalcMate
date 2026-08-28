@@ -85,7 +85,9 @@ def _notify_slot_result(cfg: dict, entry: dict, reason: str) -> None:
 def _schedule_dir(cfg: dict) -> Path:
     root = Path(cfg.get("_root", "."))
     line = cfg.get("scheduler_line", "")
-    if line == "calc_webapp":
+    if line == "blog":
+        d = root / "data" / "schedule" / "blog"
+    elif line == "calc_webapp":
         d = root / "data" / "schedule" / "calc_webapp"
     else:
         d = root / "data" / "schedule"
@@ -131,9 +133,27 @@ def default_slots(count: int) -> list:
     return slots
 
 def get_slots_for(cfg: dict, d: date = None) -> tuple:
-    """(day_type, slots) 반환. PUBLISH_SCHEDULE 우선, 없으면 자동 생성."""
+    """(day_type, slots) 반환.
+
+    Blog 라인: BLOG_SCHEDULE.publish_slots 우선.
+    Calculator 라인(기본): PUBLISH_SCHEDULE优先, 없으면 자동 생성.
+    """
     d = d or date.today()
     day_type = "weekend" if _is_weekend(d) else "weekday"
+
+    # Blog 라인 → BLOG_SCHEDULE.publish_slots 사용
+    if cfg.get("scheduler_line") == "blog":
+        bs = cfg.get("BLOG_SCHEDULE", {}) or {}
+        slots = bs.get("publish_slots") or []
+        weekday_only = bs.get("weekday_only", False)
+        if weekday_only and day_type == "weekend":
+            slots = []  # weekday_only=True且周末 → 슬롯 없음
+        if not slots:
+            count = int(cfg.get("DAILY_POST_COUNT", 1) or 1)
+            slots = default_slots(count)
+        return day_type, slots
+
+    # Calculator 라인(기존 동작)
     ps = cfg.get("PUBLISH_SCHEDULE", {}) or {}
     slots = ps.get(day_type) or []
     if not slots:
@@ -142,6 +162,12 @@ def get_slots_for(cfg: dict, d: date = None) -> tuple:
     return day_type, slots
 
 def failure_mode(cfg: dict) -> str:
+    # Blog 라인: BLOG_SCHEDULE.failure_mode 우선 (미설정 시 기본값 사용)
+    if cfg.get("scheduler_line") == "blog":
+        bs = cfg.get("BLOG_SCHEDULE", {}) or {}
+        fm = bs.get("failure_mode", "retry_in_slot")
+        return fm if fm in FAILURE_MODES else "retry_in_slot"
+    # Calculator 라인(기존 동작)
     ps = cfg.get("PUBLISH_SCHEDULE", {}) or {}
     fm = ps.get("failure_mode", "retry_in_slot")
     return fm if fm in FAILURE_MODES else "retry_in_slot"

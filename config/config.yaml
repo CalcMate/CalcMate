@@ -79,6 +79,13 @@ CALC_WEBAPP_SCHEDULE:
   enabled: false
   mode: qa_only
   targets: []
+BLOG_SCHEDULE:
+  enabled: false
+  mode: draft
+  publish_slots:
+  - start: "10:00"
+    end: "10:30"
+  weekday_only: false
 CONTENT_SYNC:
   enabled: true
   run_at: 03:00

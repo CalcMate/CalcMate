@@ -59,6 +59,19 @@ def parse_args():
     return p.parse_args()
 
 # ─────────────────────────────────────────────────────────────
+def resolve_blog_publish_fn(cfg: dict):
+    """Blog Line의 스케줄러 실행 함수 반환.
+    BLOG_SCHEDULE.mode에 따라:
+      - draft: isolated output만 생성 (DB/WP 미연결)
+      - publish: 기존 publisher.py로 WordPress 발행
+    """
+    from modules.blog_scheduler_adapter import run_blog_once, run_blog_once_wp
+    mode = str(cfg.get("BLOG_SCHEDULE", {}).get("mode", "draft")).strip().lower()
+    if mode == "publish":
+        return run_blog_once_wp
+    return run_blog_once
+
+# ─────────────────────────────────────────────────────────────
 def run_once(cfg: dict, dry_run: bool = False, max_count: int = None) -> dict:
     """수집 후 DAILY_POST_COUNT(또는 max_count)만큼 글을 '생산'한다.
 
@@ -481,8 +494,9 @@ def main():
         run_once(cfg)
         return
 
-    # Calculator 자동 스케줄러 진입점 제거됨(Calculator는 수동 실행/웹앱 전용).
-    LOG.info("실행할 CLI 옵션이 지정되지 않음 — --once, --calculator-id 등을 사용하세요.")
+    # Calculator 자동 스케줄러는 제거됨(Calculator는 수동 실행/웹앱 전용).
+    # Blog 예약 발행은 scripts/run_blog_scheduler.py 또는 Dashboard의 Blog Schedule 스레드로 실행한다.
+    LOG.info("실행할 CLI 옵션이 지정되지 않음 — --once, --calculator-id 등을 사용하거나 Dashboard를 사용하세요.")
     return
 
 if __name__ == "__main__":

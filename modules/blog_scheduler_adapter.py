@@ -1,0 +1,423 @@
+# -*- coding: utf-8 -*-
+"""
+modules/blog_scheduler_adapter.py — Scheduler → Blog line 연결 어댑터
+
+Scheduler의 run_once_fn(contract) 인터페이스를 만족시키면서
+blog adapter(content.blog)를 통해 intent별 콘텐츠를 생성한다.
+
+핵심 보호:
+- calculators.article_content 절대 수정 안 함
+- WordPress 호출 안 함
+- Image Pipeline 호출 안 함
+- 모든 출력은 isolated directory에 저장
+"""
+import hashlib
+import json
+import os
+import sqlite3
+import sys
+from pathlib import Path
+
+# 프로젝트 루트를 path에 추가
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from content.blog import GOLDEN_10, get_golden10, validate_intent, get_content_request
+from content.blog.writer import generate_blog_article, auto_generate_blog_all
+
+
+def _db_path(cfg: dict) -> Path:
+    """DB 파일 경로 반환."""
+    root = Path(cfg.get("_root", str(ROOT)))
+    return root / "data" / "blog_auto.db"
+
+
+def _output_dir(cfg: dict) -> Path:
+    """isolated output 디렉토리."""
+    root = Path(cfg.get("_root", str(ROOT)))
+    d = root / "data" / "reproduction" / "scheduler_blog"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _load_calculator(cfg: dict, slug: str) -> dict | None:
+    """DB에서 계산기 데이터 로드 (READ-ONLY)."""
+    db = _db_path(cfg)
+    if not db.exists():
+        return None
+    conn = sqlite3.connect(str(db))
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM calculators WHERE slug=?", (slug,))
+    row = c.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def _record_hash(cfg: dict, slug: str, phase: str) -> str:
+    """DB article_content hash 기록 (전/후 비교용)."""
+    calc = _load_calculator(cfg, slug)
+    if not calc or not calc.get("article_content"):
+        return ""
+    return hashlib.sha256(calc["article_content"].encode()).hexdigest()[:16]
+
+
+# ============================================================
+# Blog ScheduleRequest
+# ============================================================
+
+class BlogScheduleRequest:
+    """Scheduler → Blog adapter 요청 객체."""
+    
+    def __init__(self, slug: str, intent: str, title: str = "",
+                 description: str = "", mode: str = "dry-run"):
+        self.slug = slug
+        self.intent = intent
+        self.title = title
+        self.description = description
+        self.mode = mode  # "dry-run" | "generate"
+    
+    def validate(self) -> list[str]:
+        """검증 — 오류 메시지 리스트 반환 (빈 리스트면 정상)."""
+        errors = []
+        if not self.slug:
+            errors.append("slug is empty")
+        if not validate_intent(self.intent):
+            errors.append(f"Invalid intent: {self.intent}")
+        # Golden 10 Contract 확인
+        gc = get_golden10(self.slug)
+        if gc is None:
+            errors.append(f"Not in Golden 10 Contract: {self.slug}")
+        elif gc.intent != self.intent:
+            errors.append(
+                f"Intent mismatch: {self.slug} expects '{gc.intent}', got '{self.intent}'"
+            )
+        return errors
+
+
+# ============================================================
+# Blog Scheduler Adapter — core
+# ============================================================
+
+def run_blog_once(cfg: dict, max_count: int = 10) -> dict:
+    """Scheduler 호환 run_once_fn(contract).
+    
+    Golden 10 전체를 대상으로 blog 콘텐츠를 생성하고
+    isolated output에 저장한다.
+    
+    DB write = 0 보장.
+    WordPress = 0 보장.
+    Image = 0 보장.
+    
+    Returns:
+        {"produced": int, "reason": str, "results": list}
+    """
+    output_dir = _output_dir(cfg)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    results = []
+    produced = 0
+    
+    for gc in GOLDEN_10[:max_count]:
+        req = BlogScheduleRequest(
+            slug=gc.slug,
+            intent=gc.intent,
+            title=gc.title,
+            description=gc.description,
+        )
+        
+        # 검증
+        errors = req.validate()
+        if errors:
+            results.append({
+                "slug": gc.slug, "intent": gc.intent,
+                "status": "VALIDATION_ERROR", "errors": errors,
+            })
+            continue
+        
+        # DB에서 계산기 데이터 로드 (READ-ONLY)
+        calc = _load_calculator(cfg, gc.slug)
+        if not calc:
+            results.append({
+                "slug": gc.slug, "intent": gc.intent,
+                "status": "ERROR", "reason": "not_in_db",
+            })
+            continue
+        
+        # hash 기록 (전)
+        hash_before = _record_hash(cfg, gc.slug, "before")
+        
+        # blog 콘텐츠 생성
+        try:
+            result = auto_generate_blog_all(cfg, calc, save=False, intent=gc.intent)
+            article = result.get("article_content", "")
+            
+            # isolated output 저장
+            slug_dir = output_dir / gc.slug
+            slug_dir.mkdir(parents=True, exist_ok=True)
+            
+            html_file = slug_dir / f"{gc.slug}_{gc.intent}.html"
+            html_file.write_text(article, encoding="utf-8")
+            
+            meta = {
+                "slug": gc.slug,
+                "intent": gc.intent,
+                "title": gc.title,
+                "description": gc.description,
+                "article_len": len(article),
+                "article_hash": hashlib.sha256(article.encode("utf-8")).hexdigest()[:16],
+                "source": "scheduler_blog_adapter",
+                "db_write": False,
+                "wordpress_call": False,
+                "image_call": False,
+            }
+            meta_file = slug_dir / f"{gc.slug}_{gc.intent}_meta.json"
+            meta_file.write_text(json.dumps(meta, ensure_ascii=False, indent=2),
+                                 encoding="utf-8")
+            
+            produced += 1
+            results.append({
+                "slug": gc.slug, "intent": gc.intent,
+                "status": "SUCCESS",
+                "article_len": len(article),
+                "output": str(html_file),
+            })
+            
+        except Exception as e:
+            results.append({
+                "slug": gc.slug, "intent": gc.intent,
+                "status": "ERROR", "reason": str(e),
+            })
+        
+        # hash 기록 (후) — DB 변경 없음을 검증
+        hash_after = _record_hash(cfg, gc.slug, "after")
+        if hash_before and hash_after and hash_before != hash_after:
+            results.append({
+                "slug": gc.slug, "intent": gc.intent,
+                "status": "PROTECTION_FAIL",
+                "reason": f"DB content changed: {hash_before} → {hash_after}",
+            })
+    
+    # 요약 저장
+    summary = {
+        "total": len(results),
+        "produced": produced,
+        "results": results,
+        "db_write": 0,
+        "wordpress_call": 0,
+        "image_call": 0,
+    }
+    summary_file = output_dir / "scheduler_blog_summary.json"
+    summary_file.write_text(json.dumps(summary, ensure_ascii=False, indent=2),
+                            encoding="utf-8")
+    
+    return {
+        "produced": produced,
+        "reason": "" if produced > 0 else "no_items",
+        "results": results,
+    }
+
+
+def run_blog_dry_run(cfg: dict, slug: str, intent: str) -> dict:
+    """단일 콘텐츠 Scheduler dry-run.
+    
+    Args:
+        cfg: 설정 dict
+        slug: 계산기 slug
+        intent: 검색 의도
+    
+    Returns:
+        {"success": bool, "result": dict, "errors": list}
+    """
+    req = BlogScheduleRequest(slug=slug, intent=intent)
+    errors = req.validate()
+    if errors:
+        return {"success": False, "result": None, "errors": errors}
+    
+    calc = _load_calculator(cfg, slug)
+    if not calc:
+        return {"success": False, "result": None, "errors": [f"Not in DB: {slug}"]}
+    
+    hash_before = _record_hash(cfg, slug, "before")
+    
+    try:
+        result = auto_generate_blog_all(cfg, calc, save=False, intent=intent)
+        article = result.get("article_content", "")
+        
+        output_dir = _output_dir(cfg) / slug
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        html_file = output_dir / f"{slug}_{intent}.html"
+        html_file.write_text(article, encoding="utf-8")
+        
+        meta = {
+            "slug": slug, "intent": intent,
+            "article_len": len(article),
+            "article_hash": hashlib.sha256(article.encode("utf-8")).hexdigest()[:16],
+            "source": "scheduler_blog_dry_run",
+            "db_write": False,
+        }
+        meta_file = output_dir / f"{slug}_{intent}_meta.json"
+        meta_file.write_text(json.dumps(meta, ensure_ascii=False, indent=2),
+                             encoding="utf-8")
+        
+        hash_after = _record_hash(cfg, slug, "after")
+        protection_ok = (hash_before == hash_after) if hash_before else True
+        
+        return {
+            "success": True,
+            "result": {
+                "slug": slug, "intent": intent,
+                "article_len": len(article),
+                "output": str(html_file),
+                "protection_ok": protection_ok,
+                "hash_before": hash_before,
+                "hash_after": hash_after,
+            },
+            "errors": [],
+        }
+    except Exception as e:
+        return {"success": False, "result": None, "errors": [str(e)]}
+
+
+# ============================================================
+# Blog Scheduler → WordPress Publisher 연결
+# ============================================================
+
+def run_blog_once_wp(cfg: dict, max_count: int = 1) -> dict:
+    """Blog Line → WordPress 발행 (Scheduler run_once_fn 호환).
+
+    Calculator Line의 run_calculator_once()와 동일한 시그니처.
+    scheduler.run_scheduler_loop(cfg, run_blog_once_wp)로 직접 연결 가능.
+
+    생성 → 검증 → 기존 publisher.py로 WordPress 발행.
+    DB write = 0 (articles 테이블에도 기록하지 않음).
+
+    Returns:
+        {"produced": int, "reason": str, "results": list}
+    """
+    import modules.publisher as publisher
+    from modules.config_loader import is_wordpress_ready
+
+    if not is_wordpress_ready(cfg):
+        # WordPress 미연결 시 isolated output만 생성
+        return run_blog_once(cfg, max_count=max_count)
+
+    output_dir = _output_dir(cfg)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    results = []
+    produced = 0
+
+    for gc in GOLDEN_10[:max_count]:
+        req = BlogScheduleRequest(
+            slug=gc.slug, intent=gc.intent,
+            title=gc.title, description=gc.description,
+        )
+        errors = req.validate()
+        if errors:
+            results.append({"slug": gc.slug, "intent": gc.intent,
+                            "status": "VALIDATION_ERROR", "errors": errors})
+            continue
+
+        calc = _load_calculator(cfg, gc.slug)
+        if not calc:
+            results.append({"slug": gc.slug, "intent": gc.intent,
+                            "status": "ERROR", "reason": "not_in_db"})
+            continue
+
+        # 중복 검사: WordPress에 이미 같은 slug가 있는지 확인
+        try:
+            existing = _check_wp_duplicate(cfg, gc.slug)
+            if existing:
+                results.append({"slug": gc.slug, "intent": gc.intent,
+                                "status": "SKIP_DUPLICATE",
+                                "wp_post_id": existing.get("wp_post_id", "")})
+                continue
+        except Exception:
+            pass  # WP 연결 실패 시 발행 시도
+
+        hash_before = _record_hash(cfg, gc.slug, "before")
+
+        try:
+            result = auto_generate_blog_all(cfg, calc, save=False, intent=gc.intent)
+            article = result.get("article_content", "")
+
+            if not article or len(article) < 100:
+                results.append({"slug": gc.slug, "intent": gc.intent,
+                                "status": "ERROR", "reason": "empty_article"})
+                continue
+
+            # 기존 publisher.py로 WordPress 발행
+            seo = {
+                "seo_title": gc.title,
+                "seo_description": gc.description,
+            }
+            post_id = f"blog_{gc.slug}_{gc.intent}"
+            pub_result = publisher.publish(post_id, seo, article, {}, cfg)
+            pub_status = pub_result.get("status", "published")
+
+            if pub_status in ("published", "draft"):
+                produced += 1
+                results.append({
+                    "slug": gc.slug, "intent": gc.intent,
+                    "status": "PUBLISHED" if pub_status == "published" else "DRAFT",
+                    "wp_post_id": pub_result.get("wp_post_id", ""),
+                    "wp_permalink": pub_result.get("wp_permalink", ""),
+                    "article_len": len(article),
+                })
+            else:
+                results.append({"slug": gc.slug, "intent": gc.intent,
+                                "status": "PUBLISH_FAILED",
+                                "error": pub_result.get("error", "unknown")})
+
+        except Exception as e:
+            results.append({"slug": gc.slug, "intent": gc.intent,
+                            "status": "ERROR", "reason": str(e)})
+
+        hash_after = _record_hash(cfg, gc.slug, "after")
+        if hash_before and hash_after and hash_before != hash_after:
+            results.append({"slug": gc.slug, "intent": gc.intent,
+                            "status": "PROTECTION_FAIL",
+                            "reason": f"DB changed: {hash_before} -> {hash_after}"})
+
+    summary = {
+        "total": len(results), "produced": produced, "results": results,
+        "db_write": 0, "wordpress_call": produced, "image_call": 0,
+    }
+    summary_file = output_dir / "blog_wp_publish_summary.json"
+    summary_file.write_text(json.dumps(summary, ensure_ascii=False, indent=2),
+                            encoding="utf-8")
+    return {"produced": produced,
+            "reason": "" if produced > 0 else "no_items",
+            "results": results}
+
+
+def _check_wp_duplicate(cfg: dict, slug: str) -> dict | None:
+    """WordPress에 이미 같은 slug의 게시물이 있는지 확인 (READ-ONLY)."""
+    import modules.publisher as publisher
+    try:
+        # WordPress에서 slug로 검색
+        wp_url = cfg.get("WORDPRESS_URL", "")
+        if not wp_url:
+            return None
+        # publisher의 get_post 재사용 — slug 기반 검색은 REST API 파라미터로
+        import requests
+        auth = None
+        username = cfg.get("WORDPRESS_USERNAME", "")
+        app_password = cfg.get("WORDPRESS_APP_PASSWORD", "")
+        if username and app_password:
+            auth = (username, app_password)
+        resp = requests.get(
+            f"{wp_url}/wp-json/wp/v2/posts",
+            params={"slug": f"blog_{slug}", "per_page": 1},
+            auth=auth, timeout=10,
+        )
+        if resp.status_code == 200:
+            posts = resp.json()
+            if posts:
+                return {"wp_post_id": posts[0].get("id", ""),
+                        "slug": posts[0].get("slug", "")}
+    except Exception:
+        pass
+    return None

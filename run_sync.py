@@ -2,7 +2,7 @@
 """
 run_sync.py — Content Sync Engine 독립 진입점
 
-Publish Scheduler(main.py --scheduler / run_scheduler.bat)와 완전히 분리된
+Blog Schedule(Dashboard/scripts/run_blog_scheduler.py)와 완전히 분리된
 독립 서비스로 기동한다. WordPress를 기준으로 Google Sheets 상태를 동기화한다.
 
 사용법:
