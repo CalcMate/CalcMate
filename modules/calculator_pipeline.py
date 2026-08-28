@@ -22,8 +22,6 @@ from .collector.factory import get_collector
 from .ai_roles import make_provider
 from .calculator_seo_generator import generate_seo
 from .calculator_faq_generator import generate_faq
-from .calculator_image_prompt_generator import _image_pair
-from . import image_generator
 from .strategist_calculator import score_keywords
 from . import cleaner
 from . import content_quality
@@ -338,7 +336,7 @@ def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None, 
     else:
         LOG.info("[QA MODE] 중복 판정(Duplicate Filter)을 건너뜁니다.")
 
-    stats = {"produced": 0, "processed": 0, "failed": 0, "no_wp": 0, "dup": 0,
+    stats = {"produced": 0, "processed": 0, "failed": 0, "dup": 0,
              "quality_hold": 0, "hold_skip": 0, "published": None}
     rcfg = cfg.get("QUALITY_RETRY", {}) or {}
     # §5 legal 미검증 차단 스위치(기본 true). needs_human_legal + 실제 legal 공백 계산기를
@@ -567,91 +565,62 @@ def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None, 
                 stats["quality_hold"] += 1
                 continue
 
-            # PASS/WARN → 발행
-            from . import publisher  # WP 발행 시점에만 로드(계산기앱 라인과 분리)
-            post_id = datetime.now().strftime("%Y%m%d%H%M%S")
-            img_prompts = _image_pair(cfg, calc)
-            image_urls = image_generator.generate(post_id, {
-                **seo,
-                "image_prompt_thumbnail": img_prompts.get("thumbnail", ""),
-                "image_prompt_body": img_prompts.get("body", ""),
-            }, cfg)
-            calc_name = calc.get("name", keyword)
-            pub = publisher.publish(post_id,
-                                    {"seo_title": seo.get("seo_title"),
-                                     "meta_description": seo.get("seo_description"),
-                                     "tags_list": seo.get("seo_keywords", []),
-                                     "alt_thumbnail": f"{calc_name} 썸네일 이미지",
-                                     "alt_body_image": f"{calc_name} 계산 원리 설명 이미지"},
-                                    final_html, image_urls, cfg)
-            pub_status = pub.get("status", "published")
+            # PASS/WARN → 콘텐츠 완성. Calculator = 웹앱 전용(WordPress/Image 미호출).
+            # 실제 웹앱 표시 콘텐츠는 calculators.article_content(app_generator가 렌더)에 저장.
+            # body_html(순수 AI 본문)만 저장 — final_html은 WP 삽입용 위젯(<script>/SM_CONFIG 포함)이
+            # 통째로 붙어있어 웹앱 페이지에 그대로 넣으면 위젯 스크립트 중첩으로 article이 숨겨짐.
+            # STEP 28-26: DB 저장 직전 SSOT 법정수치 검증(논블로킹 warning — 저장은 계속 진행).
+            _check_legal_current_before_save(body_html, calc.get("slug", ""), cid)
+            repo.update_generated(cid, {
+                "article_content": body_html,
+                "seo_title": seo.get("seo_title"),
+                "seo_description": seo.get("seo_description"),
+            })
             article_id = art_repo.save({
                 "정책명": keyword,
                 "최종추천제목": seo.get("seo_title"),
                 "메타설명": seo.get("seo_description"),
                 "태그": ", ".join(seo.get("seo_keywords", []) or []),
-                "발행 URL": pub.get("wordpress", ""),
-                "wp_post_id": pub.get("wp_post_id", ""),
-                "wp_permalink": pub.get("wp_permalink", ""),
-                "wp_status": pub.get("wp_status", ""),
-                "published_at": pub.get("published_at", ""),
                 "발행일시": datetime.now().isoformat(),
                 "원본출처": calc.get("published_url", ""),
-                "상태값": "발행완료" if pub_status == "published" else "검수대기",
+                "상태값": "발행완료",
                 "site_id": it.get("site_id", ""),
                 "calculator_id": cid,
                 **q_fields,
             })
-            # history "publish" 이벤트 기록(발행 흐름 무영향 — 실패해도 무시)
+            # history "publish" 이벤트 기록(감사 추적 — WP 없이 콘텐츠 완성 시점 기록. 실패해도 무시)
             try:
-                art_repo.append_history(article_id, "publish", {"wp_post_id": pub.get("wp_post_id", "")})
+                art_repo.append_history(article_id, "publish", {})
             except Exception as _e:
                 LOG.warning("history(publish) 기록 실패(무시): %s", _e)
-            # 재평가로 되살아나 실제 발행됨 → 같은 계산기의 옛 품질보류 행을 '재처리완료'로 정리
-            # (삭제 안 함, 상태만 변경 + history — 감사 추적). 검수대기(WP 미구성)일 땐 정리 안 함.
-            if pub_status == "published" and cid:
+            # 재평가로 되살아나 콘텐츠 완성됨 → 같은 계산기의 옛 품질보류 행을 '재처리완료'로 정리
+            # (삭제 안 함, 상태만 변경 + history — 감사 추적)
+            if cid:
                 try:
                     _nres = art_repo.resolve_holds_for_calculator(
-                        cid, new_signature=sig, published_post_id=pub.get("wp_post_id", ""),
-                        exclude_id=article_id)
+                        cid, new_signature=sig, published_post_id="", exclude_id=article_id)
                     if _nres:
-                        LOG.info("[REEVALUATE] 발행 성공 → 옛 품질보류 %d건 재처리완료(resolved): cid=%s",
+                        LOG.info("[REEVALUATE] 콘텐츠 완성 → 옛 품질보류 %d건 재처리완료(resolved): cid=%s",
                                  _nres, cid)
                 except Exception as _e:
                     LOG.warning("품질보류 정리 실패(무시): %s", _e)
             existing_by_calc.setdefault(cid, set()).add(seo.get("seo_title"))
             # 같은 run 내 후속 후보의 count_active_articles 판정을 위해 스냅샷에 반영
             snapshot.append({"calculator_id": cid,
-                             "상태값": "발행완료" if pub_status == "published" else "검수대기",
+                             "상태값": "발행완료",
                              "최종추천제목": seo.get("seo_title", ""),
                              "quality_prompt_version": sig})
             stats["produced"] += 1
-            if pub_status != "published":
-                stats["no_wp"] += 1
-            LOG.info("계산기 글 생산: %s (%s)", seo.get("seo_title"), pub_status)
-            # 슬롯 표시용 발행 메타(반환값 enrich만 — 발행/WP/시트 동작 불변). 스케줄러는 max_count=1 단건.
+            LOG.info("계산기 글 생산: %s", seo.get("seo_title"))
+            # 슬롯 표시용 메타(반환값 enrich만). 스케줄러는 max_count=1 단건.
             stats["published"] = {
                 "keyword": keyword, "title": seo.get("seo_title", ""),
-                "wp_post_id": pub.get("wp_post_id", ""),
-                "wp_url": pub.get("wp_permalink") or pub.get("wordpress", ""),
-                "status": pub_status,
+                "status": "completed",
             }
-            # 발행 완료 알림(개발/테스트). 실제 WP 발행 확정("발행완료")일 때만 1회 — 검수대기(WP 미구성)는 제외.
-            # publish_success=false면 telegram_ops가 설정 기반으로 무발송. 실패해도 발행 흐름 무영향.
-            if pub_status == "published":
-                try:
-                    tops.notify_publish_success(
-                        cfg, site=cfg.get("SITE_NAME", "CalcMate"),
-                        calculator=calc.get("name", ""), keyword=keyword,
-                        title=seo.get("seo_title", ""),
-                        published_at=datetime.now().strftime("%Y-%m-%d %H:%M"),
-                        url=pub.get("wp_permalink") or pub.get("wordpress", ""))
-                except Exception as _e:
-                    LOG.warning("발행 완료 알림 실패(무시): %s", _e)
         except Exception as e:
             stats["failed"] += 1
             LOG.error("계산기 글 생성 오류(%s): %s", keyword, e, exc_info=True)
-            tops.notify(cfg, f"❌ 계산기 글 오류: {e}")
+            tops.notify(cfg, f"[ERROR] 계산기 글 오류: {e}")
 
     # 실행 종료 사유 3구분(§5): 아무것도 발행 안 된 이유를 사람이 바로 알 수 있게.
     if stats["produced"] > 0:
@@ -664,9 +633,9 @@ def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None, 
     stats["attempted"] = attempted
 
     elapsed = round(time.time() - start, 1)
-    LOG.info("✅ 계산기 파이프라인 종료[%s]: 목표 %d / 생산 %d (발행 %d, WP대기 %d) / 시도 %d / 처리 %d / "
+    LOG.info("✅ 계산기 파이프라인 종료[%s]: 목표 %d / 생산 %d / 시도 %d / 처리 %d / "
              "중복 %d / HOLD스킵 %d / 품질보류 %d / 실패 %d / %s초",
-             reason, target, stats["produced"], stats["produced"] - stats["no_wp"], stats["no_wp"],
+             reason, target, stats["produced"],
              attempted, stats["processed"], stats["dup"], stats["hold_skip"], stats["quality_hold"],
              stats["failed"], elapsed)
     return stats
