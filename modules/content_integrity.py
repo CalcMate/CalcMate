@@ -8,9 +8,11 @@ G-LEGAL  : 법적 근거 오인용 / 무관 키워드 검출
 G-STYLE+ : AI 문체 잔존 강화 검사 (G7 보완)
 """
 from __future__ import annotations
+import hashlib
 import re
 import sys
 import pathlib
+from datetime import datetime
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 from modules.publish_quality import _plain_text as _strip_html
@@ -321,6 +323,64 @@ def check_g_legal_current(
             })
 
     return fails
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# STEP 28-52 : 콘텐츠 SSOT 추적 필드
+# ═══════════════════════════════════════════════════════════════════════════
+
+def build_content_tracking_fields(article_html: str, slug: str, content_source: str) -> dict:
+    """저장 payload에 병합할 콘텐츠 SSOT 추적 필드를 계산한다.
+
+    check_g_legal_current()를 그대로 재사용(신규 파서 없음)해 검증하고,
+    _legal_current_passed/_legal_current_failures 같은 내부 실패 상세 리스트는
+    반환값에 포함하지 않는다(기존 로그/출력 방식 유지, DB에는 상태 문자열만 저장).
+    """
+    from .law_ssot import content_ssot_hash
+
+    article_html = article_html or ""
+    ssot_hash = content_ssot_hash(slug) if slug else ""
+    if not slug:
+        status = "NOT_CHECKED"
+    else:
+        fails = check_g_legal_current(article_html, slug)
+        status = "PASS" if not fails else "FAIL"
+
+    return {
+        "content_hash": hashlib.sha256(article_html.encode("utf-8")).hexdigest(),
+        "content_source": content_source,
+        "content_ssot_hash": ssot_hash,
+        "legal_validated_at": datetime.now().isoformat(),
+        "legal_validated_ssot_hash": ssot_hash,
+        "legal_validation_status": status,
+    }
+
+
+def get_content_freshness(row: dict) -> str:
+    """STEP 28-52: DB row 1건의 SSOT 신선도를 read-only로 판정.
+
+    우선순위: NO_SSOT → NEEDS_REVIEW → STALE → MATCH.
+    실제 DB 값을 수정하지 않으며, 기존 17개 row처럼 추적 필드가 없는 경우는
+    STALE로 단정하지 않고 NEEDS_REVIEW로 분류한다.
+    """
+    from .law_ssot import get_slug_ssot, content_ssot_hash
+
+    slug = row.get("slug", "")
+    if not get_slug_ssot(slug).get("items", []):
+        return "NO_SSOT"
+
+    validated_hash = row.get("legal_validated_ssot_hash")
+    validation_status = row.get("legal_validation_status")
+    if not validated_hash or not row.get("content_ssot_hash") or not validation_status:
+        return "NEEDS_REVIEW"
+
+    current_hash = content_ssot_hash(slug)
+    if current_hash != validated_hash:
+        return "STALE"
+
+    if validation_status == "PASS":
+        return "MATCH"
+    return "NEEDS_REVIEW"
 
 
 # ═══════════════════════════════════════════════════════════════════════════

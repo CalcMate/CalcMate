@@ -571,10 +571,20 @@ def run_calculator_once(cfg: dict, max_count: int = None, only_cid: str = None, 
             # 통째로 붙어있어 웹앱 페이지에 그대로 넣으면 위젯 스크립트 중첩으로 article이 숨겨짐.
             # STEP 28-26: DB 저장 직전 SSOT 법정수치 검증(논블로킹 warning — 저장은 계속 진행).
             _check_legal_current_before_save(body_html, calc.get("slug", ""), cid)
+            # STEP 28-52: 콘텐츠 SSOT 추적 필드(content_hash/content_ssot_hash/
+            # legal_validated_* 등) 계산 — 기존 게이트를 내부에서 재사용하는 공통 helper.
+            try:
+                from .content_integrity import build_content_tracking_fields
+                _tracking_fields = build_content_tracking_fields(
+                    body_html, calc.get("slug", ""), "pipeline_auto")
+            except Exception as _te:
+                LOG.warning("콘텐츠 추적 필드 계산 실패(저장은 계속 진행): cid=%s -> %s", cid, _te)
+                _tracking_fields = {}
             repo.update_generated(cid, {
                 "article_content": body_html,
                 "seo_title": seo.get("seo_title"),
                 "seo_description": seo.get("seo_description"),
+                **_tracking_fields,
             })
             article_id = art_repo.save({
                 "정책명": keyword,

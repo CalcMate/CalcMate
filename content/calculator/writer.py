@@ -137,6 +137,16 @@ def auto_generate_all(cfg: dict, calc: dict, save: bool = True, review: bool = F
         LOG.warning("[auto-gen] G-LEGAL-CURRENT 불일치 감지(저장은 계속 진행): %s -> %s",
                     slug, [f.get("detail") for f in _legal_fails])
 
+    # STEP 28-52: 콘텐츠 SSOT 추적 필드(content_hash/content_ssot_hash/content_source/
+    # legal_validated_*) 계산. 기존 게이트(check_g_legal_current)를 내부에서 재사용하는
+    # 공통 helper이며, 실패 상세 리스트는 DB에 저장하지 않는다(status 문자열만).
+    try:
+        from modules.content_integrity import build_content_tracking_fields
+        _tracking_fields = build_content_tracking_fields(article, slug, "writer_auto")
+    except Exception as _te:
+        LOG.warning("[auto-gen] 콘텐츠 추적 필드 계산 실패(저장은 계속 진행): %s", _te)
+        _tracking_fields = {}
+
     result = {
         "seo_title": seo["seo_title"],
         "seo_description": seo["seo_description"],
@@ -150,6 +160,7 @@ def auto_generate_all(cfg: dict, calc: dict, save: bool = True, review: bool = F
     # DB payload는 위 result 스냅샷만 사용(update_generated에 그대로 전달되므로
     # _legal_current_* 같은 내부 메타는 DB 저장 뒤에 result에 추가한다 — 아래 _saved와 동일 패턴).
     _db_payload = dict(result)
+    _db_payload.update(_tracking_fields)
     result["_legal_current_passed"] = not _legal_fails
     result["_legal_current_failures"] = _legal_fails
 

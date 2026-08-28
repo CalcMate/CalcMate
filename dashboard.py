@@ -1751,10 +1751,17 @@ elif tab == "🧮 계산기 관리":
                 # STEP 28-37: DB 저장 직전 SSOT 법정수치 검증(논블로킹 warning — 저장은 계속 진행).
                 # STEP 28-26에서 만든 기존 헬퍼를 그대로 재사용(신규 파서 없음).
                 from modules.calculator_pipeline import _check_legal_current_before_save
+                # STEP 28-52: 콘텐츠 SSOT 추적 필드 — 기존 게이트를 내부에서 재사용하는 공통 helper.
+                from modules.content_integrity import build_content_tracking_fields
                 with st.spinner("본문 생성 중..."):
                     article = generate_article(cfg, c)
                     _check_legal_current_before_save(article, c.get("slug", ""), cid)
-                    repo.update_generated(cid, {"article_content": article})
+                    try:
+                        _tracking_fields = build_content_tracking_fields(
+                            article, c.get("slug", ""), "dashboard_manual")
+                    except Exception:
+                        _tracking_fields = {}
+                    repo.update_generated(cid, {"article_content": article, **_tracking_fields})
                 st.success("본문 생성·저장"); st.rerun()
             if g[3].button("이미지 프롬프트", key=f"ag_img_{cid}"):
                 from modules import calculator_image_prompt_generator as IMG

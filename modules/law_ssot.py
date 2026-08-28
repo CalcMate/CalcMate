@@ -6,6 +6,8 @@ legal_basis.master.yaml의 content_ssot 섹션에서 slug별 법정수치 SSOT�
 G-LEGAL-CURRENT Gate 및 생성 프롬프트 주입에서 사용한다.
 """
 from __future__ import annotations
+import hashlib
+import json
 import pathlib
 from functools import lru_cache
 
@@ -96,3 +98,14 @@ def get_related_slugs(slug: str) -> list[str]:
 def get_calc_name(slug: str) -> str:
     """slug의 계산기 이름 반환. 없으면 slug 그대로."""
     return get_slug_entry(slug).get("name", slug)
+
+
+def content_ssot_hash(slug: str) -> str:
+    """STEP 28-52: slug의 content_ssot.items[]를 정규화해 SHA256 hex digest로 반환.
+    dict key 순서나 YAML의 formatting/공백/주석 변경에는 영향받지 않고, items의
+    실제 값이 바뀔 때만 달라진다(confidence/last_verified 등 메타데이터는
+    get_slug_ssot()가 반환하는 content_ssot 블록 중 items만 사용하므로 무관).
+    신규 YAML 파서 없이 기존 get_slug_ssot()만 재사용한다."""
+    items = get_slug_ssot(slug).get("items", [])
+    normalized = json.dumps(items, sort_keys=True, ensure_ascii=True, separators=(",", ":"))
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
