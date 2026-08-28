@@ -22,8 +22,11 @@ LOG = get_logger()
 
 
 def generate_article(cfg: dict, calc: dict, seo: dict = None, faq: list = None,
-                     review: bool = False, example_context: dict = None, intent: str = None) -> str:
-    """블로그 본문 HTML 생성(2000자+). review=True면 Editor 검수 1회."""
+                     review: bool = False, example_context: dict = None, intent: str = None,
+                     law_ssot_block: str = "") -> str:
+    """블로그 본문 HTML 생성(2000자+). review=True면 Editor 검수 1회.
+    law_ssot_block: modules.law_ssot.get_ssot_prompt_block(slug) 결과(SSOT 법정수치 지시문).
+    빈 문자열이면 기존과 동일하게 동작(no-op)."""
     # HACK: Mocking to bypass AI dependency for production validation
     # HACK: Mocking to bypass AI dependency for production validation
     if "OPENAI_API_KEY" not in cfg:
@@ -39,7 +42,8 @@ def generate_article(cfg: dict, calc: dict, seo: dict = None, faq: list = None,
                 f"<h2>FAQ</h2><p>주휴수당 대상은? 15시간 이상 근로자입니다.</p>"
                 f"<h2>출처</h2><p>근로기준법 제55조, 고용노동부 공식 안내</p>")
 
-    system, user = PM.get_article_prompt(calc, seo, faq, example_context, intent=intent)
+    system, user = PM.get_article_prompt(calc, seo, faq, example_context, intent=intent,
+                                          law_ssot_block=law_ssot_block)
     provider, model = build_provider_for_role("writing", cfg)   # MODEL_WRITER
 
     def _call():
@@ -89,8 +93,11 @@ def auto_generate_all(cfg: dict, calc: dict, save: bool = True, review: bool = F
     # 2) FAQ
     faq = generate_faq(cfg, calc)
 
-    # 3) 본문
-    article = generate_article(cfg, calc, seo, faq, review=review, example_context=example_context)
+    # 3) 본문 — SSOT 법정수치 지시문 주입(content_ssot 없는 slug는 빈 문자열 → 기존 동작 유지)
+    from modules.law_ssot import get_ssot_prompt_block
+    law_ssot_block = get_ssot_prompt_block(slug)
+    article = generate_article(cfg, calc, seo, faq, review=review, example_context=example_context,
+                               law_ssot_block=law_ssot_block)
 
     # 4) 이미지 프롬프트
     img = _image_pair(cfg, calc)

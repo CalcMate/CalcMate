@@ -148,16 +148,25 @@ def _legal_undetermined_block() -> str:
     )
 
 
+def _ssot_suffix(calc: dict) -> str:
+    """STEP 28-24: content_ssot 기반 최신 법정수치 블록(law_ssot.get_ssot_prompt_block 재사용).
+    slug에 content_ssot가 없으면 빈 문자열 — 기존 _legal_basis_block() 출력에 영향 없음."""
+    from .law_ssot import get_ssot_prompt_block
+    block = get_ssot_prompt_block(str(calc.get("slug", "")).strip())
+    return f"\n\n{block}" if block else ""
+
+
 def _legal_basis_block(calc: dict) -> str:
     """계산기 slug의 검증된 법적 근거를 'AI가 지어내지 말고 그대로 인용'하도록 주입.
     AI_STYLE_BLOCKLIST(문체 금지, _style_block)와는 별개 목록(조항 금지=lb['forbidden_articles']).
-    null-safe: 값이 없는 필드는 줄 자체를 생략(빈칸/None 누출 방지). 미검증 계산기는 §4 블록으로 대체."""
+    null-safe: 값이 없는 필드는 줄 자체를 생략(빈칸/None 누출 방지). 미검증 계산기는 §4 블록으로 대체.
+    STEP 28-24: 법령 인용 가드레일 뒤에 content_ssot 기반 최신 법정수치(_ssot_suffix)를 덧붙인다."""
     lb = _load_legal_basis().get(str(calc.get("slug", "")).strip())
     if not lb:
         return ""
     # legal 미확정(needs_human_legal + 실제 legal 공백) → 환각방지 지침 블록으로 대체
     if _legal_unverified(lb):
-        return _legal_undetermined_block()
+        return _legal_undetermined_block() + _ssot_suffix(calc)
     parts = ["\n[법적 근거 — 아래 검증된 값을 그대로 정확히 인용한다. 스스로 다른 조항 번호를 "
              "만들어내지 않으며, 확실하지 않으면 법령명과 취지만 쓴다]"]
     if lb.get("law"):
@@ -182,7 +191,7 @@ def _legal_basis_block(calc: dict) -> str:
     parts.append(f"- 주의사항 섹션에 다음 취지의 면책 문구를 반드시 포함한다: "
                  f"\"정확한 세부 기준은 {authority} 등 관할기관에 확인하시기 바랍니다.\" "
                  f"(소관기관명이 복합 표기이면 자연스럽게 요약해서 문장에 녹인다.)")
-    return "\n".join(parts)
+    return "\n".join(parts) + _ssot_suffix(calc)
 
 
 def _resolve_context_block(calc: dict) -> str:
