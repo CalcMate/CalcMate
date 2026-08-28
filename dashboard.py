@@ -1748,8 +1748,13 @@ elif tab == "🧮 계산기 관리":
                 st.success("FAQ 생성·저장"); st.rerun()
             if g[2].button("본문 생성", key=f"ag_art_{cid}"):
                 from modules.calculator_content_generator import generate_article
+                # STEP 28-37: DB 저장 직전 SSOT 법정수치 검증(논블로킹 warning — 저장은 계속 진행).
+                # STEP 28-26에서 만든 기존 헬퍼를 그대로 재사용(신규 파서 없음).
+                from modules.calculator_pipeline import _check_legal_current_before_save
                 with st.spinner("본문 생성 중..."):
-                    repo.update_generated(cid, {"article_content": generate_article(cfg, c)})
+                    article = generate_article(cfg, c)
+                    _check_legal_current_before_save(article, c.get("slug", ""), cid)
+                    repo.update_generated(cid, {"article_content": article})
                 st.success("본문 생성·저장"); st.rerun()
             if g[3].button("이미지 프롬프트", key=f"ag_img_{cid}"):
                 from modules import calculator_image_prompt_generator as IMG
