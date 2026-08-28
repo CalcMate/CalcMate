@@ -80,6 +80,7 @@ def auto_generate_all(cfg: dict, calc: dict, save: bool = True, review: bool = F
     calc는 calculators 행(dict, 'id' 포함). 반환: 생성 결과 dict(review_* 포함).
     auto_review=True면 calculator_reviewer로 검수 후 REWRITE 시 자동 재생성."""
     name = calc.get("name", "")
+    slug = calc.get("slug", "")
     LOG.info("[auto-gen] 시작: %s", name)
 
     # 1) SEO
@@ -125,6 +126,17 @@ def auto_generate_all(cfg: dict, calc: dict, save: bool = True, review: bool = F
         except Exception as e:
             LOG.warning("[auto-gen] 리뷰어 연결 실패(생성물은 유지): %s", e)
 
+    # STEP 28-26: DB 저장 직전 SSOT 법정수치 검증(논블로킹 warning — 실패해도 저장은 계속 진행).
+    # STEP 28-20에서 generate_calculator()에 연결한 기존 게이트를 그대로 재사용(신규 파서 없음).
+    try:
+        from modules.content_integrity import check_g_legal_current
+        _legal_fails = check_g_legal_current(article, slug)
+    except Exception as _e:
+        _legal_fails = [{"gate": "G-LEGAL-CURRENT", "grade": "error", "detail": f"게이트 실행 오류: {_e}"}]
+    if _legal_fails:
+        LOG.warning("[auto-gen] G-LEGAL-CURRENT 불일치 감지(저장은 계속 진행): %s -> %s",
+                    slug, [f.get("detail") for f in _legal_fails])
+
     result = {
         "seo_title": seo["seo_title"],
         "seo_description": seo["seo_description"],
@@ -135,13 +147,18 @@ def auto_generate_all(cfg: dict, calc: dict, save: bool = True, review: bool = F
         "image_prompt_body": img["body"],
     }
     result.update(review_fields)   # review_status/score/reason/attempts/reviewed_at
+    # DB payload는 위 result 스냅샷만 사용(update_generated에 그대로 전달되므로
+    # _legal_current_* 같은 내부 메타는 DB 저장 뒤에 result에 추가한다 — 아래 _saved와 동일 패턴).
+    _db_payload = dict(result)
+    result["_legal_current_passed"] = not _legal_fails
+    result["_legal_current_failures"] = _legal_fails
 
     # 6) DB 저장 (Repository 경유)
     if save and calc.get("id"):
         try:
             from adapters.db.factory import get_db_adapter
             from repositories.calculator_repository import CalculatorRepository
-            CalculatorRepository(get_db_adapter(cfg)).update_generated(calc["id"], result)
+            CalculatorRepository(get_db_adapter(cfg)).update_generated(calc["id"], _db_payload)
             LOG.info("[auto-gen] 저장 완료: %s", name)
             result["_saved"] = True
         except Exception as e:

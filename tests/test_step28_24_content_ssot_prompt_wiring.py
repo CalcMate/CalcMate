@@ -102,12 +102,14 @@ class TestNoContentSsotIsNoOp:
 
     def test_writer_path_empty_block_for_slug_without_content_ssot(self):
         capture = {}
-        calc = {"slug": "weekly-holiday-allowance", "name": "주휴수당 계산기", "id": None}
+        # STEP 28-26에서 weekly-holiday-allowance에 content_ssot가 추가되어
+        # "content_ssot 없는 슬러그" 예시를 annual-leave-allowance로 교체.
+        calc = {"slug": "annual-leave-allowance", "name": "연차수당 계산기", "id": None}
         _mocked_auto_generate_all(calc, capture)
         assert capture.get("law_ssot_block") == ""
 
     def test_calculator_pipeline_path_unchanged_for_slug_without_content_ssot(self):
-        block = _legal_basis_block({"slug": "weekly-holiday-allowance"})
+        block = _legal_basis_block({"slug": "annual-leave-allowance"})
         # content_ssot가 없으므로 "현행 법정수치" 섹션 자체가 붙지 않아야 한다.
         assert "현행 법정수치" not in block
         assert "근로기준법" in block  # 기존 법령 인용 가드레일은 그대로 유지

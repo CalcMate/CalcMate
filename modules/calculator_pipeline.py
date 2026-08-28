@@ -194,6 +194,21 @@ def _legal_basis_block(calc: dict) -> str:
     return "\n".join(parts) + _ssot_suffix(calc)
 
 
+def _check_legal_current_before_save(body_html: str, slug: str, cid: str) -> list[dict]:
+    """STEP 28-26: DB 저장 직전 SSOT 법정수치 검증(논블로킹 warning).
+    STEP 28-20에서 generate_calculator()에 연결한 기존 게이트(check_g_legal_current)를
+    그대로 재사용한다(신규 파서 없음). 실패해도 저장을 막지 않고 warning만 남긴다."""
+    try:
+        from .content_integrity import check_g_legal_current
+        fails = check_g_legal_current(body_html, slug)
+    except Exception as e:
+        fails = [{"gate": "G-LEGAL-CURRENT", "grade": "error", "detail": f"게이트 실행 오류: {e}"}]
+    if fails:
+        LOG.warning("G-LEGAL-CURRENT 불일치 감지(저장은 계속 진행): cid=%s -> %s",
+                    cid, [f.get("detail") for f in fails])
+    return fails
+
+
 def _resolve_context_block(calc: dict) -> str:
     """resolve()로 legal_master.deduction_rules/calculation_flow + registry.writer_context를 조회해
     writer 프롬프트에 '계산 근거 데이터'로 주입한다. 해당 데이터가 없는 계산기는 빈 문자열(no-op)
