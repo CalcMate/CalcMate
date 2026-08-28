@@ -38,7 +38,6 @@ def parse_args():
     p = argparse.ArgumentParser(description="블로그자동화 v11.6")
     p.add_argument("--dry-run", action="store_true", help="설정 검증만 수행, 실제 API 호출 없음")
     p.add_argument("--once", action="store_true", help="파이프라인 1회만 실행(단발)")
-    p.add_argument("--scheduler", action="store_true", help="슬롯 기반 발행 스케줄러 (오늘 일정대로 시각별 1건 발행)")
     p.add_argument("--instance", default=None, help="멀티 인스턴스 ID (config/instances/{id}/config.yaml 로드)")
     p.add_argument("--strategy-room", action="store_true", help="전략회의실 즉시 실행")
     p.add_argument("--calculator-id", default=None, help="특정 계산기(ID)만 파이프라인 실행")
@@ -58,21 +57,6 @@ def parse_args():
                    help="P2-3 자동 리라이트: RMS/time-based 후보 수집 후 content+excerpt 갱신. "
                         "title/permalink 변경 없음. --dry-run 으로 후보 확인만 가능. 스케줄러 자동 연결 없음")
     return p.parse_args()
-
-# ─────────────────────────────────────────────────────────────
-def resolve_publish_fn(cfg: dict):
-    """PUBLISH_MODE(calculator|rss)에 따라 스케줄러가 호출할 실행 함수 선택.
-    두 함수 모두 (cfg, max_count=1) 시그니처로 스케줄러와 호환된다.
-      - calculator(기본): run_calculator_once (계산기 SEO 파이프라인)
-      - rss: run_once (기존 RSS 파이프라인 — 정책 라인 붙일 때 재사용)
-    """
-    mode = str(cfg.get("PUBLISH_MODE", "calculator")).strip().lower()
-    if mode == "rss":
-        return run_once
-    if mode != "calculator":
-        LOG.warning("알 수 없는 PUBLISH_MODE=%r → calculator로 처리", mode)
-    from modules.calculator_pipeline import run_calculator_once
-    return run_calculator_once
 
 # ─────────────────────────────────────────────────────────────
 def run_once(cfg: dict, dry_run: bool = False, max_count: int = None) -> dict:
@@ -497,11 +481,8 @@ def main():
         run_once(cfg)
         return
 
-    # 운영 방식: 슬롯 기반 예약 발행(스케줄러) 단일화. (Legacy 반복 실행 모드는 v12 Lite에서 제거)
-    from modules.scheduler import run_scheduler_loop
-    publish_fn = resolve_publish_fn(cfg)
-    LOG.info("운영 방식: 예약 발행(스케줄러) — PUBLISH_MODE=%s", cfg.get("PUBLISH_MODE", "calculator"))
-    run_scheduler_loop(cfg, publish_fn)
+    # Calculator 자동 스케줄러 진입점 제거됨(Calculator는 수동 실행/웹앱 전용).
+    LOG.info("실행할 CLI 옵션이 지정되지 않음 — --once, --calculator-id 등을 사용하세요.")
     return
 
 if __name__ == "__main__":
