@@ -1,7 +1,8 @@
 # OPERATIONS — 운영 절차
 
-> 계산기 신규 추가부터 발행·관찰·수정까지의 운영 흐름. 대시보드(`run_dashboard.bat`)와
-> 스케줄러(`run_scheduler.bat`)로 운영한다.
+> 계산기 신규 추가부터 발행·관찰·수정까지의 운영 흐름. 대시보드(`run_dashboard.bat`)로 운영한다.
+> Calculator는 자동 Scheduler 없이 **수동 생성**(App Factory/계산기 관리)이 기준이며,
+> 예약 자동 발행이 필요한 라인은 Blog(Golden 10 → Blog Schedule → WordPress)뿐이다.
 
 ## 1) 신규 계산기 추가
 
@@ -29,9 +30,11 @@ docs/legal_basis.draft.yaml 편집 — 해당 slug에 law/article/authority 등 
 ## 3) 발행
 
 ```
-스케줄러 상시 실행(run_scheduler.bat) → 슬롯 시각마다 계산기 파이프라인이 자동 발행
-또는 수동: main.py --calculator
+대시보드 🧮 계산기 관리(또는 🏠 운영센터 빠른 실행) ▸ "🧮 계산기 생성" → run_calculator_once() 1회 실행
+또는 CLI: python main.py --calculator-id <id>
 ```
+
+Calculator는 자동 Scheduler가 제거되어 위 수동 트리거로만 실행된다(예약 자동 발행 없음).
 
 파이프라인: writer 생성 → Gate(G1~G8) → Score(S1~S6) → PASS/WARN이면 WordPress 발행,
 REWRITE면 재생성(최대 MAX_TOTAL_RETRY), 한도 초과 시 품질보류.
@@ -43,8 +46,8 @@ REWRITE면 재생성(최대 MAX_TOTAL_RETRY), 한도 초과 시 품질보류.
 | 대시보드 📝 Content ▸ 발행 목록 | 발행완료/검수대기/수정됨/품질보류 상태, quality_score |
 | 마스터_DB(articles 시트) | quality_* 필드, history(publish/quality_hold 등) |
 | 대시보드 📡 Logs | 오류·실시간 로그·헬스체크 |
-| Telegram | 발행 성공 · 슬롯 내 모든 후보 HOLD · 후보 소진 알림(이벤트 ON 시) |
-| 대시보드 📅 Schedule | 슬롯별 실행 결과 이력 (자동 새로고침 불안정 — 수동 F5 권장) |
+| Telegram | 발행 성공 · 모든 후보 HOLD · 후보 소진 알림(이벤트 ON 시) |
+| 대시보드 📝 Blog Schedule | Blog 예약 발행 설정/상태(Calculator는 자동 스케줄 없음 — 발행 목록에서 결과 확인) |
 
 **품질보류(HOLD)가 뜨면**: legal 미검증(신규 계산기 legal 미입력)인지, 아니면 Score 반복 실패인지 구분.
 - legal 미검증 → 2)번 legal 입력
