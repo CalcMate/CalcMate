@@ -18,7 +18,7 @@ NP_RATE  = 0.0475   # 2026년 국민연금 근로자 부담 4.75%
 NP_MIN   = 410_000   # 기준소득월액 하한 (2026년 7월~2027년 6월, 국민연금공단)
 NP_MAX   = 6_590_000 # 기준소득월액 상한 (2026년 7월~2027년 6월, 국민연금공단)
 HI_RATE  = 0.03595  # 2026년 건강보험 근로자 부담 3.595%
-LTC_RATE = 0.1296
+LTC_RATE = 0.1314   # 2026년 장기요양 = 건강보험료 × 13.14% (보건복지부 2025-11-05)
 EI_RATE  = 0.009
 
 
@@ -123,9 +123,9 @@ def test_normal_300():
     assert out is not None
     assert _round(out["national_pension"])    == 142_500   # 3,000,000 × 4.75%
     assert _round(out["health_insurance"])    == 107_850   # 3,000,000 × 3.595%
-    assert _round(out["long_term_care"])      == 13_977    # 107,850 × 12.96%
+    assert _round(out["long_term_care"])      == 14_171    # 107,850 × 13.14%
     assert _round(out["employment_insurance"])== 27_000    # 3,000,000 × 0.9%
-    assert _round(out["total"])              == 291_327    # 합산
+    assert _round(out["total"])              == 291_521    # 합산
     _assert_total_equals_sum(out)
     # 정상 범위: NP notices 없음, 산재보험 notice만 1개
     assert len(out["notices"]) == 1
@@ -146,8 +146,8 @@ def test_ltc_order_must_use_health_insurance():
     out = compute_fi(salary)
     assert out is not None
 
-    wrong_ltc = salary * LTC_RATE            # 388,800원 (급여에 직접 곱)
-    correct_ltc = salary * HI_RATE * LTC_RATE  # 13,977원 (건강보험료에 곱, 2026 기준)
+    wrong_ltc = salary * LTC_RATE            # 394,200원 (급여에 직접 곱)
+    correct_ltc = salary * HI_RATE * LTC_RATE  # 14,171원 (건강보험료에 곱, 2026 기준)
 
     # 두 값의 차이가 충분히 커서 혼동 불가능
     assert abs(wrong_ltc - correct_ltc) > 370_000, "테스트 설계 오류: 두 값이 너무 가까움"
@@ -167,8 +167,8 @@ def test_ltc_order_extreme():
     assert out is not None
 
     hi = salary * HI_RATE
-    correct_ltc = hi * LTC_RATE    # 46,591원 (2026: 10,000,000 × 3.595% × 12.96%)
-    wrong_ltc   = salary * LTC_RATE  # 1,296,000원
+    correct_ltc = hi * LTC_RATE    # 47,238원 (2026: 10,000,000 × 3.595% × 13.14%)
+    wrong_ltc   = salary * LTC_RATE  # 1,314,000원
 
     assert abs(out["long_term_care"] - correct_ltc) < 1, (
         f"장기요양 순서 오류: 실제={out['long_term_care']:.2f}, 올바른={correct_ltc:.2f}"
@@ -206,7 +206,7 @@ def test_legal_basis_sync_300():
     # 정부 기준 fixture (2026년 요율 기준)
     assert _round(out["national_pension"])     == 142_500   # 3,000,000 × 4.75%
     assert _round(out["health_insurance"])     == 107_850   # 3,000,000 × 3.595%
-    assert _round(out["long_term_care"])       == 13_977    # 107,850 × 12.96%
+    assert _round(out["long_term_care"])       == 14_171    # 107,850 × 13.14%
     assert _round(out["employment_insurance"]) == 27_000    # 3,000,000 × 0.9%
     _assert_total_equals_sum(out)
 
@@ -221,7 +221,7 @@ def test_legal_basis_sync_np_rates():
 
 
 def test_legal_basis_sync_ltc_rate():
-    """장기요양 12.96% 적용 확인."""
+    """장기요양 13.14% 적용 확인."""
     salary = 5_000_000
     out = compute_fi(salary)
     expected_hi  = 5_000_000 * HI_RATE
@@ -332,7 +332,7 @@ def test_extreme_above_max_large_error():
     _assert_total_equals_sum(out)
 
 def test_normal_case_300_full_diff():
-    """정상 케이스(300만원): 장기요양 누락 시 total ≈ 277,350원, 올바른 291,327원 (13,977원 차이)."""
+    """정상 케이스(300만원): 장기요양 누락 시 total ≈ 277,350원, 올바른 291,521원 (14,171원 차이)."""
     out = compute_fi(3_000_000)
     # LTC 누락 시 wrong total (단순 3종 합산)
     wrong_total = 3_000_000 * (0.0475 + 0.03595 + 0.009)  # 277,350 (2026년 기준)
@@ -392,7 +392,7 @@ def test_yaml_driven_300():
     # 정부 기준 fixture (2026년 기준)
     assert _round(np_val)  == 142_500
     assert _round(hi_val)  == 107_850
-    assert _round(ltc_val) == 13_977
+    assert _round(ltc_val) == 14_171
     assert _round(ei_val)  == 27_000
     assert abs(total - (np_val + hi_val + ltc_val + ei_val)) < 0.01
 
@@ -452,11 +452,11 @@ def test_formula_ltc_shows_health_insurance_amount():
     # 장기요양 단계 추출 (| 뒤 세 번째 세그먼트)
     segments = f.split(" | ")
     assert len(segments) == 4
-    ltc_seg = segments[2]  # "장기요양 건강보험료 107,850원 × 12.96% = 13,977원" (2026 기준)
+    ltc_seg = segments[2]  # "장기요양 건강보험료 107,850원 × 13.14% = 14,171원" (2026 기준)
 
     # 건강보험료 금액이 명시되는지 확인
     assert "건강보험료" in ltc_seg, f"'건강보험료' 없음: {ltc_seg!r}"
-    assert "× 12.96%" in ltc_seg or "× 12.960%" in ltc_seg or "× 12.96%" in ltc_seg, (
+    assert "× 13.14%" in ltc_seg or "× 13.140%" in ltc_seg or "× 13.14%" in ltc_seg, (
         f"장기요양 비율 표시 없음: {ltc_seg!r}"
     )
     # 건강보험료 실제 금액(106,350)이 포함되어 있어야 함

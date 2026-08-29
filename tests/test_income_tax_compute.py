@@ -158,8 +158,8 @@ class TestInsuranceDeduction:
         r = compute_insurance_deduction(60_000_000)
         assert r["annual_total"] > 0
         assert r["np_monthly"] > 0
-        # 장기요양 = 건강보험료 × LTC_RATE
-        assert abs(r["ltc_monthly"] - r["hi_monthly"] * 0.1296) < 1
+        # 장기요양 = 건강보험료 × LTC_RATE (2026: 13.14%)
+        assert abs(r["ltc_monthly"] - r["hi_monthly"] * 0.1314) < 1
 
     def test_np_min_clamp(self):
         # 매우 낮은 급여 → 국민연금 하한(410,000/월) 기준 (2026.7~2027.6, 4.75%)
@@ -176,18 +176,18 @@ class TestInsuranceDeduction:
 
 class TestYearEndSettlement:
     def test_refund_case(self):
-        # 총급여 4000만, 2인, 기납부 250만 → 환급 1,164,155원 (2026 요율 기준)
+        # 총급여 4000만, 2인, 기납부 250만 → 환급 1,164,543원 (2026 요율 기준, 장기요양 13.14%)
         r = compute_year_end_settlement(40_000_000, 2, 2_500_000)
-        assert r["estimated_refund"] == 1_164_155
+        assert r["estimated_refund"] == 1_164_543
         assert r["labor_deduction"] == 11_250_000
         assert r["personal_deduction"] == 3_000_000
         assert r["taxable_income"] > 0
         assert r["determined_tax"] > 0
 
     def test_extra_payment_case(self):
-        # 총급여 7000만, 1인, 기납부 200만 → 추가납부 3,347,854원 (2026 요율 기준)
+        # 총급여 7000만, 1인, 기납부 200만 → 추가납부 3,347,174원 (2026 요율 기준, 장기요양 13.14%)
         r = compute_year_end_settlement(70_000_000, 1, 2_000_000)
-        assert r["estimated_refund"] == -3_347_854
+        assert r["estimated_refund"] == -3_347_174
         assert r["labor_deduction"] == 13_250_000
 
     def test_zero_paid_tax(self):
