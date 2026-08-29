@@ -247,3 +247,86 @@ def test_real_registry_files_untouched():
     assert result.stdout.strip() == "", (
         f"실제 registry 파일이 변경됨(이번 STEP은 탐지 테스트 코드만 추가해야 함): {result.stdout}"
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# STEP 28-134 — v2 field_labels drift 정합화(annual-leave-remaining,
+# real-estate-brokerage-fee) 회귀 테스트. 실제 docs/registry_auto.yaml /
+# docs/registry/*.yaml을 읽기 전용으로 읽어 검증한다(이 파일들을 쓰지 않음).
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _load_real_v2():
+    import yaml
+    root = Path(__file__).resolve().parent.parent
+    with open(root / "docs" / "registry_auto.yaml", encoding="utf-8") as f:
+        return yaml.safe_load(f) or {}
+
+
+def _load_real_v3():
+    import yaml
+    import glob
+    root = Path(__file__).resolve().parent.parent
+    v3 = {}
+    for path in glob.glob(str(root / "docs" / "registry" / "*.yaml")):
+        with open(path, encoding="utf-8") as f:
+            d = yaml.safe_load(f) or {}
+        for slug, entry in d.items():
+            if isinstance(entry, dict):
+                v3[slug] = entry
+    return v3
+
+
+def test_annual_leave_remaining_field_labels_matches_v3():
+    """v2의 field_labels가 months_of_service 기준으로 v3와 완전히 일치해야 한다
+    (STEP 28-133에서 확정된 SSOT: DB/v3/실제 HTML·JS 전부 months_of_service)."""
+    v2 = _load_real_v2()
+    v3 = _load_real_v3()
+    fl2 = v2["annual-leave-remaining"]["field_labels"]
+    fl3 = v3["annual-leave-remaining"]["field_labels"]
+    assert "months_of_service" in fl2
+    assert "years_of_service" not in fl2
+    assert fl2 == fl3
+
+
+def test_real_estate_brokerage_fee_field_labels_matches_v3():
+    """v2의 field_labels에서 applied_rate_pct가 제거되어 v3와 완전히 일치해야 한다
+    (STEP 28-133에서 확정: DB/v3/실제 HTML·JS 어디에도 applied_rate_pct 없음)."""
+    v2 = _load_real_v2()
+    v3 = _load_real_v3()
+    fl2 = v2["real-estate-brokerage-fee"]["field_labels"]
+    fl3 = v3["real-estate-brokerage-fee"]["field_labels"]
+    assert "applied_rate_pct" not in fl2
+    assert fl2 == fl3
+
+
+def test_other_v2_fields_preserved_for_fixed_slugs():
+    """field_labels 외 다른 필드(compute_rules 포함)는 이번 정합화로 변경되지 않아야 한다."""
+    v2 = _load_real_v2()
+    alr = v2["annual-leave-remaining"]
+    reb = v2["real-estate-brokerage-fee"]
+
+    # annual-leave-remaining은 애초에 compute_rules가 없던 계산기 — 여전히 없어야 함
+    assert not alr.get("compute_rules")
+    assert alr["name"] == "연차 잔여일 계산기"
+    assert alr["category"] == "노동/고용법"
+    assert alr["needs_human_legal"] is True
+
+    # real-estate-brokerage-fee도 compute_rules 없음 그대로 유지
+    assert not reb.get("compute_rules")
+    assert reb["name"] == "부동산 중개수수료 계산기"
+    assert reb["category"] == "부동산/임대"
+
+
+def test_drift_detector_reports_only_expected_two_compute_rules_drifts():
+    """STEP 28-134 정합화 이후, 실제 registry 전체에서 남은 drift는 정확히
+    bmi-calculator/자동차_취등록세_계산기의 compute_rules 2건뿐이어야 한다."""
+    v2 = _load_real_v2()
+    v3 = _load_real_v3()
+    drifts = detect_registry_drift(v2, v3, slugs=sorted(v2.keys()))
+
+    assert len(drifts) == 2, _format_drift_report(drifts)
+    by_slug = {d["slug"]: d["field"] for d in drifts}
+    assert by_slug == {
+        "bmi-calculator": "compute_rules",
+        "자동차_취등록세_계산기": "compute_rules",
+    }

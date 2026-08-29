@@ -54,10 +54,10 @@ annual-leave-remaining:
   date_fields: []
   validation_mode: formula
   field_labels:
-    years_of_service: 근속연수
+    months_of_service: 근속개월수
     used_days: 이미 사용한 연차일수
-    total_days: 올해 총 연차일수
-    remaining_days: 잔여 연차일수
+    total_days: 올해 총 연차일수(일)
+    remaining_days: 잔여 연차일수(일)
   difficulty: multi_output
   difficulty_status: provisional
   needs_human_legal: true
@@ -127,7 +127,6 @@ real-estate-brokerage-fee:
     deal_type: 거래 유형
     deal_amount: 거래 금액
     brokerage_fee: 중개수수료
-    applied_rate_pct: 적용요율(%)
   difficulty: multi_output
   difficulty_status: provisional
   needs_human_legal: true
