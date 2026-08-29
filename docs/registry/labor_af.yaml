@@ -139,6 +139,94 @@ annual-leave-remaining:
     checked_at: '2026-08-26'
     verification_note: 'STEP 15-I 정식 수정 완료: "법정 연차가 부여되지 않으나" 오류 문구 제거, 근로기준법 제60조
       제2항 기준으로 4개 FAQ 항목 전부 재작성. FAQ forbidden phrase 자동검사(STEP 15-H) 통과 확인.'
+자동차_취등록세_계산기:
+  name: 자동차 취등록세 계산기
+  slug: 자동차_취등록세_계산기
+  category: 세금
+  emoji: 🧮
+  card_label: 자동차 취등록세 계산기
+  compute_type: dict
+  date_fields: []
+  validation_mode: formula
+  field_labels:
+    car_type: 차량 종류
+    car_price: 차량 가격
+    region: 지역
+    acquisition_tax: 취득세
+    registration_tax: 등록세
+  input_labels: []
+  output_labels: []
+  display_order: 13
+  card_desc: 사용자가 차량의 종류, 가격, 지역 등을 입력하면 자동차를 구매할 때 필요한 취득…
+  difficulty: multi_output
+  difficulty_status: provisional
+  status: HOLD
+  tier: 2
+  source: app_factory
+  content:
+    evergreen: true
+    update_cycle: null
+    content_caveat: null
+  related_slugs: []
+  legal_refs: []
+  writer_context:
+    emphasize: []
+    example_patterns:
+    - 사용자가 차량의 종류, 가격, 지역 등을 입력하면 자동차를 구매할 때 필요한 취득세와 등록세를 자동으로 계산
+    calculation_story: []
+  contract_source: null
+  review_checklist:
+  - id: formula_accuracy
+    severity: critical
+    label: 계산 공식 정확성
+    display_value: '{"acquisition_tax": "car_price * 0.07", "registration_tax": "car_price
+      * 0.02"}'
+    auto_source: formula_field
+    checked: false
+    checked_by: null
+    checked_at: null
+  - id: legal_basis
+    severity: advisory
+    label: 법적 근거 (법령/조항)
+    display_value: ⚠️ legal_refs 미입력 — 근거 법령이 있으면 입력 필요
+    auto_source: legal_refs_empty
+    checked: false
+    checked_by: null
+    checked_at: null
+  - id: rate_constant
+    severity: critical
+    label: 적용 세율/계수 확인
+    display_value: '공식 내 상수: [''0.07'', ''0.02'']'
+    auto_source: formula_constants
+    checked: false
+    checked_by: null
+    checked_at: null
+  - id: description_text
+    severity: advisory
+    label: 화면 안내문 확인
+    display_value: 사용자가 차량의 종류, 가격, 지역 등을 입력하면 자동차를 구매할 때 필요한 취득세와 등록세를 자동으로 계산해주는
+      계산기입니다. 이는 직장인이 새 차를 구매할 때 예상되는 세금을 미리 파악하고, 예산을 효율적으로 관리하는 데 도움을 줍니다.
+    auto_source: description_field
+    checked: false
+    checked_by: null
+    checked_at: null
+  - id: seo_title
+    severity: advisory
+    label: SEO 제목 검토
+    display_value: 자동차 취등록세 계산기 - 차량 구매 세금 예측
+    auto_source: seo_title_field
+    checked: false
+    checked_by: null
+    checked_at: null
+  - id: faq_content
+    severity: advisory
+    label: FAQ 내용 검토
+    display_value: '[''자동차 취등록세 계산기는 어떻게 사용하나요?'', ''이 계산기는 어떤 차량에 사용할 수 있나요?'', ''계산
+      결과는 정확한가요?'']'
+    auto_source: faq_field
+    checked: false
+    checked_by: null
+    checked_at: null
 bmi-calculator:
   name: BMI(체질량지수) 계산기
   slug: bmi-calculator

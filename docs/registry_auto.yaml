@@ -114,6 +114,39 @@ military-discharge-date:
     evergreen: null
     update_cycle: null
   related_slugs: []
+자동차_취등록세_계산기:
+  slug: 자동차_취등록세_계산기
+  name: 자동차 취등록세 계산기
+  category: 세금
+  emoji: 🧮
+  card_label: 자동차 취등록세 계산기
+  compute_type: dict
+  date_fields: []
+  validation_mode: formula
+  field_labels:
+    car_type: 차량 종류
+    car_price: 차량 가격
+    region: 지역
+    acquisition_tax: 취득세
+    registration_tax: 등록세
+  difficulty: multi_output
+  difficulty_status: provisional
+  needs_human_legal: true
+  law: null
+  article: null
+  authority: null
+  related_articles: []
+  writer_note: null
+  reviewer_expectation: []
+  forbidden_articles: []
+  forbidden_phrases: []
+  confidence: null
+  last_verified: null
+  verification_source: []
+  content:
+    evergreen: null
+    update_cycle: null
+  related_slugs: []
 bmi-calculator:
   slug: bmi-calculator
   name: BMI(체질량지수) 계산기
