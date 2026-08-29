@@ -114,6 +114,39 @@ military-discharge-date:
     evergreen: null
     update_cycle: null
   related_slugs: []
+real-estate-brokerage-fee:
+  slug: real-estate-brokerage-fee
+  name: 부동산 중개수수료 계산기
+  category: 부동산/임대
+  emoji: 🧮
+  card_label: 부동산 중개수수료 계산기
+  compute_type: dict
+  date_fields: []
+  validation_mode: formula
+  field_labels:
+    deal_type: 거래 유형
+    deal_amount: 거래 금액
+    brokerage_fee: 중개수수료
+    applied_rate_pct: 적용요율(%)
+  difficulty: multi_output
+  difficulty_status: provisional
+  needs_human_legal: true
+  law: null
+  article: null
+  authority: null
+  related_articles: []
+  writer_note: null
+  reviewer_expectation: []
+  forbidden_articles: []
+  forbidden_phrases: []
+  confidence: null
+  last_verified: null
+  verification_source: []
+  content:
+    evergreen: null
+    update_cycle: null
+  related_slugs:
+  - jeonse-vs-monthly
 자동차_취등록세_계산기:
   slug: 자동차_취등록세_계산기
   name: 자동차 취등록세 계산기
