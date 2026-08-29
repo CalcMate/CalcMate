@@ -69,7 +69,7 @@ real-estate-brokerage-fee:
   output_labels:
   - brokerage_fee
   display_order: 12
-  card_desc: 주택 매매·교환 또는 임대차(전세·월세, 환산보증금 기준) 거래금액을 입력하면 공…
+  card_desc: 주택 매매·교환 또는 임대차(전세·월세, 환산보증금 기준) 거래금액과 거래 유형을 입력하면 공인중개사법 시행규칙에 따른 상한요율로 중개수수료를 계산합니다.
   difficulty: multi_output
   difficulty_status: provisional
   status: READY
