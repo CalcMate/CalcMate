@@ -1003,11 +1003,22 @@ def _compute_js(calc) -> str:
 
 def _compute_validation_js(rules: dict, fmap: dict) -> str:
     """compute_rules YAML → JS 검증 코드 블록 생성.
-    양수 입력 체크 → 최솟값(주 시간 등) 체크 → 최저임금 경고 순."""
+    양수(positive_inputs, <=0 거부) → 음수 금지(non_negative_inputs, <0 거부)
+    → 필드별 최솟값(min_value, 미만 거부) → 최솟값(주 시간 등) 체크 → 최저임금 경고 순."""
     lines = []
     positive = rules.get("positive_inputs") or []
     if positive:
         cond = " || ".join(f"{n} <= 0" for n in positive)
+        lines.append(f"  if ({cond}) {{ return null; }}\n")
+
+    non_negative = rules.get("non_negative_inputs") or []
+    if non_negative:
+        cond = " || ".join(f"{n} < 0" for n in non_negative)
+        lines.append(f"  if ({cond}) {{ return null; }}\n")
+
+    min_value = rules.get("min_value") or {}
+    if min_value:
+        cond = " || ".join(f"{field} < {thr}" for field, thr in min_value.items())
         lines.append(f"  if ({cond}) {{ return null; }}\n")
 
     min_hours = rules.get("min_weekly_hours")

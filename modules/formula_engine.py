@@ -60,7 +60,10 @@ def _eval(node, vars: dict):
         left, right = _eval(node.left, vars), _eval(node.right, vars)
         if isinstance(node.op, ast.Pow) and (abs(right) > _MAX_POW):
             raise FormulaError("거듭제곱 지수 한도 초과")
-        return op(left, right)
+        try:
+            return op(left, right)
+        except ZeroDivisionError:
+            raise FormulaError("0으로 나눌 수 없는 입력값입니다")
     if isinstance(node, ast.UnaryOp):
         op = _OPS.get(type(node.op))
         if op is None:

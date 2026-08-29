@@ -156,6 +156,9 @@ real-estate-brokerage-fee:
   compute_type: dict
   date_fields: []
   validation_mode: formula
+  compute_rules:
+    non_negative_inputs:
+    - car_price
   field_labels:
     car_type: 차량 종류
     car_price: 차량 가격
@@ -189,6 +192,9 @@ bmi-calculator:
   compute_type: single
   date_fields: []
   validation_mode: formula
+  compute_rules:
+    min_value:
+      height_cm: 50
   field_labels:
     height_cm: 키 (cm)
     weight_kg: 몸무게 (kg)
