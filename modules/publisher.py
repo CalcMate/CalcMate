@@ -305,7 +305,7 @@ def _wordpress_api(seo, html, wp_imgs, cfg) -> dict:
     payload = {
         "title": seo.get("seo_title", ""),
         "status": "publish",
-        "excerpt": seo.get("meta_description", ""),
+        "excerpt": seo.get("meta_description") or seo.get("seo_description", ""),
         "content": full_content,
         "featured_media": thumb_info.get("media_id", 0)
     }
