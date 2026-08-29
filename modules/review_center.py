@@ -152,6 +152,25 @@ def extract_checklist(app: dict, tier: str = "Tier2-A", category: str = "") -> l
             "checked": False, "checked_by": None, "checked_at": None,
         })
 
+    # ─ input_validation_review: compute_rules 유무와 무관하게 항상 생성.
+    # edge_cases(아래)는 compute_rules가 "있을 때" 그 구체적 내용을 검토하는 항목이고,
+    # 이 항목은 compute_rules가 "있든 없든" 검증 정책 자체를 사람이 확인했는지를 검토한다
+    # (STEP 28-128 설계 확정: 부재 자체를 오류로 취급하지 않되, 사람이 확인하기 전까지
+    # READY 승격을 차단하기 위함 — promote_to_ready()는 이 항목이 checklist에 존재하기만
+    # 하면 기존 critical 미체크 차단 로직을 그대로 적용하므로 별도 분기 추가 불필요).
+    if compute_rules:
+        _ivr_display = f"설정된 검증 규칙: {str(compute_rules)[:300]}"
+    else:
+        _ivr_display = "⚠️ 설정된 입력값 검증 규칙 없음 — 의도적인지 확인 필요"
+    items.append({
+        "id": "input_validation_review",
+        "severity": "critical",
+        "label": "입력값 검증 정책 확인",
+        "display_value": _ivr_display,
+        "auto_source": "compute_rules_presence",
+        "checked": False, "checked_by": None, "checked_at": None,
+    })
+
     # ─ edge_cases: compute_rules 있는 경우
     if compute_rules:
         items.append({

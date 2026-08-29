@@ -511,6 +511,179 @@ def test_faq_forbidden_phrase_via_v3_legal_refs(monkeypatch):
     assert "법정 연차가 부여되지 않으나" in detail
 
 
+# ─────────────────────────────────────────────────────────────
+# 7. STEP 28-129 — input_validation_review 체크리스트 항목
+# ─────────────────────────────────────────────────────────────
+
+def test_input_validation_review_present_without_compute_rules():
+    """compute_rules 없음(app dict에 키 자체가 없음) → input_validation_review가
+    반드시 생성되고, 검증 규칙 없음을 나타내는 문구를 표시해야 한다."""
+    app = {
+        "formula": "gross * 0.033", "legal_refs": [], "category": "세금/세법",
+        "input_schema": {}, "seo_title": "", "faq": [],
+    }
+    items = extract_checklist(app, tier="Tier2-A", category="세금/세법")
+    ivr = next((i for i in items if i["id"] == "input_validation_review"), None)
+    assert ivr is not None, "input_validation_review 누락"
+    assert ivr["severity"] == "critical"
+    assert ivr["checked"] is False
+    assert ivr["label"] == "입력값 검증 정책 확인"
+    assert "설정된 입력값 검증 규칙 없음" in ivr["display_value"]
+
+
+def test_input_validation_review_present_with_empty_dict_compute_rules():
+    """compute_rules = {} (빈 dict)도 '없음'과 동일하게 취급되어야 한다."""
+    app = _make_app(formula="a * b", compute_rules={})
+    items = extract_checklist(app, tier="Tier2-A", category="세금/세법")
+    ivr = next((i for i in items if i["id"] == "input_validation_review"), None)
+    assert ivr is not None
+    assert "설정된 입력값 검증 규칙 없음" in ivr["display_value"]
+
+
+def test_input_validation_review_present_with_compute_rules():
+    """compute_rules가 있으면 input_validation_review와 edge_cases가 모두 존재하고,
+    서로 다른 ID를 가지며, edge_cases의 기존 동작이 그대로 유지되어야 한다."""
+    app = _make_app(formula="car_price * 0.07",
+                     compute_rules={"non_negative_inputs": ["car_price"]})
+    items = extract_checklist(app, tier="Tier2-A", category="세금/세법")
+    ids = [i["id"] for i in items]
+
+    assert "input_validation_review" in ids
+    assert "edge_cases" in ids
+    assert ids.count("input_validation_review") == 1
+    assert ids.count("edge_cases") == 1
+
+    ivr = next(i for i in items if i["id"] == "input_validation_review")
+    assert ivr["severity"] == "critical"
+    assert "non_negative_inputs" in ivr["display_value"]
+
+    # edge_cases 기존 동작(회귀) — display_value/auto_source/severity 불변
+    ec = next(i for i in items if i["id"] == "edge_cases")
+    assert ec["severity"] == "critical"
+    assert ec["auto_source"] == "compute_rules"
+    assert ec["display_value"] == str({"non_negative_inputs": ["car_price"]})[:300]
+
+
+def test_input_validation_review_id_distinct_from_edge_cases():
+    """두 항목의 ID가 절대 같아지지 않아야 한다(설계 요구사항)."""
+    app = _make_app(formula="a * b", compute_rules={"positive_inputs": ["a"]})
+    items = extract_checklist(app, tier="Tier2-A", category="세금/세법")
+    ids = [i["id"] for i in items]
+    assert "input_validation_review" != "edge_cases"
+    assert ids.count("input_validation_review") == 1
+    assert ids.count("edge_cases") == 1
+
+
+# ─────────────────────────────────────────────────────────────
+# 8. STEP 28-129 — promote_to_ready() READY Gate 정책 (실제 checklist 데이터 사용,
+#    파일 I/O만 tmp_path로 격리 — Gate 판정 로직 자체는 mock하지 않는다)
+# ─────────────────────────────────────────────────────────────
+
+def _write_af_yaml(reg_dir, yaml_name, slug, entry):
+    import yaml as _yaml
+    reg_dir.mkdir(parents=True, exist_ok=True)
+    (reg_dir / f"{yaml_name}.yaml").write_text(
+        _yaml.dump({slug: entry}, allow_unicode=True, sort_keys=False), encoding="utf-8"
+    )
+
+
+def test_promote_to_ready_blocks_when_input_validation_review_unchecked(tmp_path, monkeypatch):
+    """compute_rules 없음 + input_validation_review 미체크 → READY 차단.
+    실제 promote_to_ready() 코드 경로를 그대로 실행하되, 레지스트리 파일 위치만
+    tmp_path로 격리해 실제 docs/registry/*.yaml에는 어떤 쓰기도 발생하지 않는다."""
+    from modules import app_factory as AF
+
+    entry = {
+        "source": "app_factory", "status": "HOLD", "category": "세금/세법",
+        "review_checklist": [
+            {"id": "formula_accuracy", "severity": "critical", "label": "계산 공식", "checked": True},
+            {"id": "input_validation_review", "severity": "critical",
+             "label": "입력값 검증 정책 확인", "checked": False},
+        ],
+    }
+    _write_af_yaml(tmp_path, "labor_af", "diag-ready-test-1", entry)
+
+    monkeypatch.setattr("modules.registry_loader.load_registry_v3", lambda force=False: {"diag-ready-test-1": entry})
+    monkeypatch.setattr(AF, "_REG_DIR", tmp_path)
+
+    ok, msg = AF.promote_to_ready("diag-ready-test-1")
+    assert not ok, "input_validation_review 미체크인데 READY 승격됨"
+    assert "입력값 검증 정책 확인" in msg or "필수" in msg
+
+
+def test_promote_to_ready_succeeds_when_input_validation_review_checked(tmp_path, monkeypatch):
+    """compute_rules 없음 + input_validation_review 체크 완료 + 다른 critical 없음
+    → READY 가능. 다른 critical 항목이 전혀 없는 최소 fixture 사용."""
+    from modules import app_factory as AF
+
+    entry = {
+        "source": "app_factory", "status": "HOLD", "category": "세금/세법",
+        "review_checklist": [
+            {"id": "input_validation_review", "severity": "critical",
+             "label": "입력값 검증 정책 확인", "checked": True},
+        ],
+    }
+    _write_af_yaml(tmp_path, "labor_af", "diag-ready-test-2", entry)
+
+    monkeypatch.setattr("modules.registry_loader.load_registry_v3", lambda force=False: {"diag-ready-test-2": entry})
+    monkeypatch.setattr(AF, "_REG_DIR", tmp_path)
+    monkeypatch.setattr("modules.registry_loader.invalidate", lambda: None)
+
+    ok, msg = AF.promote_to_ready("diag-ready-test-2")
+    assert ok, f"input_validation_review 체크 완료인데 READY 승격 실패: {msg}"
+
+    # 실제 파일도 tmp_path 안에서만 갱신되었는지 확인(레포 파일 무변경 보장의 이중 확인)
+    written = (tmp_path / "labor_af.yaml").read_text(encoding="utf-8")
+    assert "status: READY" in written
+
+
+def test_promote_to_ready_blocks_when_edge_cases_unchecked_even_if_ivr_checked(tmp_path, monkeypatch):
+    """compute_rules 있음 + input_validation_review 체크 + edge_cases 미체크
+    → 여전히 READY 차단(edge_cases도 critical이므로)."""
+    from modules import app_factory as AF
+
+    entry = {
+        "source": "app_factory", "status": "HOLD", "category": "세금/세법",
+        "review_checklist": [
+            {"id": "input_validation_review", "severity": "critical",
+             "label": "입력값 검증 정책 확인", "checked": True},
+            {"id": "edge_cases", "severity": "critical",
+             "label": "예외조건 처리 확인", "checked": False},
+        ],
+    }
+    _write_af_yaml(tmp_path, "labor_af", "diag-ready-test-3", entry)
+
+    monkeypatch.setattr("modules.registry_loader.load_registry_v3", lambda force=False: {"diag-ready-test-3": entry})
+    monkeypatch.setattr(AF, "_REG_DIR", tmp_path)
+
+    ok, msg = AF.promote_to_ready("diag-ready-test-3")
+    assert not ok, "edge_cases 미체크인데 READY 승격됨"
+
+
+def test_promote_to_ready_succeeds_when_both_checked(tmp_path, monkeypatch):
+    """compute_rules 있음 + input_validation_review 체크 + edge_cases 체크 →
+    다른 critical 항목이 없다면 READY 가능."""
+    from modules import app_factory as AF
+
+    entry = {
+        "source": "app_factory", "status": "HOLD", "category": "세금/세법",
+        "review_checklist": [
+            {"id": "input_validation_review", "severity": "critical",
+             "label": "입력값 검증 정책 확인", "checked": True},
+            {"id": "edge_cases", "severity": "critical",
+             "label": "예외조건 처리 확인", "checked": True},
+        ],
+    }
+    _write_af_yaml(tmp_path, "labor_af", "diag-ready-test-4", entry)
+
+    monkeypatch.setattr("modules.registry_loader.load_registry_v3", lambda force=False: {"diag-ready-test-4": entry})
+    monkeypatch.setattr(AF, "_REG_DIR", tmp_path)
+    monkeypatch.setattr("modules.registry_loader.invalidate", lambda: None)
+
+    ok, msg = AF.promote_to_ready("diag-ready-test-4")
+    assert ok, f"모두 체크했는데 READY 승격 실패: {msg}"
+
+
 if __name__ == "__main__":
     import pytest
     sys.exit(pytest.main([__file__, "-v"]))
