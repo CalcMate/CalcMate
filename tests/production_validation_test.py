@@ -19,10 +19,16 @@ CALCULATORS = [
 ]
 
 def test_full_pipeline_execution(orchestrator):
-    """1. 7개 계산기 정상 실행 검증"""
+    """1. 7개 계산기 정상 실행 검증
+
+    PUBLISH 단계의 WordPress Publisher는 mock 처리한다 (P4.5 §17):
+    pytest는 실 WordPress(원격 blog.genon.app)에 접근하지 않는다.
+    content_pipeline_test.py의 기존 패턴과 동일.
+    """
     results_table = {}
     for calc in CALCULATORS:
-        with patch.object(orchestrator.adapter, 'run_h4a_quality', return_value={"status": "PASS", "data": {}}):
+        with patch.object(orchestrator.adapter, 'run_h4a_quality', return_value={"status": "PASS", "data": {}}), \
+             patch.object(orchestrator.gate.publisher, 'create_draft', return_value="123"):
             state = orchestrator.run(calc, {"profile": {"topics": ["계산 방법"]}})
             results_table[calc] = {
                 "H4B": "PASS", "GENERATION": "PASS", "H3_FAQ": "PASS", 
