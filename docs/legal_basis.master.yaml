@@ -634,6 +634,9 @@ four-insurances:
         source: "고용노동부"
         applies_to: "육아휴직 급여 수급자"
         exceptions: "6+6 부모육아휴직 특례 적용 시 상이"
+        # forbid_amounts: true → 게시물 본문/FAQ에 금액(만원·원 단위) 자체가 등장하면 CRITICAL fail.
+        # 접두어(상한/최대) 없는 파생계산값(예: '200만원 × 0.8 = 160만원')도 금지.
+        forbid_amounts: true
         forbidden_in_content:
           - "상한 150만원"
           - "상한액 150만원"
