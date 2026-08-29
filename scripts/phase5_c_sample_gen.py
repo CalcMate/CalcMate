@@ -189,16 +189,17 @@ def build_example_context(calc: dict) -> dict | None:
             "formula": formula, "source": "verified_formula"
         }
     elif slug == "육아휴직_급여_계산기":
-        # result에 benefit 금액 미포함 — SSOT content_ssot에서 특정 상한/하한 금액 언급 금지.
+        # SSOT content_ssot: 금액 미언급 정책 — 게시물에 구체 금액(만원/원 단위) 자체를 금지.
+        # result/inputs에 금액을 넣지 않아 AI가 파생계산값(예: 200만원 × 0.8 = 160만원)을 생성하지 못하게 한다.
         # G-CALC는 result가 비어 있으면 금액 검증 건너뜀.
         return {
             "examples": [
-                {"inputs": {"monthly_wage": 2000000},
+                {"inputs": {},
                  "result": {},
-                 "narrative": "월 통상임금 200만원 → 통상임금 × 80% 공식 적용. 정확한 지급액은 고용노동부 최신 안내 확인 필요"},
-                {"inputs": {"monthly_wage": 1500000},
+                 "narrative": "육아휴직 급여는 통상임금의 80%를 기준으로 산정되며, 정확한 지급액과 상한·하한은 고용노동부의 최신 안내를 참고해야 합니다."},
+                {"inputs": {},
                  "result": {},
-                 "narrative": "월 통상임금 150만원 → 통상임금 × 80% 공식 적용. 정확한 지급액은 고용노동부 최신 안내 확인 필요"},
+                 "narrative": "6+6 부모육아휴직제 등 특례가 적용되면 산정 기준이 달라지므로, 본인 사례는 고용보험센터에 확인이 필요합니다."},
             ],
             "formula": formula, "source": "verified_formula",
             "note": "남녀고용평등법 제19조의2 기준 — 통상임금 80% 지급. 상한·하한액은 고용노동부 최신 안내 확인 필요"
