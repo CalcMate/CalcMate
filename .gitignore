@@ -18,3 +18,13 @@ data/schedule/
 data/legal/
 data/workspace/*
 !data/workspace/_site/
+
+# Security / secrets
+.env
+.env.*
+*.secret
+*secret*
+*credential*
+*credentials*
+*token*
+*api_key*
