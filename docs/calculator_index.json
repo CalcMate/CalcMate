@@ -7,6 +7,10 @@
     "category": "노동/고용법",
     "name": "연차 잔여일 계산기"
   },
+  "bmi-calculator": {
+    "category": "건강/피트니스",
+    "name": "BMI(체질량지수) 계산기"
+  },
   "four-insurances": {
     "category": "고용/보험",
     "name": "4대보험 계산기"
@@ -26,6 +30,10 @@
   "military-discharge-date": {
     "category": "병역/공무",
     "name": "군인 전역일 계산기"
+  },
+  "real-estate-brokerage-fee": {
+    "category": "부동산/임대",
+    "name": "부동산 중개수수료 계산기"
   },
   "severance-pay": {
     "category": "노무/급여",
@@ -54,5 +62,9 @@
   "육아휴직_급여_계산기": {
     "category": "노무/급여/보험",
     "name": "육아휴직 급여 계산기"
+  },
+  "자동차_취등록세_계산기": {
+    "category": "세금",
+    "name": "자동차 취등록세 계산기"
   }
 }
