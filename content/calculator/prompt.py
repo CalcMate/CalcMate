@@ -86,6 +86,17 @@ _H2_RULE = (
     "<h2> 제목으로 사용하지 않는다.\n"
 )
 
+_HTML_OUTPUT_RULE = (
+    "[HTML 출력 규칙 — 반드시 준수]\n"
+    "- Markdown 문법을 절대 사용하지 않는다.\n"
+    "- 강조 표현에 '**bold**' 사용 금지. 강조는 반드시 <strong>...</strong> 태그로 작성한다.\n"
+    "- 일반적인 계산식·수식에 <pre> 태그를 사용하지 않는다. 계산식은 <p> 태그의 짧은 문장으로 작성한다.\n"
+    "- 긴 한 줄 텍스트를 <pre>에 담지 않는다. <pre>는 실제 코드 또는 고정폭이 반드시 필요한 "
+    "다중 라인 내용에만 사용한다(일반 계산 공식에는 사용하지 않는다).\n"
+    "- 생성하는 HTML은 모바일 화면(폭 375px 기준)에서 가로 스크롤이 발생하지 않는 구조여야 한다. "
+    "긴 문장은 자연스럽게 줄바꿈되는 <p>로 작성하고, 고정폭 요소로 감싸지 않는다.\n"
+)
+
 
 def get_article_prompt(calc: dict, seo: dict = None, faq: list = None, example_context: dict = None, intent: str = None, law_ssot_block: str = "") -> tuple:
     seo = seo or {}
@@ -143,6 +154,7 @@ def get_article_prompt(calc: dict, seo: dict = None, faq: list = None, example_c
         f"[필수 구조 — 아래 H2 이름을 그대로 사용하고 순서를 지킨다]\n{structure}\n"
         f"{system_instructions}\n\n"
         + _H2_RULE
+        + _HTML_OUTPUT_RULE
         + _NO_LINK_RULE
         + ssot_block + "\n\n"
         "[검증된 계산 데이터]\n"

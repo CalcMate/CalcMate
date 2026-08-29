@@ -64,3 +64,58 @@ def strip_prompt_artifacts(html: str) -> str:
     html = _ARTIFACT_LABEL_H_RE.sub('', html)
     html = _NUMBERED_H_RE.sub(r'\1', html)
     return html
+
+
+# ── HTML 출력 정규화(Markdown/모바일 overflow 재발 방지) ──
+# AI가 "HTML로 출력하라"는 지시를 받고도 비결정적으로 Markdown 문법을 섞어 낼 때가 있다.
+# 여기서 최종 저장/발행 직전에 deterministic하게 정규화해 방어선을 둔다.
+
+# **text** → <strong>text</strong>. 캡처 범위에서 *, <, >, 개행을 제외해
+# 이미 존재하는 <strong> 태그나 다른 HTML 태그 경계를 침범하지 않는다.
+_MD_BOLD_RE = re.compile(r'\*\*([^*\n<>]+?)\*\*')
+
+
+def normalize_bold_markdown(html: str) -> str:
+    """Markdown bold(**text**)를 <strong>text</strong>로 변환. 기존 HTML 구조는 보존한다."""
+    if not html or '**' not in html:
+        return html
+    return _MD_BOLD_RE.sub(r'<strong>\1</strong>', html)
+
+
+# <pre> 내부에 실제 코드/스크립트로 볼 수 있는 토큰이 있으면 <pre>를 유지한다.
+_PRE_CODE_MARKER_RE = re.compile(
+    r'(function\s|def\s+\w|class\s+\w|\{|\}|;|<\?php|SELECT\s|import\s|```|//|#!|==|->|::|\$\w)',
+    re.I
+)
+_PRE_BLOCK_RE = re.compile(r'<pre[^>]*>(.*?)</pre>', re.DOTALL | re.I)
+
+
+def normalize_pre_blocks(html: str) -> str:
+    """일반 계산식이 담긴 <pre>를 <p>로 변환해 모바일 가로 overflow를 예방한다.
+    실제 코드/고정폭 표현으로 판단되는 <pre>(코드 토큰 포함)는 그대로 둔다."""
+    if not html or '<pre' not in html.lower():
+        return html
+
+    def _replace(m):
+        inner = m.group(1)
+        text = inner.strip()
+        if not text:
+            return m.group(0)
+        if _PRE_CODE_MARKER_RE.search(text):
+            return m.group(0)
+        lines = [ln.strip() for ln in text.split('\n') if ln.strip()]
+        if not lines:
+            return m.group(0)
+        return ''.join(f'<p>{ln}</p>' for ln in lines)
+
+    return _PRE_BLOCK_RE.sub(_replace, html)
+
+
+def normalize_html_output(html: str) -> str:
+    """콘텐츠 생성 최종 단계의 HTML 정규화 진입점.
+    <pre> 정규화 후 Markdown bold 정규화 순으로 적용한다."""
+    if not html:
+        return html
+    html = normalize_pre_blocks(html)
+    html = normalize_bold_markdown(html)
+    return html
