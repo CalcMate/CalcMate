@@ -2851,9 +2851,7 @@ elif tab == "🏭 App Factory":
                     st.session_state["af_result"] = None
                     st.session_state.pop("af_contract", None)
                     st.session_state["af_just_saved_name"] = app.get("name", "")
-                    st.session_state["nav_group"] = "🧮 Calculator"
-                    st.session_state["sub_🧮 Calculator"] = "🧮 계산기 관리"
-                    st.success(f"{msg} — 계산기 관리로 이동합니다.")
+                    st.success(f"{msg} — 사이드바에서 '🧮 계산기 관리'로 이동해 확인하세요.")
                     st.rerun()
                 else:
                     st.error(msg)
