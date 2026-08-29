@@ -12,7 +12,7 @@ class ContentGapAnalyzer:
         our_topics = set(our_profile.get("topics", []))
         competitor_common = set(competitor_topics.get("common_topics", []))
         
-        missing_topics = list(competitor_common - our_topics)
+        missing_topics = sorted(competitor_common - our_topics)
         
         if not missing_topics:
             return {"missing_topics": [], "priority": "LOW"}
