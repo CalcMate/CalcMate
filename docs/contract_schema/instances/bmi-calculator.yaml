@@ -1,0 +1,42 @@
+slug: bmi-calculator
+name: BMI(체질량지수) 계산기
+category: 건강/피트니스
+tier: Tier2-A
+input_fields:
+- height_cm
+- weight_kg
+output_fields:
+- bmi
+formula: null
+formula_status: operator_confirmed
+scope_exclusions: []
+test_cases:
+- input:
+    height_cm: 170
+    weight_kg: 65
+  expected:
+    bmi: 22.49
+- input:
+    height_cm: 160
+    weight_kg: 50
+  expected:
+    bmi: 19.53
+- input:
+    height_cm: 180
+    weight_kg: 100
+  expected:
+    bmi: 30.86
+- input:
+    height_cm: 150
+    weight_kg: 30
+  expected:
+    bmi: 13.33
+- input:
+    height_cm: 200
+    weight_kg: 150
+  expected:
+    bmi: 37.5
+test_cases_status: operator_confirmed
+desc: 키와 몸무게를 입력하면 체질량지수(BMI)를 계산하고 체중 상태를 확인할 수 있습니다.
+legal_refs: []
+generated_at: '2026-08-26T21:08:37.031365+09:00'

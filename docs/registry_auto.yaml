@@ -114,3 +114,34 @@ military-discharge-date:
     evergreen: null
     update_cycle: null
   related_slugs: []
+bmi-calculator:
+  slug: bmi-calculator
+  name: BMI(체질량지수) 계산기
+  category: 건강/피트니스
+  emoji: 🧮
+  card_label: BMI(체질량지수) 계산기
+  compute_type: single
+  date_fields: []
+  validation_mode: formula
+  field_labels:
+    height_cm: 키 (cm)
+    weight_kg: 몸무게 (kg)
+    bmi: 체질량지수 (BMI)
+  difficulty: simple
+  difficulty_status: provisional
+  needs_human_legal: true
+  law: null
+  article: null
+  authority: null
+  related_articles: []
+  writer_note: null
+  reviewer_expectation: []
+  forbidden_articles: []
+  forbidden_phrases: []
+  confidence: null
+  last_verified: null
+  verification_source: []
+  content:
+    evergreen: null
+    update_cycle: null
+  related_slugs: []
