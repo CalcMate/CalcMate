@@ -157,21 +157,22 @@ def build_example_context(calc: dict) -> dict | None:
             "formula": formula, "source": "verified_formula"
         }
     elif slug == "four-insurances":
-        # 2026년 공식 요율: 국민연금 4.75%, 건강보험 3.595%, 장기요양 12.96%(건보료기준), 고용 0.9%
-        # 300만원: NP=142,500 / HI=107,850 / LTC=13,977 / EI=27,000 / 합=291,327
-        # 400만원: NP=190,000 / HI=143,800 / LTC=18,636 / EI=36,000 / 합=388,436
+        # 2026년 공식 요율: 국민연금 4.75%, 건강보험 3.595%, 장기요양 13.14%(건보료기준), 고용 0.9%
+        # 300만원: NP=142,500 / HI=107,850 / LTC=14,171 / EI=27,000 / 합=291,521
+        # 400만원: NP=190,000 / HI=143,800 / LTC=18,895 / EI=36,000 / 합=388,695
+        # LTC = HI × 13.14% (보건복지부 2025-11-05 고시)
         return {
             "examples": [
                 {"inputs": {"monthly_salary": 3000000},
                  "result": {"national_pension": 142500, "health_insurance": 107850,
-                            "long_term_care": 13977, "employment_insurance": 27000,
+                            "long_term_care": 14171, "employment_insurance": 27000,
                             "worker_compensation": 0},
-                 "narrative": "월급 300만원 기준: 국민연금 142,500원(4.75%) + 건강보험 107,850원(3.595%) + 장기요양 13,977원(건강보험료의 12.96%) + 고용보험 27,000원(0.9%) = 약 291,327원"},
+                 "narrative": "월급 300만원 기준: 국민연금 142,500원(4.75%) + 건강보험 107,850원(3.595%) + 장기요양 14,171원(건강보험료의 13.14%) + 고용보험 27,000원(0.9%) = 약 291,521원"},
                 {"inputs": {"monthly_salary": 4000000},
                  "result": {"national_pension": 190000, "health_insurance": 143800,
-                            "long_term_care": 18636, "employment_insurance": 36000,
+                            "long_term_care": 18895, "employment_insurance": 36000,
                             "worker_compensation": 0},
-                 "narrative": "월급 400만원 기준: 국민연금 190,000원(4.75%) + 건강보험 143,800원(3.595%) + 장기요양 18,636원(건강보험료의 12.96%) + 고용보험 36,000원(0.9%) = 약 388,436원"},
+                 "narrative": "월급 400만원 기준: 국민연금 190,000원(4.75%) + 건강보험 143,800원(3.595%) + 장기요양 18,895원(건강보험료의 13.14%) + 고용보험 36,000원(0.9%) = 약 388,695원"},
             ],
             "formula": formula, "source": "verified_formula"
         }
