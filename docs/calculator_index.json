@@ -11,6 +11,10 @@
     "category": "고용/보험",
     "name": "4대보험 계산기"
   },
+  "four-insurances-documents": {
+    "category": "고용/보험",
+    "name": "4대보험 계산기 서류 안내"
+  },
   "freelancer-tax-3p3": {
     "category": "세금/정부혜택",
     "name": "프리랜서 3.3% 원천징수 계산기"
@@ -27,9 +31,17 @@
     "category": "노무/급여",
     "name": "퇴직금 계산기"
   },
+  "severance-pay-documents": {
+    "category": "노무/급여",
+    "name": "퇴직금 계산기 서류 안내"
+  },
   "unemployment-benefit": {
     "category": "고용/보험",
     "name": "실업급여 계산기"
+  },
+  "unemployment-benefit-howto": {
+    "category": "고용/보험",
+    "name": "실업급여 계산기 이용 방법"
   },
   "weekly-holiday-allowance": {
     "category": "노무/급여",
