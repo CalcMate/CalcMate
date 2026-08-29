@@ -45,11 +45,11 @@ def _generate_free_image(post_id: str, kind: str, prompt: str, cfg: dict) -> str
         else:
             url = f"https://image.pollinations.ai/p/{encoded_prompt}?width=800&height=450&nologo=true"
             
-        print(f"🚀 무료 이미지 생성 요청 중 ({kind})...")
+        LOG.info("무료 이미지 생성 요청 중 (%s)", kind)
         response = requests.get(url, timeout=60)
         
         if response.status_code != 200:
-            print(f"❌ [image_generator] 무료 이미지 서버 응답 에러: {response.status_code}")
+            LOG.error("[image_generator] 무료 이미지 서버 응답 에러: %s", response.status_code)
             return None
             
         img = Image.open(io.BytesIO(response.content))
@@ -59,12 +59,12 @@ def _generate_free_image(post_id: str, kind: str, prompt: str, cfg: dict) -> str
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         
         img.save(str(fpath), format="WEBP")
-        print(f"✅ 무료 로컬 이미지 저장 성공: {fpath.absolute()}")
+        LOG.info("무료 로컬 이미지 저장 성공: %s", fpath.absolute())
         
         return str(fpath.absolute())
         
     except Exception as e:
-        print(f"❌ [image_generator] {kind} 무료 이미지 생성 실패: {e}")
+        LOG.error("[image_generator] %s 무료 이미지 생성 실패: %s", kind, e)
         return None
 
 def _upload(fpath: Path, cfg: dict) -> str | None:
