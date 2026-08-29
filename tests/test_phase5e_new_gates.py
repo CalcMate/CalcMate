@@ -404,3 +404,159 @@ class TestRunIntegrityGatesExtended:
         )
         _, failed = run_integrity_gates(body, slug="four-insurances", intent="calculator")
         assert any(f["gate"] == "G-H2" for f in failed)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# STEP 5-B — 자연어 변형 / 파생금액 / 금액 미언급 / 오탐 방지
+# ═══════════════════════════════════════════════════════════════════════════
+
+class TestStep5bNaturalLanguageVariants:
+    """G-LEGAL-CURRENT 자연어 변형 탐지 (STEP 5-A에서 확인된 우회 경로)."""
+
+    def test_days_ane_variant_fails(self):
+        """'7일 안에' → '7일 이내'로 정규화되어 금지값 탐지."""
+        body = "<p>취득신고는 7일 안에 해야 합니다.</p>"
+        fails = check_g_legal_current(body, "four-insurances")
+        assert "G-LEGAL-CURRENT" in _gate_names(fails)
+        assert "critical" in _grades(fails, "G-LEGAL-CURRENT")
+
+    def test_week_within_variant_fails(self):
+        """'일주일 이내' → '7일 이내'로 정규화되어 탐지."""
+        body = "<p>취득신고는 일주일 이내에 해야 합니다.</p>"
+        fails = check_g_legal_current(body, "four-insurances")
+        assert "G-LEGAL-CURRENT" in _gate_names(fails)
+
+    def test_week_ane_variant_fails(self):
+        """'일주일 안에' → '7일 이내'로 정규화되어 탐지."""
+        body = "<p>취득신고는 일주일 안에 해야 합니다.</p>"
+        fails = check_g_legal_current(body, "four-insurances")
+        assert "G-LEGAL-CURRENT" in _gate_names(fails)
+
+    def test_days_nai_variant_fails(self):
+        """'7일 내' → '7일 이내'로 정규화되어 탐지."""
+        body = "<p>취득신고는 7일 내에 해야 합니다.</p>"
+        fails = check_g_legal_current(body, "four-insurances")
+        assert "G-LEGAL-CURRENT" in _gate_names(fails)
+
+    def test_days_no_space_variant_fails(self):
+        """'7일이내' (공백 없음) → 탐지."""
+        body = "<p>취득신고는 7일이내에 해야 합니다.</p>"
+        fails = check_g_legal_current(body, "four-insurances")
+        assert "G-LEGAL-CURRENT" in _gate_names(fails)
+
+    def test_natural_variant_positive_check_passes(self):
+        """긍정검증: '14일 안에'도 '14일 이내'로 정규화되어 현행값 인정."""
+        body = "<p>취득신고는 14일 안에, 건강보험 3.595%, 국민연금 4.75% 적용.</p>"
+        fails = check_g_legal_current(body, "four-insurances", intent="calculator")
+        # 금지값 없음 + 긍정검증 모두 통과 (3.595%/4.75% 포함)
+        assert "G-LEGAL-CURRENT" not in _gate_names(fails)
+
+    def test_percent_space_variant_fails(self):
+        """'3.545 %' (공백) → '3.545%'로 정규화되어 탐지."""
+        body = "<p>건강보험료는 3.545 %입니다.</p>"
+        fails = check_g_legal_current(body, "four-insurances")
+        assert "G-LEGAL-CURRENT" in _gate_names(fails)
+
+
+class TestStep5bOutdatedLtcRate:
+    """장기요양 12.96% (2025년 값이 아닌 오류값) 탐지 — SSOT 갱신 후 금지."""
+
+    def test_ltc_1296_fails(self):
+        """'12.96%' → 2026 실값 13.14% 아님 → CRITICAL."""
+        body = "<p>장기요양보험료는 건보료의 12.96%입니다.</p>"
+        fails = check_g_legal_current(body, "four-insurances")
+        assert "G-LEGAL-CURRENT" in _gate_names(fails)
+        assert "critical" in _grades(fails, "G-LEGAL-CURRENT")
+
+    def test_ltc_1314_passes(self):
+        """'13.14%' 현행값 → 블랙리스트 없음."""
+        body = "<p>장기요양보험료는 건보료의 13.14%입니다.</p>"
+        fails = check_g_legal_current(body, "four-insurances")
+        assert "G-LEGAL-CURRENT" not in _gate_names(fails)
+
+
+class TestStep5bAmountBan:
+    """육아휴직 금액 미언급 정책 — 접두어 없는 파생계산값·bare 금액 탐지."""
+
+    def test_derived_amount_fails(self):
+        """'200만원 × 0.8 = 160만원' 파생계산값 → CRITICAL (STEP 5-A 우회 케이스)."""
+        body = "<p>월 통상임금 200만원이면 급여는 200만원 × 0.8 = 160만원입니다.</p>"
+        fails = check_g_legal_current(body, "육아휴직_급여_계산기")
+        assert "G-LEGAL-CURRENT" in _gate_names(fails)
+        assert "critical" in _grades(fails, "G-LEGAL-CURRENT")
+
+    def test_derived_amount_150_fails(self):
+        """'150만원 × 0.8 = 120만원' → CRITICAL."""
+        body = "<p>150만원 × 0.8 = 120만원입니다.</p>"
+        fails = check_g_legal_current(body, "육아휴직_급여_계산기")
+        assert "G-LEGAL-CURRENT" in _gate_names(fails)
+
+    def test_bare_amount_fails(self):
+        """접두어 없는 bare 금액 '160만원' → CRITICAL."""
+        body = "<p>급여는 월 160만원 수준입니다.</p>"
+        fails = check_g_legal_current(body, "육아휴직_급여_계산기")
+        assert "G-LEGAL-CURRENT" in _gate_names(fails)
+
+    def test_no_amount_passes(self):
+        """금액 없이 지급률·조건만 서술 → PASS."""
+        body = "<p>육아휴직 급여는 통상임금의 80%를 기준으로 산정되며, 정확한 지급액은 고용노동부 최신 안내를 참고하세요.</p>"
+        fails = check_g_legal_current(body, "육아휴직_급여_계산기")
+        assert "G-LEGAL-CURRENT" not in _gate_names(fails)
+
+    def test_other_slug_amount_not_flagged(self):
+        """severance-pay 예시 금액 600만원 → 금액 금지 미적용 (slug별 정책)."""
+        body = "<p>퇴직금은 600만원입니다.</p>"
+        fails = check_g_legal_current(body, "severance-pay")
+        assert "G-LEGAL-CURRENT" not in _gate_names(fails)
+
+
+class TestStep5bDerivedConsistency:
+    """G-CONSISTENCY 파생금액 식의 요율 ↔ SSOT 금지값 대조 + 만원 단위 상한/하한."""
+
+    def test_derived_outdated_rate_fails(self):
+        """'107,850원 × 12.96% = 13,977원' 파생식의 구요율 → FAIL."""
+        body = (
+            "<h2>계산 원리</h2><p>장기요양 107,850원 × 12.96% = 13,977원.</p>"
+            "<h2>FAQ</h2><dl><dt>Q</dt><dd>답변.</dd></dl>"
+        )
+        fails = check_g_consistency(body, slug="four-insurances")
+        assert "G-CONSISTENCY" in _gate_names(fails)
+
+    def test_derived_current_rate_passes(self):
+        """파생식이 현행 요율 사용(4.75%) → 오탐 없음."""
+        body = (
+            "<h2>계산 원리</h2><p>국민연금 142,500원(300만원 × 4.75%).</p>"
+            "<h2>FAQ</h2><dl><dt>Q</dt><dd>답변.</dd></dl>"
+        )
+        fails = check_g_consistency(body, slug="four-insurances")
+        assert "G-CONSISTENCY" not in _gate_names(fails)
+
+    def test_manwon_ceiling_inconsistency_fails(self):
+        """만원 단위 상한: 본문 '상한 150만원' vs FAQ '상한 250만원' → FAIL (regex 보강)."""
+        body = (
+            "<h2>지급 조건</h2><p>육아휴직 급여 상한 150만원 수준입니다.</p>"
+            "<h2>FAQ</h2><dl><dt>Q</dt><dd>상한 250만원입니다.</dd></dl>"
+        )
+        fails = check_g_consistency(body)
+        assert "G-CONSISTENCY" in _gate_names(fails)
+
+    def test_manwon_ceiling_consistent_passes(self):
+        """본문·FAQ 모두 '상한 150만원' → PASS."""
+        body = (
+            "<h2>지급 조건</h2><p>상한 150만원입니다.</p>"
+            "<h2>FAQ</h2><dl><dt>Q</dt><dd>상한 150만원입니다.</dd></dl>"
+        )
+        fails = check_g_consistency(body)
+        assert "G-CONSISTENCY" not in _gate_names(fails)
+
+    def test_amount_ban_in_integration(self):
+        """통합 실행에서 육아휴직 금액 미언급 → critical 탐지."""
+        body = (
+            "<h2>지급 대상</h2><p>대상.</p>"
+            "<h2>근로시간 조건</h2><p>조건.</p>"
+            "<h2>제외 대상</h2><p>제외.</p>"
+            "<h2>계산 방법</h2><p>200만원 × 0.8 = 160만원 예시.</p>"
+            "<h2>FAQ</h2><p>FAQ.</p>"
+        )
+        _, failed = run_integrity_gates(body, slug="육아휴직_급여_계산기", intent="eligibility")
+        assert any(f["gate"] == "G-LEGAL-CURRENT" and f["grade"] == "critical" for f in failed)

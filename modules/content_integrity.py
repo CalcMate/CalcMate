@@ -22,6 +22,57 @@ from modules.publish_quality import _plain_text as _strip_html
 # 공통 유틸리티
 # ═══════════════════════════════════════════════════════════════════════════
 
+# 자연어 기간 표현 → 표준 형태 (G-LEGAL-CURRENT/G-CONSISTENCY 검증용)
+_DURATION_SYNONYMS = {
+    "일주일": "7일",
+    "보름": "15일",
+}
+
+
+def _normalize_duration_text(text: str) -> str:
+    """
+    법정 기간·요율·금액의 자연어 변형을 표준 형태로 정규화한다.
+    SSOT 대조 전용이므로 문맥 무관 전역 치환해도 안전하다.
+
+    - 일주일 → 7일, 보름 → 15일
+    - '안에' → '이내' (예: '7일 안에' → '7일 이내')
+    - 'N일 내(에)' → 'N일 이내(에)'
+    - 'N일이내' → 'N일 이내' (공백 통일)
+    - '3.595 %' → '3.595%' (요율 공백 제거)
+    - '150만 원' → '150만원', '13,977 원' → '13,977원' (금액 공백 제거)
+    """
+    out = text
+    for src, dst in _DURATION_SYNONYMS.items():
+        out = out.replace(src, dst)
+    out = out.replace("안에", "이내")
+    out = re.sub(r"(\d+)\s*일\s*내(?=에|$)", r"\1일 이내", out)
+    out = re.sub(r"(\d+)\s*일\s*이내", r"\1일 이내", out)
+    out = re.sub(r"(\d+\.?\d*)\s*%", r"\1%", out)
+    out = re.sub(r"([\d,]+)\s*만\s*원", r"\1만원", out)
+    out = re.sub(r"([\d,]+)\s*원", r"\1원", out)
+    return out
+
+
+# 금액(만원·원) 패턴 — forbid_amounts 정책(금액 미언급) 검사용
+_AMOUNT_RE = re.compile(r"(\d[\d,]*)\s*(만\s*원|원)")
+_AMOUNT_BAN_THRESHOLD = 10_000  # 1만원 미만 소액은 오탐 방지를 위해 제외
+
+
+def _find_amounts(text: str) -> list[tuple[int, str]]:
+    """텍스트에서 금액(만원/원) 추출 → [(원 단위 금액, 정규화된 원문)]"""
+    found: list[tuple[int, str]] = []
+    for m in _AMOUNT_RE.finditer(text):
+        try:
+            num = int(m.group(1).replace(",", ""))
+        except ValueError:
+            continue
+        unit = m.group(2).replace(" ", "")
+        if unit == "만원":
+            num *= 10_000
+        found.append((num, m.group(0).replace(" ", "")))
+    return found
+
+
 def _format_krw(amount: int) -> list[str]:
     """
     정수 원화 금액 → 본문에서 검색 가능한 표기 변형 목록.
@@ -280,24 +331,31 @@ def check_g_legal_current(
     G-LEGAL-CURRENT: SSOT 기반 법정수치 최신성 검사.
 
     1. 블랙리스트 검사: forbidden_in_content 값이 본문에 있으면 CRITICAL fail.
+       자연어 변형(일주일/안에/내 등)은 정규화 후 대조한다.
     2. 긍정검증: requires_in_content_for_intents 항목의 현행값이 본문에 없으면 major fail.
-       단, SSOT가 관리하는 법정수치에만 적용 — 일반 산술 예시·계산 결과 제외.
+    3. 금액 금지(forbid_amounts): SSOT에 금액 미언급 정책이면 금액 자체 등장 시 CRITICAL fail.
     """
     if not slug:
         return []
     try:
-        from modules.law_ssot import get_forbidden_in_content, get_positive_check_items
+        from modules.law_ssot import (
+            get_forbidden_in_content,
+            get_positive_check_items,
+            get_amount_ban_flag,
+        )
         forbidden = get_forbidden_in_content(slug)
         positive = get_positive_check_items(slug, intent or "") if intent else []
+        amount_ban = get_amount_ban_flag(slug)
     except Exception:
         return []
 
     fails: list[dict] = []
     text = _strip_html(body_html)
+    norm_text = _normalize_duration_text(text)
 
-    # 1. 블랙리스트 검사
+    # 1. 블랙리스트 검사 (자연어 변형 정규화 후)
     for entry in forbidden:
-        if entry["value"] in text:
+        if entry["value"] in norm_text:
             fails.append({
                 "gate": "G-LEGAL-CURRENT",
                 "grade": "critical",
@@ -308,10 +366,10 @@ def check_g_legal_current(
                 ),
             })
 
-    # 2. 긍정검증 (intent 해당 항목만)
+    # 2. 긍정검증 (intent 해당 항목만, 자연어 변형 허용)
     for entry in positive:
         current_val = entry["value"]
-        if current_val and current_val not in text:
+        if current_val and current_val not in norm_text:
             fails.append({
                 "gate": "G-LEGAL-CURRENT",
                 "grade": "major",
@@ -321,6 +379,19 @@ def check_g_legal_current(
                     f"[근거: {entry['legal_basis']}]"
                 ),
             })
+
+    # 3. 금액 금지 규칙 (forbid_amounts — 접두어 없는 파생계산값 포함)
+    if amount_ban:
+        for amount, raw in _find_amounts(norm_text):
+            if amount >= _AMOUNT_BAN_THRESHOLD:
+                fails.append({
+                    "gate": "G-LEGAL-CURRENT",
+                    "grade": "critical",
+                    "detail": (
+                        f"금액 미언급 정책 위반: '{raw}' 탐지 — "
+                        f"이 글에서는 구체 금액을 언급하지 않고 소관기관 최신 안내를 참고하도록 서술해야 합니다"
+                    ),
+                })
 
     return fails
 
@@ -391,11 +462,16 @@ def get_content_freshness(row: dict) -> str:
 _RATE_RE = re.compile(r'(\d+\.?\d*)%')
 _RATE_RANGE = (0.5, 30.0)
 
-# "상한[액] N원" / "하한[액] N원" 패턴 (법정 상한/하한 금액)
-_CEIL_FLOOR_RE = re.compile(r'(?:상한액?|하한액?)\s*([\d,]+)\s*원')
+# "상한[액] N만원" / "상한[액] N원" / "하한[액] ..." 패턴 (법정 상한/하한 금액)
+_CEIL_FLOOR_RE = re.compile(r'(?:상한액?|하한액?)\s*([\d,]+)\s*(만\s*원|원)')
 
 # "N일 이내" / "N일이내" 패턴 (법정기간)
 _PERIOD_DAY_RE = re.compile(r'(\d+)\s*일\s*이내')
+
+# 파생금액 식: "A(만)원 × R% = C(만)원" (R가 명시적 %인 경우만)
+_DERIVED_RATE_RE = re.compile(
+    r'([\d,]+)\s*(?:만\s*원|원)\s*[×x×]\s*([\d.]+)%\s*=\s*(?:약\s*)?([\d,]+)\s*(?:만\s*원|원)'
+)
 
 
 def _extract_insurance_rates(text: str) -> set[str]:
@@ -412,14 +488,53 @@ def _extract_insurance_rates(text: str) -> set[str]:
 
 
 def _extract_legal_ceilings(text: str) -> set[int]:
-    """텍스트에서 '상한[액] N원' / '하한[액] N원' 금액(숫자) 추출."""
+    """텍스트에서 '상한[액] N만원' / '상한[액] N원' 금액(원 단위) 추출."""
     result: set[int] = set()
     for m in _CEIL_FLOOR_RE.finditer(text):
         try:
-            result.add(int(m.group(1).replace(",", "")))
+            num = int(m.group(1).replace(",", ""))
         except ValueError:
-            pass
+            continue
+        unit = m.group(2).replace(" ", "")
+        if unit == "만원":
+            num *= 10_000
+        result.add(num)
     return result
+
+
+def _check_derived_amount_ssot(body_text: str, slug: str) -> list[dict]:
+    """
+    파생금액 식에 쓰인 요율(%)이 SSOT 금지(구)값이면 major fail.
+    예: '107,850원 × 12.96% = 13,977원' — 12.96%가 SSOT 금지값이면 탐지.
+    일반 사용자 계산 예시(임의 급여 × 임의 요율)는 SSOT 금지값과 무관하면 통과.
+    """
+    try:
+        from modules.law_ssot import get_forbidden_in_content
+        forbidden = get_forbidden_in_content(slug)
+    except Exception:
+        return []
+    if not forbidden:
+        return []
+    forbidden_rates = {f["value"] for f in forbidden if "%" in f["value"]}
+    if not forbidden_rates:
+        return []
+
+    fails: list[dict] = []
+    norm_text = _normalize_duration_text(body_text)
+    for m in _DERIVED_RATE_RE.finditer(norm_text):
+        base = m.group(1)
+        rate_pct = m.group(2) + "%"
+        result = m.group(3)
+        if rate_pct in forbidden_rates:
+            fails.append({
+                "gate": "G-CONSISTENCY",
+                "grade": "major",
+                "detail": (
+                    f"파생계산식에 금지 요율 '{rate_pct}' 사용 "
+                    f"({base} × {rate_pct} = {result}) — SSOT 현행값으로 대체 필요"
+                ),
+            })
+    return fails
 
 
 def _extract_legal_periods(text: str) -> set[int]:
@@ -433,11 +548,12 @@ def _extract_legal_periods(text: str) -> set[int]:
     return result
 
 
-def check_g_consistency(body_html: str) -> list[dict]:
+def check_g_consistency(body_html: str, slug: str | None = None) -> list[dict]:
     """
     FAQ ↔ 본문 수치 일관성 검사.
     비교 대상: 보험료율(%), 법정 상한/하한 금액(원), 법정기간(N일 이내).
     동일한 법정 사실끼리만 비교 — FAQ에만 있고 본문에 없는 값 = 불일치.
+    추가로 파생금액 식의 요율이 SSOT 금지(구)값이면 탐지.
     """
     faq_match = re.search(r'<h2[^>]*>FAQ</h2>(.*)', body_html, re.I | re.S)
     if not faq_match:
@@ -446,10 +562,18 @@ def check_g_consistency(body_html: str) -> list[dict]:
     faq_text = _strip_html(faq_match.group(1))
     body_text = _strip_html(body_html[:faq_match.start()])
 
+    # 자연어 변형 정규화 (일주일/안에/N일내/금액 공백 등)
+    faq_text = _normalize_duration_text(faq_text)
+    body_text = _normalize_duration_text(body_text)
+
     if not body_text.strip():
         return []
 
     fails: list[dict] = []
+
+    # --- 0. 파생금액 식의 요율 ↔ SSOT 금지값 대조 (본문 기준) ---
+    if slug:
+        fails.extend(_check_derived_amount_ssot(body_text, slug))
 
     # --- 1. 보험료율(%) 비교 ---
     faq_rates = _extract_insurance_rates(faq_text)
@@ -575,7 +699,7 @@ def run_integrity_gates(
     all_failed.extend(check_g_legal(body_html, slug))
     all_failed.extend(check_g_style_plus(body_html))
     all_failed.extend(check_g_legal_current(body_html, slug, intent=intent))
-    all_failed.extend(check_g_consistency(body_html))
+    all_failed.extend(check_g_consistency(body_html, slug=slug))
     all_failed.extend(check_g_h2_structure(body_html, intent))
 
     failed_names = {f["gate"] for f in all_failed}

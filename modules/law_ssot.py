@@ -87,7 +87,28 @@ def get_ssot_prompt_block(slug: str) -> str:
         if it.get("legal_basis"):
             line += f"  (근거: {it['legal_basis']})"
         lines.append(line)
+
+    # 금액 미언급 정책(forbid_amounts)이면 강력한 금지 지시문 추가
+    if get_amount_ban_flag(slug):
+        lines.append(
+            "\n[금액 미언급 필수 지시 — 반드시 준수]\n"
+            "- 이 글에는 어떤 금액(만원·원 단위)도 절대 언급하지 않는다.\n"
+            "- 계산 예시를 들 때도 통상임금·급여를 숫자로 쓰지 않고 '통상임금'이라고만 표현한다.\n"
+            "- '금액은 고용노동부 최신 안내를 참고' 취지로 서술한다."
+        )
     return "\n".join(lines)
+
+
+def get_amount_ban_flag(slug: str) -> bool:
+    """
+    slug의 content_ssot 항목 중 forbid_amounts: true 가 있는지 여부.
+    True면 게시물 본문/FAQ에 금액(만원·원 단위) 자체가 등장해서는 안 된다.
+    """
+    ssot = get_slug_ssot(slug)
+    return any(
+        item.get("forbid_amounts")
+        for item in ssot.get("items", [])
+    )
 
 
 def get_related_slugs(slug: str) -> list[str]:
