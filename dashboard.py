@@ -1903,7 +1903,13 @@ elif tab == "🧮 계산기 관리":
                 st.success(f"✅ 저장: data/workspace/{slug}/ (index.html · style.css · script.js). "
                            f"index.html 더블클릭 시 CSS/JS 상대경로 연결 정상 — GitHub Pages와 동일 구조.")
             if b[3].button("🗑 삭제", key=f"cm_del_{cid}"):
-                repo.delete(cid); st.rerun()
+                # DB row만 지우면 registry_auto.yaml/v3 Registry에 orphan 엔트리가 남는다
+                # (STEP 28-157에서 실제 재현 확인) — delete_app()으로 DB+registry 일괄 정리.
+                _del_slug = str(c.get("slug", cid)).strip()
+                _del_ok, _del_msg = AF_CM.delete_app(cfg, _del_slug)
+                (st.success if _del_ok else st.error)(_del_msg)
+                if _del_ok:
+                    st.rerun()
 
             # ── Build 버튼 (READY 상태 app_factory 계산기만) ─────────────
             _is_ready_af = (_v3e.get("source") == "app_factory" and
