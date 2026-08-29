@@ -56,6 +56,7 @@ def generate_article(cfg: dict, calc: dict, seo: dict = None, faq: list = None,
         LOG.warning("토큰 비용 기록 실패: %s", _e)
     html = cleaner.parse_html_body(text)
     html = cleaner.strip_prompt_artifacts(html)
+    html = cleaner.normalize_html_output(html)
 
     if review:
         try:
@@ -69,6 +70,7 @@ def generate_article(cfg: dict, calc: dict, seo: dict = None, faq: list = None,
             except Exception:
                 pass
             html = cleaner.parse_html_body(rtext) or html
+            html = cleaner.normalize_html_output(html)
         except Exception as e:
             LOG.warning("본문 검수 실패(무시): %s", e)
     return html
