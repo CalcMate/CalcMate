@@ -227,6 +227,9 @@ annual-leave-remaining:
     checked: false
     checked_by: null
     checked_at: null
+  compute_rules:
+    non_negative_inputs:
+    - car_price
 bmi-calculator:
   name: BMI(체질량지수) 계산기
   slug: bmi-calculator
@@ -322,3 +325,6 @@ bmi-calculator:
     checked: false
     checked_by: null
     checked_at: null
+  compute_rules:
+    min_value:
+      height_cm: 50

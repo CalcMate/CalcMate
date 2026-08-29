@@ -317,16 +317,11 @@ def test_other_v2_fields_preserved_for_fixed_slugs():
     assert reb["category"] == "부동산/임대"
 
 
-def test_drift_detector_reports_only_expected_two_compute_rules_drifts():
-    """STEP 28-134 정합화 이후, 실제 registry 전체에서 남은 drift는 정확히
-    bmi-calculator/자동차_취등록세_계산기의 compute_rules 2건뿐이어야 한다."""
+def test_drift_detector_reports_zero_drift_after_full_sync():
+    """STEP 28-134(field_labels) + STEP 28-135(compute_rules, update_compute_rules()
+    사용) 정합화 이후, 실제 registry v2 slug 전체에서 공통 필드 drift가 0건이어야 한다."""
     v2 = _load_real_v2()
     v3 = _load_real_v3()
     drifts = detect_registry_drift(v2, v3, slugs=sorted(v2.keys()))
 
-    assert len(drifts) == 2, _format_drift_report(drifts)
-    by_slug = {d["slug"]: d["field"] for d in drifts}
-    assert by_slug == {
-        "bmi-calculator": "compute_rules",
-        "자동차_취등록세_계산기": "compute_rules",
-    }
+    assert len(drifts) == 0, _format_drift_report(drifts)
