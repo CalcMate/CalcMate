@@ -117,6 +117,28 @@ def _next_display_order() -> int:
     return max(orders, default=9) + 1
 
 
+_CARD_DESC_MAX = 45
+_SENTENCE_END_RE = re.compile(r"[.!?。！？](?=\s|$)")
+
+
+def _make_card_desc(desc: str, limit: int = _CARD_DESC_MAX) -> str:
+    """desc → 카드 UI용 짧은 설명. limit자 이내면 그대로, 초과 시 첫 문장이
+    limit자 이내면 문장 전체를 우선 사용하고, 그렇지 않으면 단어 경계에서
+    잘라 '…'를 붙인다(단어 중간 절단 금지)."""
+    desc = (desc or "").strip()
+    if len(desc) <= limit:
+        return desc
+    m = _SENTENCE_END_RE.search(desc)
+    if m and m.end() <= limit:
+        return desc[:m.end()].strip()
+    truncated = desc[:limit].rstrip()
+    cut = truncated.rfind(" ")
+    if cut > 0:
+        truncated = truncated[:cut]
+    truncated = truncated.rstrip(" .,!?、，。！？…")
+    return (truncated or desc[:limit]) + "…"
+
+
 def _build_v3_entry(app: dict, slug: str, tier: int = 2, contract: dict = None) -> dict:
     """v3 Registry(docs/registry/*_af.yaml)에 기록할 엔트리 생성.
     기존 8개 계산기 형식과 동일 스키마 + status/tier/source 추가.
@@ -128,7 +150,7 @@ def _build_v3_entry(app: dict, slug: str, tier: int = 2, contract: dict = None) 
         ins, outs, app.get("formula", ""))
     name = app.get("name", "")
     desc = (app.get("description", "") or app.get("seo_desc", "") or "").strip()
-    card_desc = (desc[:45] + "…") if len(desc) > 45 else desc
+    card_desc = _make_card_desc(desc)
     entry = {
         "name": name,
         "slug": slug,
