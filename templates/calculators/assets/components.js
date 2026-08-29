@@ -10,6 +10,23 @@
   // (-0 + 0 === 0, toLocaleString()은 부호까지 그대로 반영하므로 +0으로 정규화 필요).
   function comma(n) { return (Math.round(n) + 0).toLocaleString(); }
 
+  // STEP 28-136: calculate()의 기존 가드(!isFinite(num(outputs[CFG.primaryOutput])))는
+  // primaryOutput 한 필드만 검사한다. renderResult()는 CFG.outputs 전체(다중 출력)를
+  // 화면에 렌더링하므로, primaryOutput이 아닌 다른 출력 필드가 NaN/Infinity/-Infinity가
+  // 되면 가드를 통과해 그대로("NaN원", "∞" 등) 화면에 노출될 수 있다. 이 함수는 그
+  // 간극을 메우는 순수 안전성 검사로, 특정 계산기의 Validation 정책이 아니라
+  // outputs object 전체(문자열/배열/notices 등은 건드리지 않고 숫자 타입 값만)를
+  // 대상으로 하는 계산기 공통 방어다.
+  function _hasNonFiniteNumericOutput(outputs) {
+    for (var k in outputs) {
+      if (Object.prototype.hasOwnProperty.call(outputs, k) &&
+          typeof outputs[k] === "number" && !isFinite(outputs[k])) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
@@ -281,7 +298,7 @@
     try {
       outputs = (typeof w.computeResult === "function") ? w.computeResult(inputs) : null;
     } catch (e) { console.error(e); outputs = null; }
-    if (!outputs || !isFinite(num(outputs[CFG.primaryOutput]))) {
+    if (!outputs || !isFinite(num(outputs[CFG.primaryOutput])) || _hasNonFiniteNumericOutput(outputs)) {
       var errEl = d.getElementById("calc-error");
       if (!errEl) {
         errEl = d.createElement("p");
