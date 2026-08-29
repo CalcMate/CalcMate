@@ -1916,3 +1916,69 @@ def save_af_checklist(slug: str, checklist: list[dict]) -> None:
     yaml_file.write_text(_AF_HEADER + "\n" + body, encoding="utf-8")
     invalidate()
     LOG.info("체크리스트 갱신: %s", slug)
+
+
+def update_compute_rules(slug: str, rules: dict) -> tuple[bool, str]:
+    """기존 App Factory 계산기의 compute_rules를 v2(registry_auto.yaml)와
+    v3(docs/registry/*_af.yaml)에 동시에 반영한다(STEP 28-130).
+
+    이 함수는 Validation 정책을 추론/생성하지 않는다 — rules는 이미 사람이 확정한
+    내용을 그대로 받아 두 registry에 정확히 기록하는 것이 유일한 역할이다.
+    compute_rules 외의 다른 필드(name/category/field_labels/formula/law/status/
+    review_checklist 등)는 절대 건드리지 않는다.
+
+    사전 검증을 전부 통과해야만 쓰기를 시작한다(한쪽만 갱신되는 사고 방지):
+      1. rules가 dict가 아니면 TypeError.
+      2. slug가 v2(registry_auto.yaml)에 없으면 ValueError — v3도 쓰지 않는다.
+      3. slug가 v3(docs/registry/*_af.yaml)에 없거나 source != app_factory면
+         ValueError — v2도 쓰지 않는다(save_af_checklist()와 동일한 보호 기준).
+
+    rules={} 는 기존 시스템의 "compute_rules 없음"과 동일한 의미(falsy)로
+    그대로 저장한다 — 별도의 특수 처리를 하지 않는다."""
+    import yaml
+    from .registry_loader import _read_yaml, _AUTO_PATH, add_auto_entry, load_registry_v3, invalidate
+
+    if not isinstance(rules, dict):
+        raise TypeError(f"compute_rules는 dict여야 합니다: {type(rules)!r}")
+
+    # ── 1) v2 엔트리 존재 확인(읽기만 — 아직 아무것도 쓰지 않는다) ──
+    v2_data = _read_yaml(_AUTO_PATH)
+    if slug not in v2_data or not isinstance(v2_data.get(slug), dict):
+        raise ValueError(f"v2 Registry(registry_auto.yaml)에 '{slug}' 없음 — 갱신 거부")
+    v2_entry = dict(v2_data[slug])  # 얕은 복사 — compute_rules 외 필드 보존용
+
+    # ── 2) v3 엔트리 존재 확인(읽기만) ──
+    v3_index = load_registry_v3(force=True)
+    v3_meta = v3_index.get(slug)
+    if v3_meta is None or v3_meta.get("source") != "app_factory":
+        raise ValueError(f"'{slug}'은 v3 Registry에 없거나 App Factory 계산기가 아님 — 갱신 거부")
+
+    category = v3_meta.get("category", "")
+    yaml_name = _category_to_af_yaml(category)
+    yaml_file = _REG_DIR / f"{yaml_name}.yaml"
+    try:
+        v3_file_data = yaml.safe_load(yaml_file.read_text(encoding="utf-8")) or {}
+    except FileNotFoundError:
+        raise ValueError(f"v3 Registry 파일 없음: {yaml_file.name} — 갱신 거부")
+    if not isinstance(v3_file_data, dict) or slug not in v3_file_data:
+        raise ValueError(f"'{slug}'이 {yaml_file.name} 파일 내용에 없음 — 갱신 거부")
+
+    # ── 사전 검증 통과 — 여기서부터 실제 쓰기 시작 ──
+    # v2: 기존 add_auto_entry()는 엔트리 전체를 교체하므로, 반드시 기존 엔트리를
+    # 얕은 복사해 compute_rules만 바꾼 뒤 전달한다(다른 필드 보존).
+    v2_entry["compute_rules"] = rules
+    add_auto_entry(slug, v2_entry)
+
+    # v3: save_af_checklist()와 동일한 방식으로 해당 slug의 compute_rules만 갱신.
+    v3_file_data[slug]["compute_rules"] = rules
+    _AF_HEADER = (
+        f"# registry/{yaml_name}.yaml — App Factory 자동생성 계산기 (v3 SSOT)\n"
+        "# ⚠️ 이 파일은 App Factory(modules/app_factory)가 자동으로 씁니다. 직접 편집 주의.\n"
+        "# status: HOLD = legal 검증 대기 중 (index/sitemap 비노출)\n"
+        "# status: READY = 공개 (index/sitemap 포함, CalcMate 정적 사이트 빌드 대상)\n"
+    )
+    body = yaml.dump(v3_file_data, allow_unicode=True, sort_keys=False, default_flow_style=False)
+    yaml_file.write_text(_AF_HEADER + "\n" + body, encoding="utf-8")
+    invalidate()
+    LOG.info("compute_rules 갱신(v2+v3): %s", slug)
+    return True, f"'{slug}' compute_rules를 v2/v3 registry에 동시 반영 완료"
