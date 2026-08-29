@@ -246,7 +246,7 @@ bmi-calculator:
   output_labels:
   - bmi
   display_order: 14
-  card_desc: 키와 몸무게를 입력하면 체질량지수(BMI)를 계산하고 체중 상태를 확인할 수 있습…
+  card_desc: 키와 몸무게를 입력하면 체질량지수(BMI)를 계산하고 체중 상태를 확인할 수 있습니다.
   difficulty: simple
   difficulty_status: provisional
   status: HOLD
