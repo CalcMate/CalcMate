@@ -157,7 +157,7 @@ annual-leave-remaining:
   input_labels: []
   output_labels: []
   display_order: 13
-  card_desc: 사용자가 차량의 종류, 가격, 지역 등을 입력하면 자동차를 구매할 때 필요한 취득…
+  card_desc: 사용자가 차량의 종류, 가격, 지역 등을 입력하면 자동차를 구매할 때 필요한 취득세와 등록세를 자동으로 계산해주는 계산기입니다.
   difficulty: multi_output
   difficulty_status: provisional
   status: HOLD
