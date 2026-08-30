@@ -170,8 +170,58 @@ def _effective_labels(calc: dict) -> dict:
     return {**reg_fl, **db_labels}  # DB가 registry보다 우선
 
 
+def _rewrite_two_arg_round(expr: str) -> str:
+    """round(x, N)(2-인자, 자릿수 반올림) 호출만 pyRound(x, N)으로 바꾼다.
+    round(x)(1-인자)는 손대지 않고 그대로 두어 아래 _JS_FUNCS의 기존
+    round→Math.round 치환이 그대로 적용되게 한다(STEP 28-140).
+
+    JS Math.round()는 두 번째 인자를 지원하지 않아 자릿수가 조용히 소실되므로
+    (예: round(22.49, 2) → Math.round(22.49, 2) → 실제로는 22), 자릿수 반올림이
+    필요한 호출만 골라내 공통 helper(templates/calculators/assets/components.js
+    의 pyRound())로 연결한다.
+
+    괄호 중첩을 고려해 실제 top-level 인자 개수를 스캔한다 — 단순 정규식으로는
+    round(weight_kg / ((height_cm / 100) ** 2), 2)처럼 중첩 괄호가 있는 표현이나
+    round(min(a, b), 2)처럼 인자 자체가 함수 호출인 경우 콤마 위치를 잘못
+    판단할 수 있다."""
+    result = []
+    i, n = 0, len(expr)
+    word_re = re.compile(r"round\s*\(")
+    while i < n:
+        m = word_re.match(expr, i)
+        if not m or (i > 0 and (expr[i - 1].isalnum() or expr[i - 1] == "_")):
+            result.append(expr[i])
+            i += 1
+            continue
+        start_paren = m.end() - 1
+        depth = 0
+        top_level_commas = []
+        end_paren = None
+        for k in range(start_paren, n):
+            ch = expr[k]
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+                if depth == 0:
+                    end_paren = k
+                    break
+            elif ch == "," and depth == 1:
+                top_level_commas.append(k)
+        if end_paren is None:  # 괄호가 안 닫힘 — 비정상 입력 방어, 그대로 둠
+            result.append(expr[i])
+            i += 1
+            continue
+        inner = _rewrite_two_arg_round(expr[start_paren + 1:end_paren])
+        fname = "pyRound" if len(top_level_commas) == 1 else "round"
+        result.append(f"{fname}({inner})")
+        i = end_paren + 1
+    return "".join(result)
+
+
 def _to_js(expr: str) -> str:
     s = str(expr)
+    s = _rewrite_two_arg_round(s)
     for fn, jsfn in _JS_FUNCS.items():
         s = re.sub(rf"\b{fn}\s*\(", f"{jsfn}(", s)
     # Python floor division (//) → JS Math.floor(a / b)

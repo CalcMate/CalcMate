@@ -10,6 +10,28 @@
   // (-0 + 0 === 0, toLocaleString()은 부호까지 그대로 반영하므로 +0으로 정규화 필요).
   function comma(n) { return (Math.round(n) + 0).toLocaleString(); }
 
+  // STEP 28-140: Python round(x, N)을 계산기 formula에서 그대로 옮기면 JS Math.round()가
+  // 두 번째 인자(자릿수)를 조용히 무시해 소수점이 사라진다(_to_js()가 round(x,N)을
+  // pyRound(x,N) 호출로 바꿔 여기로 연결한다 — modules/app_generator.py 참고).
+  // Math.round(value * 10**digits) / 10**digits 방식은 채택하지 않는다 — 곱셈이
+  // 이진 부동소수점 오차를 그대로 증폭시켜 pyRound(1.005, 2)가 1.01이 아니라 1이
+  // 되는 등 잘 알려진 경계값 오류가 있다. 대신 숫자를 10진 문자열로 바꾼 뒤
+  // 지수 표기("1.005e2")로 소수점을 옮겨 다시 파싱한다 — JS 엔진이 10진 리터럴에서
+  // 직접 이진 근사값을 구하므로 곱셈 방식보다 원래 값에 더 가깝게 반올림된다.
+  // 정책: JS Math.round()와 동일하게 0.5는 항상 양의 무한대 방향으로 반올림한다
+  // (Python의 round-half-to-even과 다를 수 있음 — 대부분의 소수 리터럴은 이진수로
+  // 정확히 .5가 아니므로 실제로는 거의 항상 일치하지만, 완전히 동일하다고 가정하지
+  // 않는다. 계산기 도메인의 재무/측정값에서 정확히 .5 tie가 문제되는 사례는
+  // 현재 없음 — STEP 28-140 진단 기준).
+  function pyRound(value, digits) {
+    digits = digits || 0;
+    if (typeof value !== "number" || !isFinite(value)) return value;
+    var shifted = Number(value.toString() + "e" + digits);
+    if (!isFinite(shifted)) return value; // 극단적 자릿수/크기 방어(안전 폴백)
+    var rounded = Math.round(shifted);
+    return Number(rounded.toString() + "e" + (-digits));
+  }
+
   // STEP 28-136: calculate()의 기존 가드(!isFinite(num(outputs[CFG.primaryOutput])))는
   // primaryOutput 한 필드만 검사한다. renderResult()는 CFG.outputs 전체(다중 출력)를
   // 화면에 렌더링하므로, primaryOutput이 아닌 다른 출력 필드가 NaN/Infinity/-Infinity가
@@ -340,6 +362,10 @@
 
   w.calculate = calculate;
   w.smRenderResult = renderResult;
+  // STEP 28-140: 계산기별 생성 코드(이 IIFE 바깥 전역 스코프에서 정의되는
+  // computeResult 함수)가 pyRound()를 호출해야 하므로 명시적으로 전역에
+  // 노출한다(기존 calculate/smRenderResult와 동일한 export 방식).
+  w.pyRound = pyRound;
   if (d.readyState === "loading") d.addEventListener("DOMContentLoaded", init);
   else init();
 })(window, document);

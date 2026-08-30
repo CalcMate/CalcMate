@@ -201,15 +201,37 @@ def _generate_js_for(slug: str) -> str:
     return generate_js(calc, cfg)
 
 
-def _extract_compute_result(js_src: str) -> str:
-    idx = js_src.index("window.computeResult")
-    return js_src[idx:]
-
-
 def _run_compute_result(slug: str, inputs: dict) -> dict:
-    fn_src = _extract_compute_result(_generate_js_for(slug))
+    """실제 generate_js() 전체 번들(components.js 공통 코드 + 계산기별
+    computeResult)을, window === globalThis인 실제 브라우저와 동일한 전역
+    스코프 구조로 Node에서 실행한다.
+
+    STEP 28-140에서 BMI의 computeResult가 round(x,N)을 components.js의 공유
+    helper pyRound()로 위임하게 되면서, computeResult 텍스트만 잘라내 독립
+    실행하던 기존 방식(components.js 미로딩)은 `pyRound is not defined`로
+    깨진다. pyRound를 이 테스트 안에 별도로 재구현하거나 stub으로 대체하지
+    않고, 실제 components.js를 그대로 로드해 진짜 구현이 실행되게 한다 —
+    검증 대상(NaN/Infinity 방어, 정상 계산 결과)은 변경하지 않고 실행
+    환경만 실제 배포되는 script.js와 동일하게 맞춘다."""
+    full_js = _generate_js_for(slug)
+    dom_stub = (
+        "global.window = global;\n"
+        "global.document = {\n"
+        "  getElementById: function () { return null; },\n"
+        "  querySelector: function () { return null; },\n"
+        "  querySelectorAll: function () { return []; },\n"
+        "  createElement: function () { return { classList: { add: function () {}, remove: function () {} }, style: {} }; },\n"
+        "  addEventListener: function () {},\n"
+        "  readyState: 'complete',\n"
+        "};\n"
+        "global.addEventListener = function () {};\n"
+        "global.requestAnimationFrame = function () {};\n"
+        "global.localStorage = { getItem: function () { return null; }, setItem: function () {}, removeItem: function () {} };\n"
+        "global.navigator = { userAgent: 'node-test' };\n"
+        "global.location = { pathname: '/test', href: 'http://localhost/test' };\n"
+    )
     harness = (
-        "global.window = {};\n" + fn_src + "\n"
+        dom_stub + "\n" + full_js + "\n"
         + f"process.stdout.write(JSON.stringify(window.computeResult({json.dumps(inputs)})));\n"
     )
     fd, path = tempfile.mkstemp(suffix=".js")
@@ -228,8 +250,13 @@ def _run_compute_result(slug: str, inputs: dict) -> dict:
 
 
 def test_regression_bmi_normal_and_boundary():
+    """STEP 28-140: round(weight_kg/((height_cm/100)**2), 2)가 이제 pyRound()를
+    거쳐 소수점 2자리를 보존한다(이전에는 Math.round(x, 2)가 두 번째 인자를
+    무시해 22로 잘렸음 — STEP 28-139에서 확인된 버그, 이번 STEP에서 수정 대상).
+    이 STEP의 목적 자체가 이 값을 22 → 22.49로 바로잡는 것이므로, 이 값을
+    수정하는 것은 assertion 완화가 아니라 버그 수정 결과를 반영하는 것이다."""
     out = _run_compute_result("bmi-calculator", {"height_cm": 170, "weight_kg": 65})
-    assert out["bmi"] == 22  # 기존 Math.round 표시 관례 그대로(이번 STEP과 무관, 회귀 확인용)
+    assert out["bmi"] == 22.49
     assert _run_compute_result("bmi-calculator", {"height_cm": 0, "weight_kg": 65}) is None
 
 
