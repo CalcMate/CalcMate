@@ -1012,7 +1012,12 @@ def _compute_js(calc) -> str:
         out_key = next(iter(fmap))
         out_expr = _to_js(next(iter(fmap.values())))
         in_keys = list(ins.keys())
-        if len(in_keys) == 2:
+        # STEP 28-142: 이 특례는 weekly-holiday-allowance의 실제 수식 형태
+        # ("시급 × (주당근로시간÷40×8)")를 그대로 박아둔 것이라, 입력 개수가
+        # 우연히 2개라는 이유만으로 다른 계산기(예: bmi-calculator)에도 적용되면
+        # 의미 없는 문구가 생성된다(STEP 28-141에서 확정). slug를 명시적으로
+        # 확인해 이 계산기 전용으로만 적용한다 — 문구 자체는 한 글자도 바꾸지 않음.
+        if len(in_keys) == 2 and slug == "weekly-holiday-allowance":
             # 기존 2-input 계산기(예: 주휴수당) 문구 그대로 유지 — 회귀 방지.
             formula_str = (f"{in_keys[0]}.toLocaleString() + '원 × (' "
                            f"+ {in_keys[1]} + '÷40×8) = ' "
