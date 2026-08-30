@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2563EB">
+<meta name="naver-site-verification" content="de4ad3f1575284b5a8ea58baab7bc7a77b7cf07e">
+<meta name="description" content="BMI 계산기를 사용하여 신체 질량 지수를 쉽고 빠르게 계산하세요. 키와 몸무게만 입력하면 체중 상태를 확인할 수 있습니다. 건강 및 피트니스 관리에 도움을 드립니다.">
+<title>BMI 계산기 - 체질량지수로 건강 상태 확인하기</title>
+<link rel="canonical" href="https://calcmate.kr/bmi-calculator/">
+<link rel="stylesheet" href="style.css">
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-EP2Q8035VF"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag("js",new Date());gtag("config","G-EP2Q8035VF");</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "BMI 계산기는 어떻게 사용하나요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "BMI 계산기는 키와 몸무게를 입력하면 체질량지수를 계산해줍니다. 이를 통해 자신의 체중 상태를 확인할 수 있습니다."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "BMI 계산기로 알 수 있는 정보는 무엇인가요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "BMI 계산기를 통해 자신의 체질량지수를 알고, 저체중, 정상 체중, 과체중 또는 비만인지 확인할 수 있습니다."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "BMI 수치는 무엇을 의미하나요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "BMI는 체중을 키의 제곱으로 나눈 값으로, 일반적으로 체중 상태를 평가하는 데 사용됩니다."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "BMI 계산의 정확성은 어느 정도인가요?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "BMI는 간단한 체중 상태 확인 용도로 적합하지만, 근육량이나 체지방률 등은 반영하지 않기 때문에 정확한 건강 상태 평가에는 한계가 있습니다."
+      }
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "CalcMate",
+  "url": "https://calcmate.kr",
+  "description": "급여·노무 계산기 모음 — 퇴직금·주휴수당·실업급여·4대보험·연말정산·육아휴직"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "CalcMate",
+      "item": "https://calcmate.kr"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "건강/피트니스",
+      "item": "https://calcmate.kr/#calculators"
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "name": "BMI(체질량지수) 계산기",
+      "item": "https://calcmate.kr/bmi-calculator/"
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<div class="sm-wrap">
+
+  <!-- ① Hero -->
+  <header class="sm-hero">
+        <nav class="sm-hero-nav" aria-label="사이트 내비게이션">
+      <a class="sm-hero-nav-link" href="https://calcmate.kr/">홈</a>
+      <a class="sm-hero-nav-link" href="https://calcmate.kr/#calculators">계산기 목록</a>
+    </nav>
+    <div class="sm-hero-badge">🧮 건강/피트니스</div>
+    <h1>BMI(체질량지수) 계산기</h1>
+    <p class="sm-hero-sub">BMI 계산기를 사용하여 신체 질량 지수를 쉽고 빠르게 계산하세요. 키와 몸무게만 입력하면 체중 상태를 확인할 수 있습니다. 건강 및 피트니스 관리에 도움을 드립니다.</p>
+  </header>
+
+  <!-- ② 계산 입력 -->
+  <section class="sm-card" aria-label="계산 입력">
+    <h2 class="sm-card-title">계산 입력</h2>
+    <div class="sm-field"><label class="sm-label" for="in_height_cm">키</label><div class="sm-input-wrap"><input class="sm-input" type="text" inputmode="numeric" data-comma id="in_height_cm" name="in_height_cm" placeholder="예) 0"><span class="sm-unit">cm</span></div></div>
+<div class="sm-field"><label class="sm-label" for="in_weight_kg">몸무게</label><div class="sm-input-wrap"><input class="sm-input" type="text" inputmode="numeric" data-comma id="in_weight_kg" name="in_weight_kg" placeholder="예) 0"><span class="sm-unit">kg</span></div></div>
+    <button class="sm-btn" type="button" onclick="calculate()">BMI(체질량지수) 계산하기</button>
+  </section>
+
+  <!-- ③ 결과 카드 -->
+  <div class="sm-result-card" id="result-card" role="region" aria-label="계산 결과" aria-live="polite">
+    <div class="sm-result-label">예상 체질량지수</div>
+    <div>
+      <span class="sm-result-value" id="out_bmi">-</span>
+      <span class="sm-result-unit">BMI</span>
+    </div>
+
+    <div class="sm-result-sub" id="result-formula"></div>
+    <!-- ③-CTA: 결과 하단 CTA (정적, Phase D에서 개인화) -->
+        <div id="sm-result-cta" class="sm-result-cta">
+      <p class="sm-result-cta-text">더 알아보기</p>
+      <div class="sm-result-cta-links"><a class="sm-result-cta-link" href="https://calcmate.kr/">전체 계산기 보기</a></div>
+    </div>
+  </div>
+
+  <!-- ④ 결과 액션 버튼 (계산 후에만 표시) -->
+  <div class="sm-result-actions" id="result-actions">
+    <button class="sm-action-btn" type="button" data-action="result_save" onclick="saveResultPng()">
+      <span class="sm-action-icon" aria-hidden="true">📄</span>결과 저장
+    </button>
+    <button class="sm-action-btn" type="button" data-action="share" onclick="kakaoShare()">
+      <span class="sm-action-icon" aria-hidden="true">💬</span>카카오 공유
+    </button>
+    <button class="sm-action-btn" type="button" data-action="pwa" id="pwa-btn" onclick="pwaInstall()">
+      <span class="sm-action-icon" aria-hidden="true">📱</span>홈 화면 추가
+    </button>
+  </div>
+
+  <!-- ⑤ Notices: 계산 결과 안내 메시지 (JS가 동적으로 채움) -->
+  <div class="sm-notices" id="notices-container" role="status" aria-label="계산 결과 안내"></div>
+
+  <!-- ⑥ 계산 과정 보기 (Phase C: step accordion, JS가 채움) -->
+  <section class="sm-card" id="steps-card" style="display:none" aria-label="계산 과정">
+    <h2 class="sm-card-title">계산 과정 보기</h2>
+    <div id="steps-list"></div>
+  </section>
+
+  <!-- ⑦ 기존 계산 상세 (steps-card 없는 계산기 폴백) -->
+  <section class="sm-card" id="detail-card" style="display:none" aria-label="계산 상세">
+    <h2 class="sm-card-title">계산 상세</h2>
+    <div id="detail-rows"></div>
+  </section>
+
+  <!-- ⑧ 안내사항 -->
+  <div class="sm-notice" role="note">
+    <span class="sm-notice-icon" aria-hidden="true">⚠️</span>
+    <span>본 계산 결과는 참고용이며, 실제 지급액은 근로계약·관련 법령에 따라 달라질 수 있습니다.</span>
+  </div>
+
+
+
+  <!-- ⑧ 본문 -->
+  <section class="sm-card sm-article">
+    <BODY_HTML_START>
+<h2>계산 원리</h2>
+<p>체질량지수(BMI)는 신체의 체중과 키를 바탕으로 건강 상태를 측정하는 지표입니다. 법적 근거에 따라, BMI는 영국의 보건 당국에서 건강 관련 통계 수치로 활용되고 있습니다. BMI는 다음과 같은 단계를 통해 계산됩니다: </p>
+<ol>
+  <li>체중을 킬로그램(kg)으로 측정합니다.</li>
+  <li>신장을 센티미터(cm)로 측정한 후, 미터(m)로 환산합니다.</li>
+  <li>BMI는 다음 공식을 사용하여 계산됩니다: <p>BMI = 체중(kg) / (신장(m) * 신장(m))</p></li>
+</ol>
+<p>예시 1: 키가 175cm이고 몸무게가 70kg인 경우, BMI는 22.86입니다. <br>
+예시 2: 키가 160cm이고 몸무게가 50kg인 경우, BMI는 19.53입니다.</p>
+
+<h2>지급 조건</h2>
+<p>BMI는 모든 성인에게 적용되지만, 특정 조건에 따라 지나치게 낮거나 높은 BMI는 비정상적인 건강 상태를 암시할 수 있습니다. <strong>제외 조건</strong>으로는 어린이, 임산부, 특정 질환을 앓고 있는 환자 등이 있습니다. <strong>중요 기준</strong>은 BMI 수치가 18.5 이하일 경우 저체중, 18.5~24.9일 경우 정상 체중, 25~29.9일 경우 과체중, 30 이상일 경우 비만으로 분류된다는 것입니다. </p>
+
+<h2>주의사항</h2>
+<p>자주 발생하는 오류는 다음과 같습니다: </p>
+<ul>
+  <li>신장 단위를 잘못 입력하는 경우. cm와 m를 혼동하지 않도록 주의해야 합니다.</li>
+  <li>체중을 kg 대신 lb(파운드)로 입력하는 경우가 있습니다.</li>
+  <li>BMI가 건강을 단적으로 판단하는 지표가 아니라는 점을 간과하는 경우가 있습니다. 개인의 근육량, 체형 등을 고려해야 합니다.</li>
+</ul>
+
+<h2>FAQ</h2>
+<dl>
+  <dt>BMI가 무엇인가요?</dt>
+  <dd>BMI는 키와 체중을 바탕으로 건강 상태를 평가하는 지표입니다.</dd>
+  <dt>BMI 수치가 낮으면 건강에 문제가 있나요?</dt>
+  <dd>네, BMI가 18.5 이하일 경우 저체중으로 분류되어 건강에 문제가 있을 수 있습니다.</dd>
+  <dt>BMI 수치를 높이기 위한 방법은?</dt>
+  <dd>건강한 식습관과 규칙적인 운동을 통해 체중을 증가시킬 수 있습니다.</dd>
+  <dt>BMI가 높으면 무조건 비만인가요?</dt>
+  <dd>높은 BMI는 비만으로 분류되지만, 근육량이 많은 사람의 경우 정상 체중일 수 있습니다.</dd>
+  <dt>여성과 남성의 BMI 기준이 다른가요?</dt>
+  <dd>BMI 기준은 성별에 관계없이 동일하게 적용됩니다. 그러나 신체 구성 비율은 달라질 수 있습니다.</dd>
+</dl>
+<BODY_HTML_END>
+  </section>
+
+  <!-- Phase C: 본문 중간 CTA -->
+  <div class="sm-inline-cta">
+    <p class="sm-inline-cta-title">지금 바로 BMI(체질량지수) 계산해 보세요</p>
+    <p class="sm-inline-cta-sub">무료 · 회원가입 불필요 · 결과 즉시 확인</p>
+    <a class="sm-inline-cta-btn" href="#" onclick="window.scrollTo({top:0,behavior:'smooth'});return false;">계산 바로 하기 ↑</a>
+  </div>
+
+
+
+  <!-- ⑨ FAQ -->
+  <section class="sm-card" id="faq-card">
+    <h2 class="sm-card-title">자주 묻는 질문</h2>
+    <div id="sm-dynamic-faq"></div>
+    <div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">BMI 계산기는 어떻게 사용하나요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">BMI 계산기는 키와 몸무게를 입력하면 체질량지수를 계산해줍니다. 이를 통해 자신의 체중 상태를 확인할 수 있습니다.</div></div>
+<div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">BMI 계산기로 알 수 있는 정보는 무엇인가요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">BMI 계산기를 통해 자신의 체질량지수를 알고, 저체중, 정상 체중, 과체중 또는 비만인지 확인할 수 있습니다.</div></div>
+<div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">BMI 수치는 무엇을 의미하나요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">BMI는 체중을 키의 제곱으로 나눈 값으로, 일반적으로 체중 상태를 평가하는 데 사용됩니다.</div></div>
+<div class="sm-faq-item"><button class="sm-faq-q" onclick="toggleFaq(this)">BMI 계산의 정확성은 어느 정도인가요?<span class="sm-faq-icon">+</span></button><div class="sm-faq-a">BMI는 간단한 체중 상태 확인 용도로 적합하지만, 근육량이나 체지방률 등은 반영하지 않기 때문에 정확한 건강 상태 평가에는 한계가 있습니다.</div></div>
+  </section>
+
+  <!-- ⑩ 관련 계산기 -->
+  <section class="sm-card" id="related-card">
+    <h2 class="sm-card-title">관련 계산기</h2>
+    <div class="sm-related-grid">
+      
+    </div>
+  </section>
+
+
+
+
+
+  <!-- Phase C: 페이지 하단 CTA -->
+  <div class="sm-footer-cta">
+    <p class="sm-footer-cta-title">CalcMate — 급여·노무 계산기 모음</p>
+    <p class="sm-footer-cta-sub">퇴직금·주휴수당·실업급여·4대보험·연말정산·육아휴직까지</p>
+    <div class="sm-footer-cta-links">
+      <a class="sm-footer-cta-link" href="https://calcmate.kr">전체 계산기</a>
+      <a class="sm-footer-cta-link" href="https://calcmate.kr">다른 계산기 보기</a>
+    </div>
+  </div>
+
+
+  <!-- ⑫ Footer -->
+  <footer style="text-align:center;padding-top:var(--sp-3);border-top:1px solid var(--c-border);margin-top:var(--sp-3)">
+    <p style="font-size:13px;color:var(--c-text-light);margin-bottom:var(--sp-1)">본 계산기는 참고용이며 실제 지급액과 다를 수 있습니다.</p>
+    <div style="font-size:16px;font-weight:800;color:var(--c-primary);margin-bottom:var(--sp-1)">CalcMate</div>
+    <nav style="display:flex;gap:var(--sp-2);justify-content:center;flex-wrap:wrap;margin-bottom:var(--sp-1)"><a href="https://calcmate.kr/about/" style="font-size:13px;color:var(--c-text-sub);text-decoration:none">소개</a><a href="https://calcmate.kr/privacy/" style="font-size:13px;color:var(--c-text-sub);text-decoration:none">개인정보처리방침</a><a href="https://calcmate.kr/terms/" style="font-size:13px;color:var(--c-text-sub);text-decoration:none">이용약관</a><a href="https://calcmate.kr/contact/" style="font-size:13px;color:var(--c-text-sub);text-decoration:none">문의하기</a></nav>
+    <p style="font-size:12px;color:var(--c-text-light)">© 2026 CalcMate. All rights reserved.</p>
+  </footer>
+
+</div>
+
+<!-- Mobile Fixed CTA -->
+<div class="sm-mobile-cta">
+  <button class="sm-btn" type="button" onclick="calculate();setTimeout(function(){var c=document.getElementById('result-card');if(c)c.scrollIntoView({behavior:'smooth',block:'center'});},100)">
+    지금 계산하기
+  </button>
+</div>
+
+<!-- 계산기 설정(파라미터) — app_generator가 주입 -->
+<script>window.SM_CONFIG = {"name": "BMI(체질량지수) 계산기", "slug": "bmi-calculator", "primaryOutput": "bmi", "resultUnit": "BMI", "inputs": [{"name": "height_cm", "label": "키", "type": "number", "unit": "cm"}, {"name": "weight_kg", "label": "몸무게", "type": "number", "unit": "kg"}], "outputs": [{"key": "bmi", "label": "체질량지수", "unit": "BMI", "decimals": 2}], "show_adsense": false, "show_cpa": false, "show_share": true, "show_pwa": false, "show_result_save": true, "show_faq": true, "show_notice": true, "show_related": true, "show_detail": true, "show_article": true, "site_mode": "pre_adsense", "result_export_type": "png", "kakao_js_key": "", "calculator_version": "2.0.0", "law_version": "2026-07", "ga4_id": "G-EP2Q8035VF"};</script>
+<script src="script.js"></script>
+</body>
+</html>
