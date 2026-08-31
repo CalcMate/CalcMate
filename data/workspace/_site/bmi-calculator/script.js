@@ -429,6 +429,105 @@
     if (ans) ans.hidden = !isOpen;
   };
 
+  // STEP 28-157: BMI 전용 개인화 판정 등급(대한비만학회 2018 기준, 명확한 비교
+  // 연산만 사용 — 경계 임의 보정 없음). registry/Contract/DB output_schema에
+  // 새 필드를 추가하지 않고 out.bmi 값으로부터 화면 표시 전용으로 파생한다.
+  // BMI slug에만 적용되며 다른 계산기의 renderResult() 동작에는 전혀 관여하지 않는다.
+  function _bmiGrade(bmi) {
+    if (bmi < 18.5) return "저체중";
+    if (bmi < 23) return "정상체중";
+    if (bmi < 25) return "비만전단계";
+    if (bmi < 30) return "1단계 비만";
+    if (bmi < 35) return "2단계 비만";
+    return "3단계 비만";
+  }
+
+  function _renderBmiGrade(outputs) {
+    if (CFG.slug !== "bmi-calculator") return;
+    var bmi = num(outputs.bmi);
+    if (!isFinite(bmi)) return;
+    var el = d.getElementById("bmi-grade");
+    if (!el) {
+      var host = d.getElementById("result-formula");
+      if (!host || !host.parentNode) return;
+      el = d.createElement("div");
+      el.id = "bmi-grade";
+      el.className = "sm-result-sub";
+      host.parentNode.insertBefore(el, host.nextSibling);
+    }
+    el.textContent = "판정: " + _bmiGrade(bmi);
+  }
+
+  // STEP 28-165: BMI 전용 적정 체중 범위. 정상체중 기준(18.5≤BMI<23) 중
+  // 화면 표시 상한은 22.9를 사용한다(175cm → 56.7kg~70.1kg 예시와 일치).
+  // weight_kg/out.bmi와 무관하게 height_cm만으로 항상 파생 가능하므로
+  // inputs(=renderResult의 첫 번째 인자, collectInputs() 결과)만 사용한다.
+  // 반올림/표시 형식은 기존 pyRound()/comma()를 그대로 재사용 — 새 반올림
+  // 로직을 만들지 않는다. registry/Contract/DB output_schema 미변경.
+  function _renderBmiWeightRange(inputs) {
+    if (CFG.slug !== "bmi-calculator") return;
+    var h = num(inputs && inputs.height_cm);
+    if (!isFinite(h) || h <= 0) return;
+    var hm = h / 100;
+    var minW = 18.5 * hm * hm;
+    var maxW = 22.9 * hm * hm;
+    var el = d.getElementById("bmi-weight-range");
+    if (!el) {
+      var host = d.getElementById("bmi-grade");
+      if (!host || !host.parentNode) return;
+      el = d.createElement("div");
+      el.id = "bmi-weight-range";
+      el.className = "sm-result-sub";
+      host.parentNode.insertBefore(el, host.nextSibling);
+    }
+    el.textContent = "적정 체중: " + comma(minW, 1) + "kg ~ " + comma(maxW, 1) + "kg";
+  }
+
+  // STEP 28-166: BMI 전용 6단계 시각 게이지(대한비만학회 2018 기준과 동일한
+  // 경계값). 표시 범위는 BMI 15~40으로 고정하고, marker 위치는 반드시
+  // 0~100%로 clamp한다(15 미만은 0%, 40 초과는 100%). 공유 CSS 파일은
+  // 건드리지 않고 인라인 스타일만 사용 — 다른 계산기에는 아무 영향이 없다.
+  function _renderBmiGauge(outputs) {
+    if (CFG.slug !== "bmi-calculator") return;
+    var bmi = num(outputs.bmi);
+    if (!isFinite(bmi)) return;
+    var GMIN = 15, GMAX = 40;
+    var pct = (bmi - GMIN) / (GMAX - GMIN) * 100;
+    if (pct < 0) pct = 0;
+    if (pct > 100) pct = 100;
+
+    var wrap = d.getElementById("bmi-gauge");
+    if (!wrap) {
+      var host = d.getElementById("bmi-weight-range") || d.getElementById("bmi-grade");
+      if (!host || !host.parentNode) return;
+      wrap = d.createElement("div");
+      wrap.id = "bmi-gauge";
+      wrap.style.cssText = "position:relative;margin-top:12px;padding-top:10px;";
+      var bar = d.createElement("div");
+      bar.style.cssText = "display:flex;width:100%;height:8px;border-radius:4px;overflow:hidden;";
+      // 저체중/정상체중/비만전단계/1·2·3단계 비만 — 경계값(18.5/23/25/30/35)을
+      // BMI 15~40 범위 기준 폭(%)으로 환산: 14/18/8/20/20/20.
+      var segs = [
+        [14, "#93C5FD"], [18, "#4ADE80"], [8, "#FBBF24"],
+        [20, "#FB923C"], [20, "#F87171"], [20, "#DC2626"]
+      ];
+      segs.forEach(function (s) {
+        var seg = d.createElement("div");
+        seg.style.cssText = "flex:0 0 " + s[0] + "%;background:" + s[1] + ";";
+        bar.appendChild(seg);
+      });
+      wrap.appendChild(bar);
+      var marker = d.createElement("div");
+      marker.id = "bmi-gauge-marker";
+      marker.style.cssText = "position:absolute;top:0;width:4px;height:16px;"
+        + "background:#1E293B;border-radius:2px;transform:translateX(-50%);";
+      wrap.appendChild(marker);
+      host.parentNode.insertBefore(wrap, host.nextSibling);
+    }
+    var markerEl = d.getElementById("bmi-gauge-marker");
+    if (markerEl) markerEl.style.left = pct + "%";
+  }
+
   // 결과 UI 렌더 (계산 로직 없음 — 표시만)
   function renderResult(inputs, outputs) {
     outputs = outputs || {};
@@ -445,6 +544,13 @@
 
     var sub = d.getElementById("result-formula");
     if (sub) sub.textContent = outputs._formula || "";
+
+    // STEP 28-157: BMI 전용 판정 등급(slug 조건부, 다른 계산기는 즉시 return)
+    _renderBmiGrade(outputs);
+    // STEP 28-165: BMI 전용 적정 체중 범위(slug 조건부, 다른 계산기는 즉시 return)
+    _renderBmiWeightRange(inputs);
+    // STEP 28-166: BMI 전용 시각 게이지(slug 조건부, 다른 계산기는 즉시 return)
+    _renderBmiGauge(outputs);
 
     var actions = d.getElementById("result-actions");
     if (actions) actions.classList.add("show");
@@ -642,8 +748,11 @@ window.computeResult = function(inputs){
   var weight_kg = inputs["weight_kg"] || 0;
   var out = {};
   out.notices = [];
+  if (!Number.isFinite(height_cm) || !Number.isFinite(weight_kg)) { return null; }
+  if (weight_kg <= 0) { return null; }
   if (height_cm < 50) { return null; }
   out["bmi"] = (pyRound(weight_kg / ((height_cm / 100) ** 2), 2));
   out._formula = ('키 (cm): ' + height_cm.toLocaleString() + ', ' + '몸무게 (kg): ' + weight_kg.toLocaleString()) + ' → ' + ('체질량지수 (BMI): ' + (pyRound(weight_kg / ((height_cm / 100) ** 2), 2)).toLocaleString());
+  out._detail = [{label:"계산 과정", value:weight_kg + " ÷ (" + (height_cm / 100).toFixed(2) + " × " + (height_cm / 100).toFixed(2) + ") = " + out["bmi"]}];
   return out;
 };
