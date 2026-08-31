@@ -1711,7 +1711,17 @@ def render_top_nav(cfg: dict = None) -> str:
 # override 가능한 구조만 추가하고 각 dict는 비워 둔다(기존 표시 문구 그대로 유지).
 _FOOTER_CTA_TITLE_BY_SLUG: dict = {}
 _FOOTER_CTA_SUB_BY_SLUG: dict = {}
-_FOOTER_DISCLAIMER_BY_SLUG: dict = {}
+# STEP 28-178: fallback("본 계산기는 참고용이며 실제 지급액과 다를 수 있습니다.")이
+# 급여·노무 도메인 문구라 비급여 계산기(건강/부동산/세금/병역)에 부적절하게 노출되던
+# 문제 수정. 급여·노무·보험 계산기는 여기 추가하지 않아 기존 문구를 그대로 유지한다.
+_FOOTER_DISCLAIMER_BY_SLUG: dict = {
+    "bmi-calculator": "본 계산 결과는 참고용이며, 정확한 정보는 관련 기관 또는 전문가에게 확인하시기 바랍니다.",
+    "jeonse-vs-monthly": "본 계산 결과는 참고용이며, 정확한 정보는 관련 기관 또는 전문가에게 확인하시기 바랍니다.",
+    "annual-leave-remaining": "본 계산 결과는 참고용이며, 정확한 정보는 관련 기관 또는 전문가에게 확인하시기 바랍니다.",
+    "military-discharge-date": "본 계산 결과는 참고용이며, 정확한 정보는 관련 기관 또는 전문가에게 확인하시기 바랍니다.",
+    "real-estate-brokerage-fee": "본 계산 결과는 참고용이며, 정확한 정보는 관련 기관 또는 전문가에게 확인하시기 바랍니다.",
+    "freelancer-tax-3p3": "본 계산 결과는 참고용이며, 정확한 정보는 관련 기관 또는 전문가에게 확인하시기 바랍니다.",
+}
 
 
 def render_footer_cta(calc: dict, cfg: dict = None) -> str:
