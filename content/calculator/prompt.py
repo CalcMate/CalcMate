@@ -161,8 +161,11 @@ def get_article_prompt(calc: dict, seo: dict = None, faq: list = None, example_c
         f"{example_str}\n\n"
         "[숫자 보호 규칙]\n"
         "- 숫자를 임의로 생성하거나 변경하지 않는다.\n"
-        "분량 공백 포함 1900자 이상. HTML로 출력하고 "
-        "[BODY_HTML_START]...[BODY_HTML_END] 태그로 감싼다.\n"
+        "분량 공백 포함 1900자 이상. HTML로 출력하되, "
+        "본문 전체를 반드시 [BODY_HTML_START] 로 시작하고 [BODY_HTML_END] 로 끝낸다. "
+        "이 두 표시는 HTML 태그가 아니라 본문 경계를 나타내는 출력 구분자이므로, "
+        "<h2>, <p> 같은 실제 HTML 요소와 혼동해 꺾쇠괄호(<>)로 바꾸지 말고 "
+        "반드시 대괄호([]) 형식 그대로 출력한다.\n"
         + QUALITY
     )
     user = (

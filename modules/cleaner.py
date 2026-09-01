@@ -40,8 +40,8 @@ def clean_rss_item(item: dict, cfg: dict) -> dict:
     return data
 
 def parse_html_body(text: str) -> str:
-    """STEP 9: [BODY_HTML_START]~[BODY_HTML_END] 태그 추출"""
-    m = re.search(r"\[BODY_HTML_START\](.*?)\[BODY_HTML_END\]", text, re.DOTALL)
+    """STEP 9: [BODY_HTML_START]~[BODY_HTML_END] (또는 <BODY_HTML_START>~<BODY_HTML_END>) 구분자 추출"""
+    m = re.search(r"[\[<]\s*BODY_HTML_START\s*[\]>](.*?)[\[<]\s*BODY_HTML_END\s*[\]>]", text, re.DOTALL)
     return m.group(1).strip() if m else text.strip()
 
 
