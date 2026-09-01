@@ -296,10 +296,8 @@ def _blog_page(result: dict, cfg: dict) -> str:
         f'<p class="cm-blog-category">{_esc(result["category"])}</p>'
         if result.get("category") else ""
     )
-    date_html = (
-        f'<p class="cm-blog-date">{_esc(result["date"])}</p>'
-        if result.get("date") else ""
-    )
+    # 화면 표시에서만 작성일/발행일을 뺀다 — result["date"] 자체는 그대로 두고
+    # JSON-LD의 datePublished(_article_jsonld)에는 계속 사용한다.
 
     body = f"""
 <main>
@@ -308,7 +306,6 @@ def _blog_page(result: dict, cfg: dict) -> str:
       <header class="cm-blog-header">
         {category_html}
         <h1 class="cm-page-title">{_esc(result["title"])}</h1>
-        {date_html}
       </header>
       <div class="cm-content">
 {result["content"]}
