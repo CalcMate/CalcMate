@@ -81,6 +81,9 @@ _NOTICE_BY_SLUG: dict = {
     "freelancer-tax-3p3": "본 계산 결과는 참고용이며, 실제 세액은 소득 규모 및 관련 세법 적용에 따라 달라질 수 있습니다.",
     "jeonse-vs-monthly": "본 계산 결과는 참고용이며, 실제 유불리는 전월세전환율 등 시장 조건에 따라 달라질 수 있습니다.",
     "annual-leave-remaining": "본 계산 결과는 참고용이며, 실제 연차일수는 출근율 및 관련 법령에 따라 달라질 수 있습니다.",
+    # STEP 28-155: BMI는 급여/노무 계산기가 아니므로 위 fallback(근로계약·법령 문구)이
+    # 부적절하다(STEP 28-153에서 확인) — 건강 계산기 전용 고지문으로 명시 등록한다.
+    "bmi-calculator": "본 결과는 참고용이며, 정확한 건강 상태 진단 및 평가 전문 의료진과 상담하시기 바랍니다.",
 }
 
 # Phase C: 계산기별 관련 글 데이터 (정적, 계산기 지원용 블로그 Set)
@@ -404,6 +407,15 @@ def _sm_config(calc, cfg) -> dict:
                                  else "boolean" if "boolean" in _spec_l
                                  else "number"), "unit": unit})
     outputs = [{"key": k, "label": _split_label(k, labels)[0], "unit": _split_label(k, labels)[1] or "원"} for k in outs]
+    # STEP 28-149: BMI는 DB 17개 계산기 중 유일하게 소수점 표시가 의미 있는 결과다
+    # (나머지는 전부 원화 금액/일수/비율로 정수 표시가 정확함 — STEP 28-148 전수 확인).
+    # comma()/countUp()에 자릿수를 전달하기 위한 최소 범위 예외이며, 새 registry
+    # 스키마를 만들지 않고 여기서만 slug 조건으로 주입한다. decimals 미지정인 다른
+    # 모든 계산기는 기존과 완전히 동일하게 동작한다.
+    if str(calc.get("slug", "")) == "bmi-calculator":
+        for _o in outputs:
+            if _o["key"] == "bmi":
+                _o["decimals"] = 2
     primary = list(outs.keys())[0] if outs else "result"
     c = cfg if isinstance(cfg, dict) else {}
     flags = _show_flags(cfg)
@@ -997,6 +1009,60 @@ def _compute_js(calc) -> str:
             '  return out;\n};\n'
             )
         )
+    if str(calc.get("slug", "")) == "자동차_취등록세_계산기":
+        # STEP 28-192/193: 2011년 지방세법 개정으로 "등록세"는 취득세에 통합되어
+        # 더 이상 존재하지 않는 세목이다(STEP 28-188/189 확정). car_type/eco_type은
+        # 문자열이 아닌 숫자 코드(select 옵션 value)로 받는다 — collectInputs()가
+        # boolean/date를 제외한 모든 입력을 num()으로 강제 변환하므로(components.js),
+        # 문자열 enum은 이 파이프라인과 호환되지 않는다(real-estate-brokerage-fee의
+        # deal_type=1/2와 동일한 기존 검증된 패턴, STEP 28-192-A/193에서 확정).
+        # car_type: 1=비영업승용 2=경차 3=영업용 4=승합·화물·특수 5=이륜차
+        # eco_type: 0=일반 1=전기 2=수소
+        # 감면 중복(경차+전기/수소) 법령 근거가 확정되지 않아(STEP 28-190) 자동
+        # 합산·우선순위를 임의로 만들지 않고 결과 자체를 차단한다. compute_rules
+        # 어휘(positive_inputs/non_negative_inputs/min_value)로는 "두 필드의 조합
+        # 조건" 자체를 표현할 수 없어(STEP 28-192-A 확인) BMI/unemployment-benefit과
+        # 동일하게 slug 조건부 완전 커스텀 분기로 구현 — 다른 계산기 compute_rules
+        # 어휘나 공통 검증 로직은 전혀 변경하지 않는다(opt-in, 회귀 영향 없음).
+        return (
+            _js_open()
+            + _js_read("car_price")
+            + '  var car_type = inputs["car_type"] || 0;\n'
+            + '  var eco_type = inputs["eco_type"] || 0;\n'
+            + '  if (!Number.isFinite(car_price) || car_price <= 0) { return null; }\n'
+            + '  var RATE_MAP = {1: 0.07, 2: 0.04, 3: 0.04, 4: 0.05, 5: 0.02};\n'
+            + '  if (!RATE_MAP.hasOwnProperty(car_type)) { return null; }\n'
+            + '  if (eco_type !== 0 && eco_type !== 1 && eco_type !== 2) { return null; }\n'
+            + _js_init_out()
+            + (
+            '  var rate = RATE_MAP[car_type];\n'
+            # STEP 28-193: car_price * rate(0.07 등)는 이진 부동소수점 곱셈이라
+            # 1400000.0000000002 같은 오차가 그대로 남는다(테스트에서 실측 확인).
+            # STEP 28-140에서 이미 검증된 pyRound()(문자열 경유 반올림)로 원 단위
+            # 정수화해 오차를 제거한다 — components.js가 generate_js()에서 항상
+            # 이 함수보다 먼저 포함되므로 런타임에 정의되어 있음이 보장된다.
+            '  var standard_acquisition_tax = pyRound(car_price * rate, 0);\n'
+            '  var isLightCar = (car_type === 2);\n'
+            '  var isEco = (eco_type === 1 || eco_type === 2);\n'
+            '  if (isLightCar && isEco) {\n'
+            '    return null;\n'
+            '  }\n'
+            '  var exemption_amount = 0;\n'
+            '  if (isLightCar) {\n'
+            '    exemption_amount = standard_acquisition_tax <= 750000 ? standard_acquisition_tax : 750000;\n'
+            '  } else if (isEco) {\n'
+            '    exemption_amount = standard_acquisition_tax <= 1400000 ? standard_acquisition_tax : 1400000;\n'
+            '  }\n'
+            '  var final_acquisition_tax = Math.max(0, standard_acquisition_tax - exemption_amount);\n'
+            '  out["standard_acquisition_tax"] = standard_acquisition_tax;\n'
+            '  out["exemption_amount"] = exemption_amount;\n'
+            '  out["acquisition_tax"] = final_acquisition_tax;\n'
+            '  out._formula = car_price.toLocaleString() + "원 × " + (rate * 100) + "% = " + Math.round(standard_acquisition_tax).toLocaleString() + "원"'
+            ' + (exemption_amount > 0 ? (" → 감면 " + Math.round(exemption_amount).toLocaleString() + "원 적용 → " + Math.round(final_acquisition_tax).toLocaleString() + "원") : "");\n'
+            '  return out;\n'
+            )
+            + _js_close()
+        )
     ins = _pj(calc.get("input_schema"), {})
     outs = _pj(calc.get("output_schema"), {})
     formula = _pj(calc.get("formula"), calc.get("formula", ""))
@@ -1006,6 +1072,16 @@ def _compute_js(calc) -> str:
     slug = str(calc.get("slug", ""))
     rules = (_registry().get(slug) or {}).get("compute_rules") or {}
     validation = _compute_validation_js(rules, fmap) if rules else ""
+
+    # STEP 28-168: BMI 전용 — height_cm/weight_kg가 유한수가 아니면(Infinity/-Infinity/NaN)
+    # 기존 height_cm<50 가드를 우회할 수 있다(예: height_cm=Infinity는 50 미만이 아니므로
+    # 통과되고, weight_kg/Infinity**2가 유한값 0이 되어 bmi:0이 정상 결과처럼 반환됨 —
+    # STEP 28-167 최종 검수에서 확인). compute_rules(min_value/positive_inputs) 자체는
+    # 건드리지 않고, 그보다 먼저 실행되도록 validation 문자열 맨 앞에 추가한다.
+    if slug == "bmi-calculator":
+        validation = (
+            '  if (!Number.isFinite(height_cm) || !Number.isFinite(weight_kg)) { return null; }\n'
+        ) + validation
 
     if validation:
         # 검증 블록 있음: reads → notices 초기화 → 검증 → 수식 → _formula → return
@@ -1033,8 +1109,15 @@ def _compute_js(calc) -> str:
                 " + ', ' + ".join(f"'{_label(k, labels)}: ' + {k}.toLocaleString()" for k in in_keys)
                 if in_keys else "''"
             )
+            # STEP 28-149: BMI는 formula 자체가 pyRound(x,2)로 이미 소수점까지
+            # 반올림된 값을 만든다. 여기서 다시 Math.round()로 감싸면 정수로
+            # 뭉개져 화면 표시("22")와 실제 계산값("22.49")이 어긋난다(STEP 28-148
+            # 진단). 다른 계산기는 전부 정수 결과이므로 Math.round() 래핑을
+            # 그대로 유지 — slug를 명시적으로 확인해 BMI 전용으로만 예외 적용한다.
             out_join = " + ', ' + ".join(
-                f"'{_label(k, labels)}: ' + Math.round({_to_js(expr)}).toLocaleString()"
+                (f"'{_label(k, labels)}: ' + ({_to_js(expr)}).toLocaleString()"
+                 if slug == "bmi-calculator"
+                 else f"'{_label(k, labels)}: ' + Math.round({_to_js(expr)}).toLocaleString()")
                 for k, expr in fmap.items()
             )
             formula_str = f"({in_join}) + ' → ' + ({out_join})"
@@ -1042,12 +1125,25 @@ def _compute_js(calc) -> str:
         out_lines = "".join(
             f'  out["{k}"] = ({_to_js(expr)});\n' for k, expr in fmap.items()
         )
+        # STEP 28-164: BMI 전용 "계산 상세/계산 과정"(_detail) — 기존 계산기의
+        # _detail(연말정산_환급액_계산기/severance-pay)은 각자 하드코딩된 별도
+        # 분기에서 생성되며 이 코드와 전혀 겹치지 않는다. registry/Contract/DB
+        # output_schema는 건드리지 않는다 — renderSteps()가 이미 소비하는
+        # {label, value} 배열에 슬러그 조건부로 한 항목만 추가한다.
+        detail_line = ""
+        if slug == "bmi-calculator":
+            detail_line = (
+                '  out._detail = [{label:"계산 과정", value:'
+                'weight_kg + " ÷ (" + (height_cm / 100).toFixed(2) + " × " '
+                '+ (height_cm / 100).toFixed(2) + ") = " + out["bmi"]}];\n'
+            )
         body = (
             "  var out = {};\n"
             "  out.notices = [];\n"
             + validation
             + out_lines
             + f'  out._formula = {formula_str};\n'
+            + detail_line
         )
     else:
         body = "  var out = {};\n" + "".join(
@@ -1787,17 +1883,46 @@ def render_faq(calc: dict, cfg: dict = None) -> str:
             '  </section>')
 
 
+def _related_blog_items(calc: dict) -> str:
+    """계산기 slug → 관련 Golden10 블로그 링크 목록(STEP 16-B).
+    content.blog.BLOG_TO_CALCULATOR_SLUG가 유일 소스 — 매핑에 없으면 빈 리스트."""
+    from content.blog import get_related_blog_slugs, get_golden10
+    cur = str(calc.get("slug", ""))
+    items = []
+    for blog_slug in get_related_blog_slugs(cur):
+        gc = get_golden10(blog_slug)
+        if not gc:
+            continue
+        items.append(
+            f'<a class="sm-related-item" href="../blog/{blog_slug}/" target="_self">'
+            f'<span class="sm-related-emoji">📖</span>'
+            f'<span class="sm-related-name">{_html.escape(gc.title)}</span></a>'
+        )
+    return "\n".join(items)
+
+
 def render_related(calc: dict, cfg: dict = None, related_items: str = None) -> str:
     if not _show_flags(cfg)["show_related"]:
         return ""
     items = related_items if related_items is not None else _related_items_v2(calc)
-    return ('  <!-- ⑩ 관련 계산기 -->\n'
-            '  <section class="sm-card" id="related-card">\n'
-            '    <h2 class="sm-card-title">관련 계산기</h2>\n'
-            '    <div class="sm-related-grid">\n'
-            f'      {items}\n'
-            '    </div>\n'
-            '  </section>')
+    section = ('  <!-- ⑩ 관련 계산기 -->\n'
+               '  <section class="sm-card" id="related-card">\n'
+               '    <h2 class="sm-card-title">관련 계산기</h2>\n'
+               '    <div class="sm-related-grid">\n'
+               f'      {items}\n'
+               '    </div>\n'
+               '  </section>')
+
+    blog_items = _related_blog_items(calc)
+    if blog_items:
+        section += ('\n  <!-- ⑩-b 관련 글(Golden10) -->\n'
+                     '  <section class="sm-card" id="related-blog-card">\n'
+                     '    <h2 class="sm-card-title">관련 글</h2>\n'
+                     '    <div class="sm-related-grid">\n'
+                     f'      {blog_items}\n'
+                     '    </div>\n'
+                     '  </section>')
+    return section
 
 
 # ── HTML (design v2 마스터 시안 치환) ─────────────────────────────

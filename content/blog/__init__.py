@@ -111,6 +111,39 @@ def get_golden10(slug: str) -> GoldenContent | None:
     return _GOLDEN_MAP.get(slug)
 
 
+# ============================================================
+# Golden 10 ↔ 계산기 상호 연결(STEP 16-B) — 명시적 매핑
+# ============================================================
+#
+# "-documents"/"-howto" 접미사가 붙은 blog slug는 별도 계산기가 아니라
+# 같은 계산기를 다루는 다른 intent의 글이므로, 실제 계산기 slug로
+# 명시적으로 매핑한다(추측/자동 접미사 제거 금지 — 항상 이 표를 갱신).
+
+BLOG_TO_CALCULATOR_SLUG = {
+    "severance-pay": "severance-pay",
+    "severance-pay-documents": "severance-pay",
+    "weekly-holiday-allowance": "weekly-holiday-allowance",
+    "unemployment-benefit": "unemployment-benefit",
+    "unemployment-benefit-howto": "unemployment-benefit",
+    "four-insurances": "four-insurances",
+    "four-insurances-documents": "four-insurances",
+    "annual-leave-allowance": "annual-leave-allowance",
+    "육아휴직_급여_계산기": "육아휴직_급여_계산기",
+    "연말정산_환급액_계산기": "연말정산_환급액_계산기",
+}
+
+
+def get_related_calculator_slug(blog_slug: str) -> str | None:
+    """블로그 slug → 관련 계산기 slug. 매핑에 없으면 None."""
+    return BLOG_TO_CALCULATOR_SLUG.get(blog_slug)
+
+
+def get_related_blog_slugs(calculator_slug: str) -> list:
+    """계산기 slug → 관련 Golden10 블로그 slug 리스트(GOLDEN_10 원본 순서 유지)."""
+    return [gc.slug for gc in GOLDEN_10
+            if BLOG_TO_CALCULATOR_SLUG.get(gc.slug) == calculator_slug]
+
+
 def validate_intent(intent: str) -> bool:
     """intent가 유효한지 검증."""
     return intent in VALID_INTENTS

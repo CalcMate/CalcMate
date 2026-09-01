@@ -74,6 +74,13 @@ a:hover{text-decoration:underline}
   transition:background .15s,transform .1s}
 .cm-hero-btn:hover{background:var(--c-primary-dark);text-decoration:none;transform:translateY(-1px)}
 
+/* ── 블로그 글 → 계산기 CTA(STEP 16-B) ── */
+.cm-blog-cta{display:inline-flex;align-items:center;gap:6px;margin-top:var(--sp-2);
+  padding:10px 20px;background:var(--c-primary);color:#fff;
+  border-radius:var(--r-btn);font-size:14px;font-weight:700;
+  text-decoration:none;transition:background .15s}
+.cm-blog-cta:hover{background:var(--c-primary-dark);text-decoration:none}
+
 /* ── 섹션 헤더 ── */
 .cm-section{padding:var(--sp-4) 0 0}
 .cm-section-title{font-size:20px;font-weight:800;letter-spacing:-.4px;
@@ -299,6 +306,14 @@ def _blog_page(result: dict, cfg: dict) -> str:
     # 화면 표시에서만 작성일/발행일을 뺀다 — result["date"] 자체는 그대로 두고
     # JSON-LD의 datePublished(_article_jsonld)에는 계속 사용한다.
 
+    # 관련 계산기 CTA(STEP 16-B) — 매핑은 content.blog.BLOG_TO_CALCULATOR_SLUG가 유일 소스
+    from content.blog import get_related_calculator_slug
+    calc_slug = get_related_calculator_slug(result["slug"])
+    cta_html = (
+        f'<a class="cm-blog-cta" href="{u}/{calc_slug}/">이 계산기로 바로 계산해보기 →</a>'
+        if calc_slug else ""
+    )
+
     body = f"""
 <main>
   <div class="cm-wrap--narrow">
@@ -306,6 +321,7 @@ def _blog_page(result: dict, cfg: dict) -> str:
       <header class="cm-blog-header">
         {category_html}
         <h1 class="cm-page-title">{_esc(result["title"])}</h1>
+        {cta_html}
       </header>
       <div class="cm-content">
 {result["content"]}
@@ -355,6 +371,17 @@ def generate_index(cfg: dict) -> str:
         if (calc := reg.get(slug))
     )
 
+    # Golden10 블로그 카드 — 계산기 그리드와 동일한 카드 패턴 재사용(STEP 16-B)
+    from content.blog import GOLDEN_10
+    blog_cards = "\n".join(
+        f'<a class="cm-calc-card" href="{u}/blog/{gc.slug}/" aria-label="{_esc(gc.title)}">'
+        f'<span class="cm-calc-emoji" aria-hidden="true">📖</span>'
+        f'<div class="cm-calc-name">{_esc(gc.title)}</div>'
+        f'<div class="cm-calc-desc">{_esc(gc.description)}</div>'
+        f'</a>'
+        for gc in GOLDEN_10
+    )
+
     body = f"""
 <main>
   <div class="cm-wrap">
@@ -394,6 +421,14 @@ def generate_index(cfg: dict) -> str:
         <li>중요한 결정을 앞두고 있다면 노무사, 세무사 등 전문가와 상담하시길 권장합니다.</li>
       </ul>
     </div>
+
+    <!-- 계산 가이드(Golden10 블로그) -->
+    <section class="cm-section" id="guides" aria-labelledby="guides-title">
+      <h2 class="cm-section-title" id="guides-title">자주 찾는 계산 가이드</h2>
+      <div class="cm-calc-grid">
+{blog_cards}
+      </div>
+    </section>
 
     {_footer(u)}
   </div>
