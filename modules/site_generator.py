@@ -258,6 +258,78 @@ def _page(title: str, description: str, css_path: str,
 </html>"""
 
 
+# ── 블로그 글 페이지(Golden10 Static Publisher, STEP 2) ─────────────────
+#
+# content/blog/writer.py, modules/publisher.py 등 기존 콘텐츠/발행 계층은
+# 전혀 모르는 신규 함수. WordPress 관련 개념(post ID/media ID/category ID/
+# REST payload)을 일절 참조하지 않는다.
+
+def _article_jsonld(result: dict) -> str:
+    """BlogPosting JSON-LD. Content Result에 실제로 존재하는 필드만 사용하고
+    author/image 등 없는 데이터는 임의로 만들지 않는다."""
+    import json as _json
+
+    data = {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "headline": result["title"],
+        "description": result["description"],
+        "mainEntityOfPage": {"@type": "WebPage", "@id": result["canonical"]},
+    }
+    if result.get("date"):
+        data["datePublished"] = result["date"]
+    return f'<script type="application/ld+json">{_json.dumps(data, ensure_ascii=False)}</script>'
+
+
+def _blog_page(result: dict, cfg: dict) -> str:
+    """Golden10 블로그 글 1건(Content Result) → 전체 HTML 문서.
+
+    result["content"]는 이미 완성된 HTML(content/calculator/writer.generate_article()
+    산출물)이며, 여기서 Markdown 변환이나 재작성을 하지 않고 그대로 삽입한다.
+    result["image"]가 없으면(None) <img>/og:image를 만들지 않는다 — _page()가
+    애초에 og:image를 생성하지 않으므로 추가 처리가 필요 없다.
+    """
+    u = cfg.get("SITE_URL", "https://calcmate.kr").rstrip("/")
+    ga4_id = cfg.get("GA4_MEASUREMENT_ID", "") or ""
+
+    category_html = (
+        f'<p class="cm-blog-category">{_esc(result["category"])}</p>'
+        if result.get("category") else ""
+    )
+    date_html = (
+        f'<p class="cm-blog-date">{_esc(result["date"])}</p>'
+        if result.get("date") else ""
+    )
+
+    body = f"""
+<main>
+  <div class="cm-wrap--narrow">
+    <article class="cm-blog-article">
+      <header class="cm-blog-header">
+        {category_html}
+        <h1 class="cm-page-title">{_esc(result["title"])}</h1>
+        {date_html}
+      </header>
+      <div class="cm-content">
+{result["content"]}
+      </div>
+    </article>
+    {_footer(u)}
+  </div>
+</main>
+{_article_jsonld(result)}"""
+
+    return _page(
+        title=result["title"],
+        description=result["description"],
+        css_path="../../site.css",
+        site_url=u,
+        body=body,
+        canonical=result["canonical"],
+        ga4_id=ga4_id,
+    )
+
+
 # ── 메인 홈 페이지 ────────────────────────────────────────────────
 
 def generate_index(cfg: dict) -> str:
@@ -589,7 +661,12 @@ def generate_sitemap(cfg: dict) -> str:
         ("/contact/", "0.5", "monthly"),
     ]
     calc_entries = [(f"/{slug}/", "0.8", "weekly") for slug in _sitemap_slugs]
-    all_entries = static_pages + calc_entries
+
+    # Golden10 블로그 글 — 기존 계산기 URL은 그대로 두고 추가만 한다(STEP 2).
+    from content.blog import GOLDEN_10
+    blog_entries = [(f"/blog/{gc.slug}/", "0.7", "monthly") for gc in GOLDEN_10]
+
+    all_entries = static_pages + calc_entries + blog_entries
 
     items = "\n".join(
         f"  <url>"
