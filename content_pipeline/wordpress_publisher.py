@@ -7,6 +7,11 @@ from modules.logger import get_logger
 
 LOG = get_logger()
 
+# 원인 미확정 상태에서 blog.genon.app에 반복적으로 실제 Draft가 생성된 사실이
+# 확인되어(pipeline.log의 "Draft 생성 성공 (ID: N)"과 WP 실제 post_id가 초 단위로 일치),
+# 원격 WordPress POST 자체를 차단한다. 해제하려면 이 상수를 False로 되돌린다.
+REMOTE_WP_POST_BLOCKED = True
+
 class WordPressPublisher:
     def __init__(self, cfg):
         self.cfg = cfg
@@ -34,7 +39,11 @@ class WordPressPublisher:
         
         if "featured_media" in metadata:
             payload["featured_media"] = metadata["featured_media"]
-        
+
+        if REMOTE_WP_POST_BLOCKED:
+            LOG.warning("[REMOTE WP POST BLOCKED] 원격 WordPress POST 차단됨 — 실제 요청을 보내지 않음 (endpoint=%s)", endpoint)
+            return "FAILED"
+
         try:
             resp = requests.post(
                 endpoint, json=payload,
