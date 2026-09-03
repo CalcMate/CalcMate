@@ -9,9 +9,10 @@ from .publish_gate import PublishGate
 class ContentPipelineOrchestrator:
     STAGE_LIST = ["H4B_COMPETITIVE", "CONTENT_GENERATION", "H3_FAQ", "H4A_QUALITY", "PUBLISH"]
 
-    def __init__(self):
+    def __init__(self, gate=None):
         self.adapter = EngineAdapter()
-        self.gate = PublishGate()
+        # DI: gate를 명시적으로 넘기지 않으면 PublishGate() 기본값(NullPublisher)을 사용한다.
+        self.gate = gate if gate is not None else PublishGate()
 
     def run(self, calculator_id, input_data, mock_fail_stage=None):
         state = PipelineState(f"p_{calculator_id}", calculator_id)

@@ -2,11 +2,15 @@
 """tests/production_validation_test.py — 콘텐츠 파이프라인 생산 검증"""
 import pytest
 from content_pipeline.orchestrator import ContentPipelineOrchestrator
+from content_pipeline.publish_gate import PublishGate
+from content_pipeline.publisher_base import NullPublisher
 from unittest.mock import patch, MagicMock
 
 @pytest.fixture
 def orchestrator():
-    return ContentPipelineOrchestrator()
+    # DI: 실제 WordPressPublisher 대신 NullPublisher를 명시적으로 주입한다.
+    # (원격 blog.genon.app에는 애초에 접근할 수 없는 구조)
+    return ContentPipelineOrchestrator(gate=PublishGate(publisher=NullPublisher()))
 
 CALCULATORS = [
     "unemployment-benefit",
@@ -21,14 +25,12 @@ CALCULATORS = [
 def test_full_pipeline_execution(orchestrator):
     """1. 7개 계산기 정상 실행 검증
 
-    PUBLISH 단계의 WordPress Publisher는 mock 처리한다 (P4.5 §17):
-    pytest는 실 WordPress(원격 blog.genon.app)에 접근하지 않는다.
-    content_pipeline_test.py의 기존 패턴과 동일.
+    PUBLISH 단계는 orchestrator fixture의 DI(NullPublisher)로 이미 원격
+    WordPress에 접근 불가능한 상태다(생성 시점부터 실제 Publisher가 존재하지 않음).
     """
     results_table = {}
     for calc in CALCULATORS:
-        with patch.object(orchestrator.adapter, 'run_h4a_quality', return_value={"status": "PASS", "data": {}}), \
-             patch.object(orchestrator.gate.publisher, 'create_draft', return_value="123"):
+        with patch.object(orchestrator.adapter, 'run_h4a_quality', return_value={"status": "PASS", "data": {}}):
             state = orchestrator.run(calc, {"profile": {"topics": ["계산 방법"]}})
             results_table[calc] = {
                 "H4B": "PASS", "GENERATION": "PASS", "H3_FAQ": "PASS", 

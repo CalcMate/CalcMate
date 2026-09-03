@@ -5,15 +5,17 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 from content_pipeline.orchestrator import ContentPipelineOrchestrator
+from content_pipeline.publish_gate import PublishGate
+from content_pipeline.publisher_base import NullPublisher
 
 @pytest.fixture
 def orchestrator():
-    return ContentPipelineOrchestrator()
+    # DI: 실제 WordPressPublisher 대신 NullPublisher를 명시적으로 주입한다.
+    return ContentPipelineOrchestrator(gate=PublishGate(publisher=NullPublisher()))
 
 def test_pipeline_success(orchestrator):
     """Test 1: 정상 Pipeline 실행"""
-    with patch.object(orchestrator.adapter, 'run_h4a_quality', return_value={"status": "PASS", "data": {}}), \
-         patch.object(orchestrator.gate.publisher, 'create_draft', return_value="123"):
+    with patch.object(orchestrator.adapter, 'run_h4a_quality', return_value={"status": "PASS", "data": {}}):
         state = orchestrator.run("calc1", {})
         assert state.data["status"] == "SUCCESS"
         assert len(state.data["results"]) >= 4 # H4B, CONTENT, H3, H4A

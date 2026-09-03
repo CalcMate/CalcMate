@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 """publish_gate.py — 최종 결과에 따른 발행 결정"""
-from .wordpress_publisher import WordPressPublisher
-from modules.config_loader import load_config
+from .publisher_base import NullPublisher
 
 class PublishGate:
-    def __init__(self):
-        self.publisher = WordPressPublisher(load_config())
+    def __init__(self, publisher=None):
+        # DI: publisher를 명시적으로 넘기지 않으면 안전한 NullPublisher를 사용한다.
+        # 실제 WordPressPublisher를 자동으로 생성하지 않는다(원격 POST 재발 방지).
+        self.publisher = publisher if publisher is not None else NullPublisher()
 
     def gate(self, quality_result, metadata):
         print(f"DEBUG GATE: quality_result={quality_result}, metadata={metadata}")

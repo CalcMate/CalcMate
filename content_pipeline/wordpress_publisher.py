@@ -4,6 +4,7 @@ import os
 import requests
 from modules.publisher import is_wordpress_ready
 from modules.logger import get_logger
+from .publisher_base import BasePublisher
 
 LOG = get_logger()
 
@@ -12,7 +13,7 @@ LOG = get_logger()
 # 원격 WordPress POST 자체를 차단한다. 해제하려면 이 상수를 False로 되돌린다.
 REMOTE_WP_POST_BLOCKED = True
 
-class WordPressPublisher:
+class WordPressPublisher(BasePublisher):
     def __init__(self, cfg):
         self.cfg = cfg
         # ENV > config > default 우선순위
@@ -42,6 +43,13 @@ class WordPressPublisher:
 
         if REMOTE_WP_POST_BLOCKED:
             LOG.warning("[REMOTE WP POST BLOCKED] 원격 WordPress POST 차단됨 — 실제 요청을 보내지 않음 (endpoint=%s)", endpoint)
+            return "FAILED"
+
+        # 추가 방어선(2차): DI/NullPublisher가 기본 경로이지만, 어떤 이유로든
+        # 실제 WordPressPublisher가 pytest/CI 프로세스 안에서 만들어지고 여기까지
+        # 도달하는 경우를 대비한 독립적인 안전장치. 이 하나에만 의존하지 않는다.
+        if "PYTEST_CURRENT_TEST" in os.environ or os.environ.get("CI", "").lower() == "true":
+            LOG.error("[SAFETY] pytest/CI 환경에서 실제 WordPress POST 시도 차단 (endpoint=%s)", endpoint)
             return "FAILED"
 
         try:

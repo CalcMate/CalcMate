@@ -2,16 +2,18 @@
 """tests/content_pipeline_integration_test.py — 파이프라인 통합 테스트"""
 import pytest
 from content_pipeline.orchestrator import ContentPipelineOrchestrator
+from content_pipeline.publish_gate import PublishGate
+from content_pipeline.publisher_base import NullPublisher
 from unittest.mock import patch
 
 @pytest.fixture
 def orchestrator():
-    return ContentPipelineOrchestrator()
+    # DI: 실제 WordPressPublisher 대신 NullPublisher를 명시적으로 주입한다.
+    return ContentPipelineOrchestrator(gate=PublishGate(publisher=NullPublisher()))
 
 def test_pipeline_normal_flow(orchestrator):
     """Test 1: 전체 정상 Flow"""
-    with patch.object(orchestrator.adapter, 'run_h4a_quality', return_value={"status": "PASS", "data": {}}), \
-         patch.object(orchestrator.gate.publisher, 'create_draft', return_value="123"):
+    with patch.object(orchestrator.adapter, 'run_h4a_quality', return_value={"status": "PASS", "data": {}}):
         state = orchestrator.run("calc1", {"profile": {"topics": ["계산 방법"]}})
         assert state.data["status"] == "SUCCESS"
         assert "PUBLISH" in state.data["results"]
